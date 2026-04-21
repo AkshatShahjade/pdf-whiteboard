@@ -3,14 +3,14 @@ Functionality Important
     - text font to helvetica
     - remove artificial smoothening done to the pen tool
     - set default to pen tool when whiteboard it opened
-- Keyboard Shortcuts
-    - Tldraw: v, d, t
-    - PDF: s, ,x
-    - Esc should deselect text box. If no text box then it should deselect region
-- Add freeform and section select tools
+
+- Add freeform and section select tools. 
+When you click the selection set button, 3 mini buttons pop up horixontally to the left of it. One is highlighted. First is section_start, the other is Section end. Only one can be on at a time. If sselection start is on and you click somewher, the y value of the click is noted as the start ofthe selection (clikcing elsewhere updates this value). Similarly then you would click the selection_end button and set the end point of the section selection. Visually, at the beginning both buttons are red, then when one is clicked (it is still red but highlighted), then when a point is clicked and a limit is set, then that button turns green. Similarly for the other button. THe third button is the confirm button. It is disabled and can't be clicked unless both the other 2 buttonsturn green. (The green button that is selected will be highlighted more). When theconfirm button is activated and clicked, the selection is mad (it is just a y_start and y_end value when it comes to specifying region...).
+The UI of the selection sort is special. Don't just shade the whole region in a translucent color, instead think in terms of a small strip line across the left edge of the page of 5-10px in the color of that region, that you can click to open its whiteboard.  
 
 UI imp
-- UI is too dark and hard to read. Also make it all translucent so you can see the pdf behind it
+- UI is too dark and hard to read- make more visible, but still dark. Also make all the options and settings that overlay the pdf translucent so you can see the pdf behind it
 UI not imp
 - Making the rectangle box boundaries thickness a little more
 - Page Numbers
+- Make the Verticle Scroll in the PDF Pane visible.

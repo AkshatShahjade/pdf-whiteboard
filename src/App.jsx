@@ -61,7 +61,8 @@ const regionColor = (id) =>
 // ─── LazyPage Component ────────────────────────────────────────────────────────
 // Only renders the heavy PDF canvas when it scrolls near the viewport.
 function LazyPage({ pageNumber, width, scale }) {
-  const [isVisible, setIsVisible] = useState(false);
+  // Eagerly load the first 2 pages instantly. Lazy load the rest.
+  const [isVisible, setIsVisible] = useState(pageNumber <= 2);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -221,6 +222,18 @@ export default function Root() {
 function WorkspaceApp({ pdfPath, settings, onHome }) {
   const PDF_WIDTH = 800;
 
+  // PDF
+  const [numPages, setNumPages]   = useState(null);
+  const [pdfReady, setPdfReady]   = useState(false);
+  const [pdfData, setPdfData]     = useState(null); // <-- Add this new state
+  const pdfScrollRef = useRef(null);
+
+  // ── Stable Reference for PDF Data ──
+  // Prevents react-pdf from infinite-reloading and detaching the memory buffer
+  const documentFile = useMemo(() => {
+    return pdfData ? { data: pdfData } : null;
+  }, [pdfData]);
+
   // ── Restore session synchronously from localStorage ──────────────────────
   const restoredSession = useMemo(() => loadSession(pdfPath), [pdfPath]);
 
@@ -231,10 +244,6 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
   const [zoom, setZoom] = useState(1);
   const containerRef = useRef(null);
 
-  // PDF
-  const [numPages, setNumPages]   = useState(null);
-  const [pdfReady, setPdfReady]   = useState(false);
-  const pdfScrollRef = useRef(null);
 
   // Tools & Regions
   const [tool, setTool]                   = useState('select');
@@ -247,10 +256,11 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const pdfContentRef = useRef(null);
 
+
   // ── Auto-Scroll Refs ──
   const mousePosRef = useRef({ x: 0, y: 0 });
   const scrollAnimRef = useRef(null);
-  const dragStateRef = useRef({ currentDrag, movingRegion });
+  const dragStateRef = useRef({ currentDrag: null, movingRegion: null }); // Initialize with nulls
 
   // Keep a stable ref of drag state for the animation frame
   useEffect(() => { 
@@ -308,6 +318,21 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
 
   const debouncedScrollSave = useMemo(() => debounce(persistSession, 400), [persistSession]);
   const handleScroll = useCallback(() => { debouncedScrollSave(); }, [debouncedScrollSave]);
+
+  // ── Load PDF directly into Memory to bypass Tauri streaming bugs ──
+  useEffect(() => {
+    let active = true;
+    setPdfData(null); // Reset when switching files
+    
+    fetch(pdfPath)
+      .then(res => res.arrayBuffer())
+      .then(buffer => {
+        if (active) setPdfData(new Uint8Array(buffer)); // Pass raw binary to state
+      })
+      .catch(err => console.error("Failed to load PDF to memory:", err));
+      
+    return () => { active = false; };
+  }, [pdfPath]);
 
   useEffect(() => {
     const onMove = (e) => {
@@ -388,26 +413,6 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
     setMovingRegion(null);
   }, [currentDrag, zoom]);
 
-  const handleBorderClick = useCallback(async (e, regionId) => {
-    e.stopPropagation();
-    
-    if (tool === 'remove') {
-      // Trigger the native OS confirmation dialog
-      const isConfirmed = await confirm(
-        'Are you sure you want to delete this region? Its whiteboard data will be permanently lost.', 
-        { title: 'Delete Whiteboard', kind: 'warning' }
-      );
-
-      if (isConfirmed) {
-        setRegions((prev) => prev.filter((r) => r.id !== regionId));
-        deleteWhiteboard(regionId);
-        if (selectedRegionId === regionId) setSelectedRegionId(null);
-      }
-    } else if (tool === 'select') {
-      setSelectedRegionId(regionId);
-    }
-  }, [tool, selectedRegionId]);
-
   // ── Auto-Scroll During Drag ──
   useEffect(() => {
     const isDragging = !!currentDrag || !!movingRegion;
@@ -464,6 +469,27 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
     scrollAnimRef.current = requestAnimationFrame(scrollStep);
     return () => cancelAnimationFrame(scrollAnimRef.current);
   }, [currentDrag, movingRegion, getUnscaledCoordsFromClient]);
+
+  const handleBorderClick = useCallback(async (e, regionId) => {
+    e.stopPropagation();
+    
+    if (tool === 'remove') {
+      // Trigger the native OS confirmation dialog
+      const isConfirmed = await confirm(
+        'Are you sure you want to delete this region? Its whiteboard data will be permanently lost.', 
+        { title: 'Delete Whiteboard', kind: 'warning' }
+      );
+
+      if (isConfirmed) {
+        setRegions((prev) => prev.filter((r) => r.id !== regionId));
+        deleteWhiteboard(regionId);
+        if (selectedRegionId === regionId) setSelectedRegionId(null);
+      }
+    } else if (tool === 'select') {
+      setSelectedRegionId(regionId);
+    }
+  }, [tool, selectedRegionId]);
+
 
   useEffect(() => {
     const onKey = (e) => {
@@ -571,25 +597,29 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
               boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
             }}
           >
-            <Document 
-              file={pdfPath} 
-              onLoadSuccess={({ numPages }) => {
-                setNumPages(numPages);
-                // Trigger scroll restoration immediately. Because our LazyPages 
-                // have perfect placeholder heights, the scroll jump will be perfectly accurate!
-                setPdfReady(true); 
-              }}
-              onLoadError={(error) => console.error("PDF Load Error:", error)}
-            >
-              {Array.from({ length: numPages ?? 0 }, (_, i) => (
-                <LazyPage
-                  key={`${pdfPath}-${i}`}
-                  pageNumber={i + 1}
-                  width={PDF_WIDTH}
-                  scale={zoom}
-                />
-              ))}
-            </Document>
+            {documentFile ? (
+              <Document 
+                file={documentFile} 
+                onLoadSuccess={({ numPages }) => {
+                  setNumPages(numPages);
+                  setPdfReady(true);
+                }}
+                onLoadError={(error) => console.error("PDF Load Error:", error)}
+              >
+                {Array.from({ length: numPages ?? 0 }, (_, i) => (
+                  <LazyPage
+                    key={`${pdfPath}-${i}`}
+                    pageNumber={i + 1}
+                    width={PDF_WIDTH}
+                    scale={zoom}
+                  />
+                ))}
+              </Document>
+            ) : (
+              <div style={{ padding: '40px', color: '#9ca3af', fontSize: '12px', textAlign: 'center' }}>
+                Loading document into memory...
+              </div>
+            )}
 
             {/* Scaled SVG overlay */}
             <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible', zIndex: 10, pointerEvents: 'none' }}>
