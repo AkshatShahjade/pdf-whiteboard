@@ -13,6 +13,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { loadSession } from './storage.js';
+import { open } from '@tauri-apps/plugin-dialog';
+import { convertFileSrc } from '@tauri-apps/api/core';
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -128,28 +130,21 @@ function CornerMark({ pos }) {
   );
 }
 
-// ── Drop Zone ─────────────────────────────────────────────────────────────────
-function DropZone({ onFile }) {
+function DropZone({ onBrowseClick }) {
   const [dragging, setDragging] = useState(false);
-  const inputRef = useRef(null);
 
+  // Note: Web-based drag-and-drop is disabled in favor of native dialogs
   const handleDrop = useCallback((e) => {
     e.preventDefault(); setDragging(false);
-    const file = [...e.dataTransfer.files].find(f => f.type === 'application/pdf');
-    if (file) onFile(file);
-  }, [onFile]);
-
-  const handleChange = useCallback((e) => {
-    const file = e.target.files?.[0];
-    if (file) onFile(file);
-  }, [onFile]);
+    alert("Please click to open files natively in Tauri.");
+  }, []);
 
   return (
     <div
       onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
-      onClick={() => inputRef.current?.click()}
+      onClick={onBrowseClick}
       style={{
         position: 'relative',
         border: `1.5px ${dragging ? 'solid' : 'dashed'} ${dragging ? '#3B82F6' : '#2a2d36'}`,
@@ -162,7 +157,6 @@ function DropZone({ onFile }) {
         backdropFilter: 'blur(4px)',
       }}
     >
-      {/* Animated ring on drag */}
       {dragging && (
         <div style={{
           position: 'absolute', inset: -1, borderRadius: '10px',
@@ -183,13 +177,8 @@ function DropZone({ onFile }) {
         {dragging ? 'Drop to open' : 'Open a PDF'}
       </div>
       <div style={{ fontSize: '11px', color: '#4b5563' }}>
-        drag & drop · or click to browse
+        click to browse your system files
       </div>
-      <input
-        ref={inputRef} type="file" accept=".pdf"
-        onChange={handleChange}
-        style={{ display: 'none' }}
-      />
     </div>
   );
 }
@@ -511,11 +500,25 @@ export default function HomeScreen({ onOpen }) {
     saveSettings(s);
   }, []);
 
-  const handleFile = useCallback((file) => {
-    const path = URL.createObjectURL(file);
-    const entry = { path, name: file.name, openedAt: Date.now(), isLocal: true };
-    pushRecent(entry);
-    onOpen(path, file, settings);
+  // ── Native Tauri File Browser ──
+  const handleBrowseClick = useCallback(async () => {
+    try {
+      const selectedPath = await open({
+        multiple: false,
+        filters: [{ name: 'PDF', extensions: ['pdf'] }]
+      });
+
+      if (selectedPath) {
+        const safeUrl = convertFileSrc(selectedPath);
+        const name = selectedPath.split(/[/\\]/).pop();
+        
+        const entry = { path: safeUrl, name: name, openedAt: Date.now(), isLocal: true };
+        pushRecent(entry);
+        onOpen(safeUrl, null, settings);
+      }
+    } catch (err) {
+      console.error("Failed to open file via Tauri native dialog:", err);
+    }
   }, [onOpen, settings]);
 
   const handleRecentOpen = useCallback((entry) => {
@@ -628,7 +631,7 @@ export default function HomeScreen({ onOpen }) {
 
         {/* Drop zone */}
         <div style={fadeIn(0.12)}>
-          <DropZone onFile={handleFile} />
+        <DropZone onBrowseClick={handleBrowseClick} />
         </div>
 
         {/* Recents */}
