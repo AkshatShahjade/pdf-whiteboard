@@ -57,6 +57,8 @@ const regionColor = (id) =>
 
 // ─── LazyPage Component ────────────────────────────────────────────────────────
 // Only renders the heavy PDF canvas when it scrolls near the viewport.
+// ─── LazyPage Component ────────────────────────────────────────────────────────
+// Only renders the heavy PDF canvas when it scrolls near the viewport.
 function LazyPage({ pageNumber, width, scale }) {
   const [isVisible, setIsVisible] = useState(false);
   const ref = useRef(null);
@@ -64,7 +66,6 @@ function LazyPage({ pageNumber, width, scale }) {
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
-        // If the page comes within 800px of the screen, trigger the render
         if (entry.isIntersecting) setIsVisible(true);
       },
       { rootMargin: '800px 0px' } 
@@ -73,12 +74,16 @@ function LazyPage({ pageNumber, width, scale }) {
     return () => observer.disconnect();
   }, []);
 
-  // Use the standard A4 ratio (1.414) to create a mathematically accurate 
-  // invisible placeholder. This keeps the scrollbar size perfect!
   const placeholderHeight = width * scale * 1.414;
 
   return (
-    <div ref={ref} style={{ minHeight: placeholderHeight, position: 'relative' }}>
+    <div ref={ref} style={{ 
+      minHeight: placeholderHeight, 
+      position: 'relative',
+      borderBottom: '2px solid rgba(242, 23, 23, 0.92)', // Faint divider line
+      marginBottom: '6px',
+      paddingBottom: '6px'
+    }}>
       {isVisible && (
         <Page
           pageNumber={pageNumber}
@@ -243,6 +248,16 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const pdfContentRef = useRef(null);
 
+  // ── Auto-Scroll Refs ──
+  const mousePosRef = useRef({ x: 0, y: 0 });
+  const scrollAnimRef = useRef(null);
+  const dragStateRef = useRef({ currentDrag, movingRegion });
+
+  // Keep a stable ref of drag state for the animation frame
+  useEffect(() => { 
+    dragStateRef.current = { currentDrag, movingRegion }; 
+  }, [currentDrag, movingRegion]);
+
   // ── Session persistence logic (unchanged) ───────────────────────────────
   const debouncedSaveSession = useMemo(
     () => debounce((data) => {
@@ -308,11 +323,19 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
   }, [isResizing]);
 
-  // ── Coordinate Translation for Zoom ───────────────────────────────────────
-  const getUnscaledCoords = useCallback((e) => {
-    const coords = getLocalCoords(e, pdfContentRef);
-    return { x: coords.x / zoom, y: coords.y / zoom };
+  // ── Coordinate Translation for Zoom & Auto-Scroll ──────────────────────────
+  const getUnscaledCoordsFromClient = useCallback((clientX, clientY) => {
+    if (!pdfContentRef.current) return { x: 0, y: 0 };
+    const rect = pdfContentRef.current.getBoundingClientRect();
+    return { 
+      x: (clientX - rect.left) / zoom, 
+      y: (clientY - rect.top) / zoom 
+    };
   }, [zoom]);
+
+  const getUnscaledCoords = useCallback((e) => {
+    return getUnscaledCoordsFromClient(e.clientX, e.clientY);
+  }, [getUnscaledCoordsFromClient]);
 
   // ── PDF mouse handlers ────────────────────────────────────────────────────
   const handleDivMouseDown = useCallback((e) => {
@@ -338,7 +361,9 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
   }, [tool, regions, zoom, getUnscaledCoords]);
 
   const handleDivMouseMove = useCallback((e) => {
+    mousePosRef.current = { x: e.clientX, y: e.clientY }; // Track for auto-scroll
     const coords = getUnscaledCoords(e);
+    
     if (currentDrag) setCurrentDrag((p) => ({ ...p, currentX: coords.x, currentY: coords.y }));
     if (movingRegion) {
       setRegions((prev) =>
@@ -374,6 +399,63 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
       setSelectedRegionId(regionId);
     }
   }, [tool, selectedRegionId]);
+
+  // ── Auto-Scroll During Drag ──
+  useEffect(() => {
+    const isDragging = !!currentDrag || !!movingRegion;
+    
+    if (!isDragging) {
+      if (scrollAnimRef.current) cancelAnimationFrame(scrollAnimRef.current);
+      return;
+    }
+
+    const scrollStep = () => {
+      if (pdfScrollRef.current) {
+        const rect = pdfScrollRef.current.getBoundingClientRect();
+        const edgeThreshold = 80; // How close to the edge to trigger scroll
+        const maxSpeed = 22; // Pixels per frame max speed
+        let scrolled = false;
+        const { y: clientY, x: clientX } = mousePosRef.current;
+
+        // Scroll Up
+        if (clientY < rect.top + edgeThreshold) {
+          const intensity = 1 - Math.max(0, clientY - rect.top) / edgeThreshold;
+          pdfScrollRef.current.scrollTop -= maxSpeed * Math.pow(intensity, 1.5);
+          scrolled = true;
+        } 
+        // Scroll Down
+        else if (clientY > rect.bottom - edgeThreshold) {
+          const intensity = 1 - Math.max(0, rect.bottom - clientY) / edgeThreshold;
+          pdfScrollRef.current.scrollTop += maxSpeed * Math.pow(intensity, 1.5);
+          scrolled = true;
+        }
+
+        // If the screen moved, we must recalculate the document coordinates
+        // so the rectangle visually stretches with the scrolling document.
+        if (scrolled) {
+          const coords = getUnscaledCoordsFromClient(clientX, clientY);
+          const state = dragStateRef.current;
+          
+          if (state.currentDrag) {
+            setCurrentDrag(p => p ? { ...p, currentX: coords.x, currentY: coords.y } : p);
+          }
+          if (state.movingRegion) {
+            setRegions((prev) =>
+              prev.map((r) =>
+                r.id === state.movingRegion.id
+                  ? { ...r, x: coords.x - state.movingRegion.offsetX, y: coords.y - state.movingRegion.offsetY }
+                  : r
+              )
+            );
+          }
+        }
+      }
+      scrollAnimRef.current = requestAnimationFrame(scrollStep);
+    };
+
+    scrollAnimRef.current = requestAnimationFrame(scrollStep);
+    return () => cancelAnimationFrame(scrollAnimRef.current);
+  }, [currentDrag, movingRegion, getUnscaledCoordsFromClient]);
 
   useEffect(() => {
     const onKey = (e) => {
