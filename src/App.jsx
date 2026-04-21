@@ -5,12 +5,11 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import {
   saveSession, loadSession,
   saveWhiteboard, loadWhiteboard, deleteWhiteboard,
-  debounce,
+  debounce, performRollingBackup
 } from './storage.js';
 import HomeScreen, { loadSettings } from './HomeScreen.jsx';
 import { confirm } from '@tauri-apps/plugin-dialog';
 
-// Change to this:
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -44,33 +43,46 @@ const isNearBorder = (coords, r, threshold = STROKE_HIT_WIDTH / 2) => {
   );
 };
 
-const isInsideRect = (coords, r, margin = STROKE_HIT_WIDTH / 2) =>
-  coords.x > r.x + margin && coords.x < r.x + r.w - margin &&
-  coords.y > r.y + margin && coords.y < r.y + r.h - margin;
+const sqr = (x) => x * x;
+const dist2 = (v, w) => sqr(v.x - w.x) + sqr(v.y - w.y);
+
+const distToSegmentSquared = (p, v, w) => {
+  const l2 = dist2(v, w);
+  if (l2 === 0) return dist2(p, v);
+  let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+  t = Math.max(0, Math.min(1, t));
+  return dist2(p, { x: v.x + t * (w.x - v.x), y: v.y + t * (w.y - v.y) });
+};
+
+const isNearLassoBorder = (coords, r, threshold) => {
+  if (coords.x < r.x - threshold || coords.x > r.x + r.w + threshold ||
+      coords.y < r.y - threshold || coords.y > r.y + r.h + threshold) return false;
+
+  const thresh2 = threshold * threshold;
+  for(let i=0; i<r.points.length; i++) {
+    const p1 = { x: r.x + r.points[i].x, y: r.y + r.points[i].y };
+    const p2 = { x: r.x + r.points[(i+1)%r.points.length].x, y: r.y + r.points[(i+1)%r.points.length].y };
+    if (distToSegmentSquared(coords, p1, p2) <= thresh2) return true;
+  }
+  return false;
+};
 
 // ─── Region colour palette ────────────────────────────────────────────────────
 const REGION_COLORS = [
   '#3B82F6', '#10B981', '#F59E0B', '#EF4444',
   '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16',
 ];
-const regionColor = (id) =>
-  REGION_COLORS[parseInt(id.replace('reg_', ''), 10) % REGION_COLORS.length];
+const regionColor = (id) => REGION_COLORS[parseInt(id.replace('reg_', ''), 10) % REGION_COLORS.length];
 
 // ─── LazyPage Component ────────────────────────────────────────────────────────
-// Only renders the heavy PDF canvas when it scrolls near the viewport.
-// ─── LazyPage Component ────────────────────────────────────────────────────────
-// Only renders the heavy PDF canvas when it scrolls near the viewport.
 function LazyPage({ pageNumber, width, scale }) {
-  // Eagerly load the first 2 pages instantly. Lazy load the rest.
   const [isVisible, setIsVisible] = useState(pageNumber <= 2);
   const ref = useRef(null);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) setIsVisible(true);
-      },
-      { rootMargin: '800px 0px' } 
+      ([entry]) => { if (entry.isIntersecting) setIsVisible(true); },
+      { rootMargin: '800px 0px' }
     );
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
@@ -79,30 +91,18 @@ function LazyPage({ pageNumber, width, scale }) {
   const placeholderHeight = width * scale * 1.414;
 
   return (
-    <div ref={ref} style={{ 
-      minHeight: placeholderHeight, 
-      position: 'relative',
-      borderBottom: '2px solid rgba(0, 0, 0, 0.92)', // Faint divider line
-    }}>
+    <div ref={ref} style={{ minHeight: placeholderHeight, position: 'relative', borderBottom: '2px solid rgba(0, 0, 0, 0.92)' }}>
       {isVisible && (
-        <Page
-          pageNumber={pageNumber}
-          width={width}
-          scale={scale}
-          renderTextLayer={false}
-          renderAnnotationLayer={false}
-        />
+        <Page pageNumber={pageNumber} width={width} scale={scale} renderTextLayer={false} renderAnnotationLayer={false} />
       )}
     </div>
   );
 }
 
 // ─── SaveIndicator ────────────────────────────────────────────────────────────
-// Small transient badge that appears whenever a save fires.
 function SaveIndicator({ savedAt }) {
   const [visible, setVisible] = useState(false);
   const prev = useRef(null);
-
   useEffect(() => {
     if (savedAt && savedAt !== prev.current) {
       prev.current = savedAt;
@@ -111,34 +111,23 @@ function SaveIndicator({ savedAt }) {
       return () => clearTimeout(t);
     }
   }, [savedAt]);
-
   return (
-    <span style={{
-      fontSize: '10px',
-      color: visible ? '#10B981' : 'transparent',
-      transition: 'color 0.4s',
-      fontFamily: "'IBM Plex Mono', monospace",
-      letterSpacing: '0.02em',
-    }}>
+    <span style={{ fontSize: '10px', color: visible ? '#34D399' : 'transparent', transition: 'color 0.4s', fontFamily: "'IBM Plex Mono', monospace", letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
       ✓ saved
     </span>
   );
 }
 
 // ─── WhiteboardPane ───────────────────────────────────────────────────────────
-// Isolated component so each region's Tldraw instance mounts fresh (via key),
-// loads its snapshot from IndexedDB on mount, and auto-saves on every change.
 function WhiteboardPane({ regionId }) {
-  // Loaded snapshot from IDB — null means "not yet loaded", undefined means "no saved data"
   const [snapshot, setSnapshot] = useState(null);
   const [loaded, setLoaded]     = useState(false);
 
-  // Load snapshot from IDB when regionId changes (i.e. on mount of this instance)
   useEffect(() => {
     let cancelled = false;
     loadWhiteboard(regionId).then((snap) => {
       if (!cancelled) {
-        setSnapshot(snap ?? undefined); // undefined = no prior save, Tldraw starts blank
+        setSnapshot(snap ?? undefined);
         setLoaded(true);
       }
     });
@@ -147,11 +136,7 @@ function WhiteboardPane({ regionId }) {
 
   if (!loaded) {
     return (
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        height: '100%', background: '#0f1117',
-        color: '#4b5563', fontSize: '12px', fontFamily: "'IBM Plex Mono', monospace",
-      }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', background: '#1c1f26', color: '#9ca3af', fontSize: '12px', fontFamily: "'IBM Plex Mono', monospace" }}>
         loading workspace…
       </div>
     );
@@ -160,62 +145,48 @@ function WhiteboardPane({ regionId }) {
   return <TldrawWithPersistence regionId={regionId} initialSnapshot={snapshot} />;
 }
 
-// Inner component — runs inside Tldraw's React context so it can call useEditor()
 function TldrawWithPersistence({ regionId, initialSnapshot }) {
-  // Debounced save function, stable for this regionId
-  const debouncedSave = useMemo(
-    () => debounce((snap) => saveWhiteboard(regionId, snap), 800),
-    [regionId]
-  );
+  const debouncedSave = useMemo(() => debounce((snap) => saveWhiteboard(regionId, snap), 800), [regionId]);
 
   const handleMount = useCallback((editor) => {
-    // Restore snapshot if one exists
     if (initialSnapshot) {
-      try {
-        editor.loadSnapshot(initialSnapshot);
-      } catch (err) {
-        console.warn('[LemmaMap] snapshot restore failed for', regionId, err);
-      }
+      try { editor.loadSnapshot(initialSnapshot); } catch (err) { console.warn(err); }
     }
+    editor.setCurrentTool('draw');
+    editor.updateInstanceState({ exportBackground: false });
 
-    // Auto-save on every store change (shapes added/moved/deleted, etc.)
+    // (The invalid updateUserPreferences call that caused the crash was removed from here)
+
     const unsub = editor.store.listen(
       () => { debouncedSave(editor.getSnapshot()); },
       { source: 'user', scope: 'document' }
     );
-
-    // Flush on unmount so no changes are lost when switching regions
-    return () => {
-      unsub();
-      debouncedSave.flush(editor.getSnapshot());
-    };
+    return () => { unsub(); debouncedSave.flush(editor.getSnapshot()); };
   }, [initialSnapshot, debouncedSave, regionId]);
 
-  return <Tldraw onMount={handleMount} />;
+  return (
+    <>
+      <style>{`
+        /* Overrides tldraw's default internal font variables */
+        .tl-container {
+          --tl-font-draw: 'Helvetica', Arial, sans-serif;
+          --tl-font-sans: 'Helvetica', Arial, sans-serif;
+          --tl-font-serif: 'Helvetica', Arial, sans-serif;
+          --tl-font-mono: 'Helvetica', Arial, sans-serif;
+        }
+      `}</style>
+      <Tldraw onMount={handleMount} />
+    </>
+  );
 }
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
-// Simple client-side router: HomeScreen ↔ WorkspaceApp
 export default function Root() {
-  const [session, setSession] = useState(null); // { pdfPath, settings }
-
+  const [session, setSession] = useState(null);
   if (!session) {
-    return (
-      <HomeScreen
-        onOpen={(pdfPath, pdfFile, settings) =>
-          setSession({ pdfPath, settings })
-        }
-      />
-    );
+    return <HomeScreen onOpen={(pdfPath, pdfFile, settings) => setSession({ pdfPath, settings })} />;
   }
-
-  return (
-    <WorkspaceApp
-      pdfPath={session.pdfPath}
-      settings={session.settings}
-      onHome={() => setSession(null)}
-    />
-  );
+  return <WorkspaceApp pdfPath={session.pdfPath} settings={session.settings} onHome={() => setSession(null)} />;
 }
 
 // ─── WorkspaceApp ─────────────────────────────────────────────────────────────
@@ -225,16 +196,9 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
   // PDF
   const [numPages, setNumPages]   = useState(null);
   const [pdfReady, setPdfReady]   = useState(false);
-  const [pdfData, setPdfData]     = useState(null); // <-- Add this new state
+  const [pdfData, setPdfData]     = useState(null);
   const pdfScrollRef = useRef(null);
-
-  // ── Stable Reference for PDF Data ──
-  // Prevents react-pdf from infinite-reloading and detaching the memory buffer
-  const documentFile = useMemo(() => {
-    return pdfData ? { data: pdfData } : null;
-  }, [pdfData]);
-
-  // ── Restore session synchronously from localStorage ──────────────────────
+  const documentFile = useMemo(() => pdfData ? { data: pdfData } : null, [pdfData]);
   const restoredSession = useMemo(() => loadSession(pdfPath), [pdfPath]);
 
   // Layout & UI State
@@ -242,32 +206,191 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
   const [isResizing, setIsResizing] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageInput, setPageInput]     = useState('1');
   const containerRef = useRef(null);
 
+  // Focus State: determines which shortcuts fire (updated on hover)
+  const [activePane, setActivePane] = useState('pdf');
 
   // Tools & Regions
   const [tool, setTool]                   = useState('select');
   const [regions, setRegions]             = useState(restoredSession?.regions ?? []);
   const [selectedRegionId, setSelectedRegionId] = useState(restoredSession?.selectedRegionId ?? null);
 
+  // Tools Specific State
+  const [sectionY, setSectionY] = useState({ start: null, end: null });
+  const [sectionTarget, setSectionTarget] = useState('start');
+  const [editingSectionId, setEditingSectionId] = useState(null);
+
+  // Edit mode for Rect and Lasso
+  const [editingShapeId, setEditingShapeId] = useState(null);
+  const [shapeBackup, setShapeBackup]       = useState(null);
+  const [lassoPoints, setLassoPoints] = useState(null);
+
   // Drag / move state
   const [currentDrag, setCurrentDrag]   = useState(null);
   const [movingRegion, setMovingRegion] = useState(null);
+
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const pdfContentRef = useRef(null);
 
-
-  // ── Auto-Scroll Refs ──
   const mousePosRef = useRef({ x: 0, y: 0 });
   const scrollAnimRef = useRef(null);
-  const dragStateRef = useRef({ currentDrag: null, movingRegion: null }); // Initialize with nulls
+  const dragStateRef = useRef({ currentDrag, movingRegion, lassoPoints });
+  const zoomTimeoutRef = useRef(null);
 
-  // Keep a stable ref of drag state for the animation frame
-  useEffect(() => { 
-    dragStateRef.current = { currentDrag, movingRegion }; 
-  }, [currentDrag, movingRegion]);
+  // Toast State
+  const [toast, setToast] = useState(null);
+  const showToast = useCallback((msg, type = 'info') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  }, []);
 
-  // ── Session persistence logic (unchanged) ───────────────────────────────
+  useEffect(() => { dragStateRef.current = { currentDrag, movingRegion, lassoPoints }; }, [currentDrag, movingRegion, lassoPoints]);
+
+  // Native Ctrl+Scroll for zooming / Shift+Scroll for horizontal pan
+  useEffect(() => {
+    const pdfWrapper = pdfScrollRef.current;
+    if (!pdfWrapper) return;
+
+    const handleWheel = (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+
+        if (!zoomTimeoutRef.current) {
+          zoomTimeoutRef.current = setTimeout(() => {
+            zoomTimeoutRef.current = null;
+          }, 250);
+          if (e.deltaY > 0) {
+            setZoom(z => Math.max(0.5, z - 0.25));
+          } else {
+            setZoom(z => Math.min(3.0, z + 0.25));
+          }
+        }
+      } else if (e.shiftKey) {
+        if (e.deltaY !== 0 && e.deltaX === 0) {
+          e.preventDefault();
+          pdfWrapper.scrollLeft += e.deltaY;
+        }
+      }
+    };
+
+    pdfWrapper.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      pdfWrapper.removeEventListener('wheel', handleWheel);
+      if (zoomTimeoutRef.current) clearTimeout(zoomTimeoutRef.current);
+    };
+  }, []);
+
+  // Keyboard Shortcuts (Capture Phase)
+  const handleKeyDown = useCallback((e) => {
+    const target = e.target;
+    const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable || target.closest('.tl-layer');
+    if (isTyping) return;
+
+    if (e.key === '\\' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      if (!selectedRegionId) return;
+      setLeftPct(55);
+      return;
+    }
+
+    if (e.key === '0' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      setZoom(1);
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (editingShapeId) {
+         setEditingShapeId(null);
+         setShapeBackup(null);
+         setTool('select');
+      } else if (tool === 'section' && sectionY.start !== null && sectionY.end !== null) {
+         const y1 = Math.min(sectionY.start, sectionY.end);
+         const y2 = Math.max(sectionY.start, sectionY.end);
+         if (editingSectionId) {
+             setRegions(prev => prev.map(r => r.id === editingSectionId ? { ...r, y: y1, h: y2 - y1 } : r));
+             setSelectedRegionId(editingSectionId);
+             setEditingSectionId(null);
+         } else {
+             const newId = `reg_${Date.now()}`;
+             setRegions(prev => [...prev, { id: newId, type: 'section', x: 0, y: y1, w: 16, h: y2 - y1 }]);
+             setSelectedRegionId(newId);
+         }
+         setTool('select');
+      }
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      if (editingShapeId) {
+         setRegions(prev => prev.map(r => r.id === shapeBackup?.id ? shapeBackup : r));
+         setEditingShapeId(null);
+         setShapeBackup(null);
+         setTool('select');
+      } else if (tool === 'section' && (editingSectionId || sectionY.start !== null || sectionY.end !== null)) {
+         setEditingSectionId(null);
+         setSectionY({ start: null, end: null });
+         setSectionTarget('start');
+         setTool('select');
+      } else if (editingSectionId) {
+         setEditingSectionId(null);
+         setTool('select');
+      } else {
+         setSelectedRegionId(null);
+      }
+      return;
+    }
+
+    if (activePane === 'pdf') {
+      const k = e.key.toLowerCase();
+      if (k === 'v') setTool('select');
+      else if (k === 'r') setTool('rect');
+      else if (k === 'c') setTool('lasso');
+      else if (k === 's') setTool(t => t === 'section' ? 'select' : 'section');
+      else if (k === 'x') setTool('remove');
+      e.stopPropagation();
+    }
+  }, [activePane, selectedRegionId, editingShapeId, shapeBackup, editingSectionId, sectionY, tool]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [handleKeyDown]);
+
+  const sectionWidths = useMemo(() => {
+    const widths = {};
+    const sections = regions.filter(r => r.type === 'section');
+    const sorted = [...sections].sort((a, b) => b.h - a.h);
+
+    sorted.forEach(s => {
+      let maxParentWidth = 16;
+      sorted.forEach(other => {
+        if (s.id !== other.id && other.y <= s.y + 1 && (other.y + other.h) >= (s.y + s.h) - 1) {
+          if (widths[other.id] > maxParentWidth) maxParentWidth = widths[other.id];
+        }
+      });
+      widths[s.id] = maxParentWidth + 8;
+    });
+    return widths;
+  }, [regions]);
+
+  useEffect(() => {
+    if (tool !== 'section') {
+      setSectionY({ start: null, end: null });
+      setSectionTarget('start');
+      setEditingSectionId(null);
+    }
+    if (tool !== 'lasso') setLassoPoints(null);
+    if (tool !== 'rect' && tool !== 'lasso') {
+      setEditingShapeId(null);
+      setShapeBackup(null);
+    }
+  }, [tool]);
+
   const debouncedSaveSession = useMemo(
     () => debounce((data) => {
       saveSession(pdfPath, data);
@@ -317,20 +440,40 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
   }, [pdfReady, restoredSession]);
 
   const debouncedScrollSave = useMemo(() => debounce(persistSession, 400), [persistSession]);
-  const handleScroll = useCallback(() => { debouncedScrollSave(); }, [debouncedScrollSave]);
+  const handleScroll = useCallback(() => {
+    debouncedScrollSave();
+    if (pdfScrollRef.current) {
+      const pageHeight = PDF_WIDTH * zoom * 1.414;
+      const newPage = Math.floor(pdfScrollRef.current.scrollTop / pageHeight) + 1;
+      setCurrentPage(newPage);
+      if (document.activeElement?.id !== 'page-input') {
+        setPageInput(String(newPage));
+      }
+    }
+  }, [debouncedScrollSave, zoom]);
 
-  // ── Load PDF directly into Memory to bypass Tauri streaming bugs ──
+  const handlePageSubmit = (e) => {
+    if (e.key === 'Enter') {
+      const target = parseInt(pageInput);
+      if (!isNaN(target) && target > 0 && target <= (numPages || 1)) {
+        if (pdfScrollRef.current) {
+          const pageHeight = PDF_WIDTH * zoom * 1.414;
+          pdfScrollRef.current.scrollTop = (target - 1) * pageHeight;
+        }
+      } else {
+        setPageInput(String(currentPage));
+      }
+      document.activeElement?.blur();
+    }
+  };
+
   useEffect(() => {
     let active = true;
-    setPdfData(null); // Reset when switching files
-    
+    setPdfData(null);
     fetch(pdfPath)
       .then(res => res.arrayBuffer())
-      .then(buffer => {
-        if (active) setPdfData(new Uint8Array(buffer)); // Pass raw binary to state
-      })
+      .then(buffer => { if (active) setPdfData(new Uint8Array(buffer)); })
       .catch(err => console.error("Failed to load PDF to memory:", err));
-      
     return () => { active = false; };
   }, [pdfPath]);
 
@@ -347,76 +490,148 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
   }, [isResizing]);
 
-  // ── Coordinate Translation for Zoom & Auto-Scroll ──────────────────────────
   const getUnscaledCoordsFromClient = useCallback((clientX, clientY) => {
     if (!pdfContentRef.current) return { x: 0, y: 0 };
     const rect = pdfContentRef.current.getBoundingClientRect();
-    return { 
-      x: (clientX - rect.left) / zoom, 
-      y: (clientY - rect.top) / zoom 
-    };
+    return { x: (clientX - rect.left) / zoom, y: (clientY - rect.top) / zoom };
   }, [zoom]);
 
   const getUnscaledCoords = useCallback((e) => {
     return getUnscaledCoordsFromClient(e.clientX, e.clientY);
   }, [getUnscaledCoordsFromClient]);
 
-  // ── PDF mouse handlers ────────────────────────────────────────────────────
   const handleDivMouseDown = useCallback((e) => {
     if (e.button !== 0) return;
     const coords = getUnscaledCoords(e);
     const hitThreshold = (STROKE_HIT_WIDTH / 2) / zoom;
 
     if (e.ctrlKey || e.metaKey) {
-      const hit = [...regions].reverse().find(
-        (r) => isNearBorder(coords, r, hitThreshold) || isInsideRect(coords, r, hitThreshold)
-      );
+      const hit = [...regions].reverse().find((r) => {
+        if (r.type === 'section') {
+          const sw = sectionWidths[r.id] || 24;
+          const inY = coords.y >= r.y && coords.y <= r.y + r.h;
+          const inLeft = coords.x >= 0 && coords.x <= sw;
+          const inRight = coords.x >= (PDF_WIDTH - sw) && coords.x <= PDF_WIDTH;
+          return inY && (inLeft || inRight);
+        }
+        if (r.type === 'lasso') {
+          return isNearLassoBorder(coords, r, hitThreshold);
+        }
+        return isNearBorder(coords, r, hitThreshold);
+      });
+
       if (hit) {
         e.preventDefault();
-        setMovingRegion({ id: hit.id, offsetX: coords.x - hit.x, offsetY: coords.y - hit.y });
-        setSelectedRegionId(hit.id);
+        if (hit.type === 'section') {
+          setTool('section');
+          setSectionY({ start: hit.y, end: hit.y + hit.h });
+          setEditingSectionId(hit.id);
+          setSectionTarget('start');
+        } else {
+          if (editingShapeId !== hit.id) {
+            setEditingShapeId(hit.id);
+            setShapeBackup({...hit});
+            setTool(hit.type);
+          }
+          setMovingRegion({ id: hit.id, offsetX: coords.x - hit.x, offsetY: coords.y - hit.y });
+        }
       }
+      return;
+    }
+
+    if (tool === 'section' && sectionTarget) {
+      setSectionY(prev => ({ ...prev, [sectionTarget]: coords.y }));
+      if (sectionTarget === 'start' && sectionY.end === null) setSectionTarget('end');
+      else if (sectionTarget === 'end' && sectionY.start === null) setSectionTarget('start');
+      return;
+    }
+
+    if (tool === 'lasso') {
+      setLassoPoints([{ x: coords.x, y: coords.y }]);
       return;
     }
 
     if (tool === 'rect') {
       setCurrentDrag({ startX: coords.x, startY: coords.y, currentX: coords.x, currentY: coords.y });
     }
-  }, [tool, regions, zoom, getUnscaledCoords]);
+  }, [tool, regions, zoom, getUnscaledCoords, sectionTarget, sectionY, sectionWidths, editingShapeId]);
 
   const handleDivMouseMove = useCallback((e) => {
-    mousePosRef.current = { x: e.clientX, y: e.clientY }; // Track for auto-scroll
+    mousePosRef.current = { x: e.clientX, y: e.clientY };
     const coords = getUnscaledCoords(e);
-    
+
     if (currentDrag) setCurrentDrag((p) => ({ ...p, currentX: coords.x, currentY: coords.y }));
+
+    if (lassoPoints) {
+      setLassoPoints((prev) => {
+        const last = prev[prev.length - 1];
+        if (Math.abs(last.x - coords.x) > 2 / zoom || Math.abs(last.y - coords.y) > 2 / zoom) {
+          return [...prev, { x: coords.x, y: coords.y }];
+        }
+        return prev;
+      });
+    }
+
     if (movingRegion) {
       setRegions((prev) =>
-        prev.map((r) =>
-          r.id === movingRegion.id
-            ? { ...r, x: coords.x - movingRegion.offsetX, y: coords.y - movingRegion.offsetY }
-            : r
-        )
+        prev.map((r) => {
+          if (r.id === movingRegion.id) {
+            if (r.type === 'section') return { ...r, y: coords.y - movingRegion.offsetY };
+            return { ...r, x: coords.x - movingRegion.offsetX, y: coords.y - movingRegion.offsetY };
+          }
+          return r;
+        })
       );
     }
-  }, [currentDrag, movingRegion, getUnscaledCoords]);
+  }, [currentDrag, movingRegion, lassoPoints, zoom, getUnscaledCoords]);
 
   const handleDivMouseUp = useCallback(() => {
     if (currentDrag) {
       const shape = rectFromDrag(currentDrag);
       if (shape.w > 10 / zoom && shape.h > 10 / zoom) {
-        const newId = `reg_${Date.now()}`;
-        setRegions((prev) => [...prev, { id: newId, ...shape }]);
-        setSelectedRegionId(newId);
+        if (editingShapeId && tool === 'rect') {
+           setRegions(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
+        } else {
+           const newId = `reg_${Date.now()}`;
+           setRegions((prev) => [...prev, { id: newId, type: 'rect', ...shape }]);
+           setSelectedRegionId(newId);
+        }
       }
+      setCurrentDrag(null);
     }
-    setCurrentDrag(null);
-    setMovingRegion(null);
-  }, [currentDrag, zoom]);
 
-  // ── Auto-Scroll During Drag ──
+    if (lassoPoints) {
+      if (lassoPoints.length > 5) {
+        const xs = lassoPoints.map(p => p.x);
+        const ys = lassoPoints.map(p => p.y);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+        const w = maxX - minX;
+        const h = maxY - minY;
+
+        if (w > 10 / zoom && h > 10 / zoom) {
+          const relativePoints = lassoPoints.map(p => ({ x: p.x - minX, y: p.y - minY }));
+          const shape = { x: minX, y: minY, w, h, points: relativePoints };
+          if (editingShapeId && tool === 'lasso') {
+             setRegions(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
+          } else {
+             const newId = `reg_${Date.now()}`;
+             setRegions(prev => [...prev, { id: newId, type: 'lasso', ...shape }]);
+             setSelectedRegionId(newId);
+          }
+        }
+      }
+      setLassoPoints(null);
+    }
+
+    setMovingRegion(null);
+  }, [currentDrag, lassoPoints, zoom, editingShapeId, tool]);
+
   useEffect(() => {
-    const isDragging = !!currentDrag || !!movingRegion;
-    
+    const isDragging = !!currentDrag || !!movingRegion || !!lassoPoints;
+
     if (!isDragging) {
       if (scrollAnimRef.current) cancelAnimationFrame(scrollAnimRef.current);
       return;
@@ -425,40 +640,46 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
     const scrollStep = () => {
       if (pdfScrollRef.current) {
         const rect = pdfScrollRef.current.getBoundingClientRect();
-        const edgeThreshold = 80; // How close to the edge to trigger scroll
-        const maxSpeed = 22; // Pixels per frame max speed
+        const edgeThreshold = 80;
+        const maxSpeed = 22;
         let scrolled = false;
         const { y: clientY, x: clientX } = mousePosRef.current;
 
-        // Scroll Up
         if (clientY < rect.top + edgeThreshold) {
           const intensity = 1 - Math.max(0, clientY - rect.top) / edgeThreshold;
           pdfScrollRef.current.scrollTop -= maxSpeed * Math.pow(intensity, 1.5);
           scrolled = true;
-        } 
-        // Scroll Down
-        else if (clientY > rect.bottom - edgeThreshold) {
+        } else if (clientY > rect.bottom - edgeThreshold) {
           const intensity = 1 - Math.max(0, rect.bottom - clientY) / edgeThreshold;
           pdfScrollRef.current.scrollTop += maxSpeed * Math.pow(intensity, 1.5);
           scrolled = true;
         }
 
-        // If the screen moved, we must recalculate the document coordinates
-        // so the rectangle visually stretches with the scrolling document.
         if (scrolled) {
           const coords = getUnscaledCoordsFromClient(clientX, clientY);
           const state = dragStateRef.current;
-          
+
           if (state.currentDrag) {
             setCurrentDrag(p => p ? { ...p, currentX: coords.x, currentY: coords.y } : p);
           }
+          if (state.lassoPoints) {
+            setLassoPoints((prev) => {
+              const last = prev[prev.length - 1];
+              if (Math.abs(last.x - coords.x) > 2 / zoom || Math.abs(last.y - coords.y) > 2 / zoom) {
+                return [...prev, { x: coords.x, y: coords.y }];
+              }
+              return prev;
+            });
+          }
           if (state.movingRegion) {
             setRegions((prev) =>
-              prev.map((r) =>
-                r.id === state.movingRegion.id
-                  ? { ...r, x: coords.x - state.movingRegion.offsetX, y: coords.y - state.movingRegion.offsetY }
-                  : r
-              )
+              prev.map((r) => {
+                if (r.id === state.movingRegion.id) {
+                  if (r.type === 'section') return { ...r, y: coords.y - state.movingRegion.offsetY };
+                  return { ...r, x: coords.x - state.movingRegion.offsetX, y: coords.y - state.movingRegion.offsetY };
+                }
+                return r;
+              })
             );
           }
         }
@@ -468,15 +689,14 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
 
     scrollAnimRef.current = requestAnimationFrame(scrollStep);
     return () => cancelAnimationFrame(scrollAnimRef.current);
-  }, [currentDrag, movingRegion, getUnscaledCoordsFromClient]);
+  }, [currentDrag, movingRegion, lassoPoints, zoom, getUnscaledCoordsFromClient]);
 
   const handleBorderClick = useCallback(async (e, regionId) => {
     e.stopPropagation();
-    
+
     if (tool === 'remove') {
-      // Trigger the native OS confirmation dialog
       const isConfirmed = await confirm(
-        'Are you sure you want to delete this region? Its whiteboard data will be permanently lost.', 
+        'Are you sure you want to delete this region? Its whiteboard data will be permanently lost.',
         { title: 'Delete Whiteboard', kind: 'warning' }
       );
 
@@ -490,175 +710,174 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
     }
   }, [tool, selectedRegionId]);
 
+  const handleBackup = async () => {
+    try {
+      const idx = await performRollingBackup();
+      showToast(`Workspace backed up! (backup_${idx}.json)`, 'success');
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  };
 
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-      if (e.key === 'Escape') setSelectedRegionId(null);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [selectedRegionId]);
+  // --- Dynamic Cursors ---
+  const deleteCursor = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%23EF4444'><path d='M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z'/></svg>") 12 12, auto`;
+  const lassoCursor = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%233B82F6' stroke-width='2'><path d='M8 8c0-3.3 2.7-6 6-6s6 2.7 6 6-2.7 6-6 6M4 20l5-5'/></svg>") 4 20, auto`;
 
-  const pdfCursor =
-    movingRegion      ? 'grabbing' :
-    tool === 'remove' ? 'crosshair' :
-    tool === 'rect'   ? 'crosshair' :
-                        'default';
+  // Swapped Start/End logic as requested.
+  const sectionStartCursor = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23EF4444' stroke-width='3'><path d='M6 20v-8h12v8' /></svg>") 12 16, auto`;
+  const sectionEndCursor = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2310B981' stroke-width='3'><path d='M6 4v8h12V4' /></svg>") 12 8, auto`;
+
+  let pdfCursor = 'default';
+  if (movingRegion) pdfCursor = 'grabbing';
+  else if (tool === 'remove') pdfCursor = deleteCursor;
+  else if (tool === 'lasso') pdfCursor = lassoCursor;
+  else if (tool === 'section') pdfCursor = sectionTarget === 'start' ? sectionStartCursor : sectionEndCursor;
+  else if (tool === 'rect') pdfCursor = 'crosshair';
 
   return (
     <div
       ref={containerRef}
-      style={{
-        width: '100%', height: '100vh', display: 'flex', overflow: 'hidden',
-        background: '#111318', fontFamily: "'IBM Plex Mono', monospace",
-        userSelect: isResizing ? 'none' : 'auto', maxWidth: '100vw',
-        position: 'relative'
-      }}
+      style={{ width: '100%', height: '100vh', display: 'flex', overflow: 'hidden', background: '#1c1f26', fontFamily: "'IBM Plex Mono', monospace", userSelect: isResizing ? 'none' : 'auto', maxWidth: '100vw', position: 'relative' }}
     >
-      {/* ── TOP HEADER BAR (AUTO-HIDE) ── */}
-      <div
-        onMouseEnter={() => setHeaderVisible(true)}
-        onMouseLeave={() => setHeaderVisible(false)}
-        style={{
-          position: 'absolute', top: 0, left: 0, right: 0,
-          height: headerVisible ? '48px' : '12px', zIndex: 100,
-        }}
-      >
+      <style>{`
+        ::-webkit-scrollbar { width: 14px; height: 14px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.5); border-radius: 7px; border: 4px solid transparent; background-clip: padding-box; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.7); }
+      `}</style>
+
+      {/* Global Toast */}
+      {toast && (
         <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, height: '48px',
-          background: 'rgba(26,29,36,0.85)', backdropFilter: 'blur(12px)',
-          borderBottom: '1px solid rgba(255,255,255,0.05)',
-          display: 'flex', alignItems: 'center', padding: '0 16px', gap: '16px',
-          transform: headerVisible ? 'translateY(0)' : 'translateY(-100%)',
-          opacity: headerVisible ? 1 : 0,
-          transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+          position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+          background: toast.type === 'error' ? 'rgba(239, 68, 68, 0.95)' : 'rgba(16, 185, 129, 0.95)',
+          backdropFilter: 'blur(8px)', border: `1px solid ${toast.type === 'error' ? '#F87171' : '#34D399'}`,
+          color: '#fff', padding: '10px 20px', borderRadius: '8px', zIndex: 9999,
+          fontSize: '12px', fontWeight: '500', boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', gap: '8px', animation: 'fadeInUp 0.3s ease-out forwards'
         }}>
+          {toast.type === 'error' ? '⚠' : '✓'} {toast.msg}
+        </div>
+      )}
+      <style>{`@keyframes fadeInUp { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }`}</style>
+
+      {/* ── TOP HEADER BAR (Aligned left, right is click-through for Tldraw) ── */}
+      <div
+        onMouseEnter={() => setHeaderVisible(true)} onMouseLeave={() => setHeaderVisible(false)}
+        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: headerVisible ? '48px' : '16px', zIndex: 100, pointerEvents: 'none', display: 'flex', justifyContent: 'flex-start' }}
+      >
+        {/* Invisible hit area to ensure the hover action is perfectly caught on the transparent gap */}
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'auto' }} />
+
+        <div style={{ position: 'relative', zIndex: 101, display: 'flex', alignItems: 'center', gap: '16px', padding: '0 24px', height: '48px', background: 'rgba(38,42,51,0.65)', backdropFilter: 'blur(10px)', borderBottomRightRadius: '12px', borderRight: '1px solid rgba(255,255,255,0.1)', borderBottom: '1px solid rgba(255,255,255,0.1)', pointerEvents: 'auto', transform: headerVisible ? 'translateY(0)' : 'translateY(-100%)', opacity: headerVisible ? 1 : 0, transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
           <button
-            onClick={onHome}
-            title="Back to home"
-            style={{
-              display: 'flex', alignItems: 'center', gap: '5px',
-              padding: '6px 10px', borderRadius: '6px',
-              border: '1px solid #374151', background: 'transparent',
-              color: '#d1d5db', cursor: 'pointer', fontSize: '14px',
-              transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.color='#fff'; e.currentTarget.style.background='rgba(255,255,255,0.05)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color='#d1d5db'; e.currentTarget.style.background='transparent'; }}
+            onClick={onHome} title="Back to home"
+            style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #4b5563', background: 'transparent', color: '#e5e7eb', cursor: 'pointer', fontSize: '13px', transition: 'all 0.15s' }}
+            onMouseEnter={e => { e.currentTarget.style.color='#fff'; e.currentTarget.style.background='rgba(255,255,255,0.1)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color='#e5e7eb'; e.currentTarget.style.background='transparent'; }}
           >
             ⌂ Home
           </button>
-          
-          <span style={{
-            fontSize: '13px', color: '#e5e7eb', fontWeight: 500, letterSpacing: '0.02em',
-          }}>
+
+          <span style={{ fontSize: '13px', color: '#f3f4f6', fontWeight: 500, letterSpacing: '0.02em', padding: '0 8px' }}>
             {decodeURIComponent(pdfPath).split(/[/\\]/).pop()}
           </span>
 
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {regions.length > 0 && (
-              <span style={{ color: '#9ca3af', fontSize: '11px' }}>
-                {regions.length} region{regions.length !== 1 ? 's' : ''}
-                {selectedRegionId && ` · R${regions.findIndex(r => r.id === selectedRegionId) + 1} active`}
-              </span>
-            )}
-            <SaveIndicator savedAt={lastSavedAt} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', paddingLeft: '8px', borderLeft: '1px solid rgba(255,255,255,0.1)' }}>
+            <button
+              onClick={handleBackup}
+              title="Rolling Backup"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '4px 10px', borderRadius: '6px', border: '1px solid #4b5563',
+                background: 'transparent', color: '#d1d5db', cursor: 'pointer', fontSize: '11px',
+                fontFamily: "'IBM Plex Mono', monospace", transition: 'all 0.15s'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color='#93C5FD'; e.currentTarget.style.borderColor='#3B82F6'; e.currentTarget.style.background='rgba(59,130,246,0.15)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color='#d1d5db'; e.currentTarget.style.borderColor='#4b5563'; e.currentTarget.style.background='transparent'; }}
+            >
+              💾 Backup
+            </button>
+            <div style={{ minWidth: '55px' }}>
+              <SaveIndicator savedAt={lastSavedAt} />
+            </div>
           </div>
         </div>
       </div>
 
       {/* ── LEFT: PDF PANE WRAPPER ── */}
-      <div style={{
-        width: selectedRegionId ? `${leftPct}%` : '100%',
-        height: '100%', flexShrink: 0, position: 'relative',
-        transition: selectedRegionId ? 'none' : 'width 0.3s ease',
-      }}>
-        
-        {/* Scrollable Container */}
-        <div
-          ref={pdfScrollRef}
-          onScroll={handleScroll}
-          style={{
-            width: '100%', height: '100%', overflow: 'auto', 
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            background: '#1a1d24',
-          }}
-        >
-          <div
-            ref={pdfContentRef}
-            onMouseDown={handleDivMouseDown}
-            onMouseMove={handleDivMouseMove}
-            onMouseUp={handleDivMouseUp}
-            style={{
-              position: 'relative', margin: '24px', background: 'white',
-              display: 'inline-block', cursor: pdfCursor,
-              boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
-            }}
-          >
+      <div
+        onMouseEnter={() => setActivePane('pdf')}
+        style={{ width: selectedRegionId ? `${leftPct}%` : '100%', height: '100%', flexShrink: 0, position: 'relative', transition: selectedRegionId ? 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'width 0.3s ease' }}
+      >
+        <div ref={pdfScrollRef} onScroll={handleScroll} style={{ width: '100%', height: '100%', overflow: 'auto', textAlign: 'center', background: '#262a33', position: 'relative' }}>
+          <div ref={pdfContentRef} onMouseDown={handleDivMouseDown} onMouseMove={handleDivMouseMove} onMouseUp={handleDivMouseUp} style={{ position: 'relative', margin: '24px', background: 'white', display: 'inline-block', textAlign: 'left', cursor: pdfCursor, boxShadow: '0 8px 40px rgba(0,0,0,0.6)' }}>
             {documentFile ? (
-              <Document 
-                file={documentFile} 
-                onLoadSuccess={({ numPages }) => {
-                  setNumPages(numPages);
-                  setPdfReady(true);
-                }}
-                onLoadError={(error) => console.error("PDF Load Error:", error)}
-              >
+              <Document file={documentFile} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setPdfReady(true); }} onLoadError={(error) => console.error("PDF Load Error:", error)}>
                 {Array.from({ length: numPages ?? 0 }, (_, i) => (
-                  <LazyPage
-                    key={`${pdfPath}-${i}`}
-                    pageNumber={i + 1}
-                    width={PDF_WIDTH}
-                    scale={zoom}
-                  />
+                  <LazyPage key={`${pdfPath}-${i}`} pageNumber={i + 1} width={PDF_WIDTH} scale={zoom} />
                 ))}
               </Document>
             ) : (
-              <div style={{ padding: '40px', color: '#9ca3af', fontSize: '12px', textAlign: 'center' }}>
-                Loading document into memory...
-              </div>
+              <div style={{ padding: '40px', color: '#9ca3af', fontSize: '12px', textAlign: 'center' }}>Loading document into memory...</div>
             )}
 
             {/* Scaled SVG overlay */}
             <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible', zIndex: 10, pointerEvents: 'none' }}>
+
+              {tool === 'section' && sectionY.start !== null && <line x1={0} x2={PDF_WIDTH * zoom} y1={sectionY.start * zoom} y2={sectionY.start * zoom} stroke="#10B981" strokeWidth={1.5} strokeDasharray="6 4" />}
+              {tool === 'section' && sectionY.end !== null && <line x1={0} x2={PDF_WIDTH * zoom} y1={sectionY.end * zoom} y2={sectionY.end * zoom} stroke="#10B981" strokeWidth={1.5} strokeDasharray="6 4" />}
+
               {regions.map((r, idx) => {
                 const color      = regionColor(r.id);
                 const isSelected = selectedRegionId === r.id;
-                // Apply zoom to saved coordinates
                 const rx = r.x * zoom, ry = r.y * zoom, rw = r.w * zoom, rh = r.h * zoom;
-                
+
+                if (r.type === 'section') {
+                  const sw = sectionWidths[r.id];
+                  const leftW = sw * zoom;
+                  const rightX = PDF_WIDTH * zoom - leftW;
+                  return (
+                    <g key={r.id}>
+                      <g style={{ pointerEvents: 'auto' }} onMouseDown={(e) => { if (e.ctrlKey || e.metaKey) return; if (tool === 'section' || tool === 'rect' || tool === 'lasso') return; e.stopPropagation(); }} onClick={(e) => { if (e.ctrlKey || e.metaKey) return; handleBorderClick(e, r.id); }}>
+                        <rect x={0} y={ry} width={Math.max(leftW, 24 * zoom)} height={rh} fill="transparent" style={{ cursor: tool === 'select' ? 'pointer' : 'crosshair' }} />
+                      </g>
+                      <rect x={0} y={ry} width={leftW} height={rh} fill={color} opacity={isSelected ? 0.66 : 0.33} style={{ transition: 'opacity 0.15s', pointerEvents: 'none' }} />
+                      <rect x={leftW + 2} y={ry + 4} width={28} height={15} fill={color} rx={2} style={{ pointerEvents: 'none' }} />
+                      <text x={leftW + 16} y={ry + 14} textAnchor="middle" fill="white" fontSize={9} fontWeight="700" style={{ pointerEvents: 'none' }}>{`S${idx + 1}`}</text>
+
+                      <g style={{ pointerEvents: 'auto' }} onMouseDown={(e) => { if (e.ctrlKey || e.metaKey) return; if (tool === 'section' || tool === 'rect' || tool === 'lasso') return; e.stopPropagation(); }} onClick={(e) => { if (e.ctrlKey || e.metaKey) return; handleBorderClick(e, r.id); }}>
+                        <rect x={rightX} y={ry} width={Math.max(leftW, 24 * zoom)} height={rh} fill="transparent" style={{ cursor: tool === 'select' ? 'pointer' : 'crosshair' }} />
+                      </g>
+                      <rect x={rightX} y={ry} width={leftW} height={rh} fill={color} opacity={isSelected ? 0.66 : 0.33} style={{ transition: 'opacity 0.15s', pointerEvents: 'none' }} />
+                      <rect x={rightX - 30} y={ry + 4} width={28} height={15} fill={color} rx={2} style={{ pointerEvents: 'none' }} />
+                      <text x={rightX - 16} y={ry + 14} textAnchor="middle" fill="white" fontSize={9} fontWeight="700" style={{ pointerEvents: 'none' }}>{`S${idx + 1}`}</text>
+                    </g>
+                  );
+                }
+
+                if (r.type === 'lasso') {
+                  const pointsStr = r.points.map(p => `${rx + (p.x * zoom)},${ry + (p.y * zoom)}`).join(' ');
+                  return (
+                    <g key={r.id}>
+                      <g style={{ pointerEvents: 'auto' }} onMouseDown={(e) => { if (e.ctrlKey || e.metaKey) return; if (tool === 'rect' || tool === 'section' || tool === 'lasso') return; e.stopPropagation(); }} onClick={(e) => { if (e.ctrlKey || e.metaKey) return; handleBorderClick(e, r.id); }}>
+                        <polygon points={pointsStr} fill="transparent" stroke="transparent" strokeWidth={STROKE_HIT_WIDTH} style={{ pointerEvents: 'stroke', cursor: tool === 'select' ? 'pointer' : 'crosshair' }} />
+                      </g>
+                      <polygon points={pointsStr} fill={isSelected ? `${color}1A` : 'none'} stroke={color} strokeWidth={isSelected ? 2 : 1.5} strokeDasharray={isSelected ? 'none' : '7 3'} style={{ pointerEvents: 'none', transition: 'fill 0.15s, stroke-width 0.1s' }} />
+                      <rect x={rx + 1} y={ry + 1} width={28} height={15} fill={color} rx={2} style={{ pointerEvents: 'none' }} />
+                      <text x={rx + 15} y={ry + 11} textAnchor="middle" fill="white" fontSize={9} fontFamily="'IBM Plex Mono', monospace" fontWeight="700" style={{ pointerEvents: 'none' }}>{`R${idx + 1}`}</text>
+                    </g>
+                  );
+                }
+
                 return (
                   <g key={r.id}>
-                    <g
-                      style={{ pointerEvents: 'auto' }}
-                      onMouseDown={(e) => {
-                        if (e.ctrlKey || e.metaKey) { e.stopPropagation(); return; }
-                        if (tool === 'rect') return;
-                        e.stopPropagation();
-                      }}
-                      onClick={(e) => handleBorderClick(e, r.id)}
-                    >
-                      <rect
-                        x={rx} y={ry} width={rw} height={rh}
-                        fill="none" stroke="transparent" strokeWidth={STROKE_HIT_WIDTH}
-                        style={{ pointerEvents: 'stroke', cursor: tool === 'select' ? 'pointer' : 'crosshair' }}
-                      />
+                    <g style={{ pointerEvents: 'auto' }} onMouseDown={(e) => { if (e.ctrlKey || e.metaKey) return; if (tool === 'rect' || tool === 'section' || tool === 'lasso') return; e.stopPropagation(); }} onClick={(e) => { if (e.ctrlKey || e.metaKey) return; handleBorderClick(e, r.id); }}>
+                      <rect x={rx} y={ry} width={rw} height={rh} fill="none" stroke="transparent" strokeWidth={STROKE_HIT_WIDTH} style={{ pointerEvents: 'stroke', cursor: tool === 'select' ? 'pointer' : 'crosshair' }} />
                     </g>
-                    <rect
-                      x={rx} y={ry} width={rw} height={rh}
-                      fill={isSelected ? `${color}14` : 'none'}
-                      stroke={color} strokeWidth={isSelected ? 2 : 1.5}
-                      strokeDasharray={isSelected ? 'none' : '7 3'} rx={2}
-                      style={{ pointerEvents: 'none', transition: 'fill 0.15s, stroke-width 0.1s' }}
-                    />
+                    <rect x={rx} y={ry} width={rw} height={rh} fill={isSelected ? `${color}1A` : 'none'} stroke={color} strokeWidth={isSelected ? 2 : 1.5} strokeDasharray={isSelected ? 'none' : '7 3'} rx={2} style={{ pointerEvents: 'none', transition: 'fill 0.15s, stroke-width 0.1s' }} />
                     <rect x={rx + 1} y={ry + 1} width={28} height={15} fill={color} rx={2} style={{ pointerEvents: 'none' }} />
-                    <text
-                      x={rx + 15} y={ry + 11} textAnchor="middle" fill="white" fontSize={9}
-                      fontFamily="'IBM Plex Mono', monospace" fontWeight="700"
-                      style={{ pointerEvents: 'none' }}
-                    >{`R${idx + 1}`}</text>
+                    <text x={rx + 15} y={ry + 11} textAnchor="middle" fill="white" fontSize={9} fontFamily="'IBM Plex Mono', monospace" fontWeight="700" style={{ pointerEvents: 'none' }}>{`R${idx + 1}`}</text>
                   </g>
                 );
               })}
@@ -666,90 +885,127 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
               {currentDrag && (() => {
                 const { x, y, w, h } = rectFromDrag(currentDrag);
                 return (
-                  <rect x={x * zoom} y={y * zoom} width={w * zoom} height={h * zoom}
-                    fill="rgba(59,130,246,0.07)" stroke="#3B82F6" strokeWidth={1.5} strokeDasharray="5 4" rx={2}
-                    style={{ pointerEvents: 'none' }}
-                  />
+                  <rect x={x * zoom} y={y * zoom} width={w * zoom} height={h * zoom} fill="rgba(59,130,246,0.1)" stroke="#3B82F6" strokeWidth={1.5} strokeDasharray="5 4" rx={2} style={{ pointerEvents: 'none' }} />
                 );
               })()}
+
+              {lassoPoints && lassoPoints.length > 0 && (
+                <polyline points={lassoPoints.map(p => `${p.x * zoom},${p.y * zoom}`).join(' ')} fill="rgba(59,130,246,0.1)" stroke="#3B82F6" strokeWidth={1.5} strokeDasharray="5 4" style={{ pointerEvents: 'none' }} />
+              )}
             </svg>
           </div>
         </div>
 
+        {/* ── BOTTOM NAV: Page Control ── */}
+        <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 50, display: 'flex', gap: '8px', alignItems: 'center', background: 'rgba(38,42,51,0.65)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', padding: '6px 16px', borderRadius: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', pointerEvents: 'auto' }}>
+          <span style={{ fontSize: '11px', color: '#9ca3af' }}>Page</span>
+          <input
+            id="page-input" type="text" value={pageInput}
+            onChange={e => setPageInput(e.target.value)}
+            onKeyDown={handlePageSubmit}
+            onBlur={() => setPageInput(String(currentPage))}
+            style={{ width: '36px', background: 'rgba(0,0,0,0.3)', border: '1px solid #4b5563', color: '#fff', textAlign: 'center', borderRadius: '4px', fontSize: '11px', padding: '2px 0', outline: 'none' }}
+          />
+          <span style={{ fontSize: '11px', color: '#9ca3af' }}>/ {numPages || '-'}</span>
+        </div>
+
         {/* ── TOOLBOX (Vertical, Bottom Right) ── */}
-        <div style={{
-          position: 'absolute', bottom: '24px', right: '24px', zIndex: 50,
-          display: 'flex', flexDirection: 'column', gap: '8px',
-        }}>
-          {/* Tools Group */}
-          <div style={{
-            background: 'rgba(26,29,36,0.95)', backdropFilter: 'blur(10px)',
-            borderRadius: '8px', padding: '6px', border: '1px solid #2a2d36',
-            display: 'flex', flexDirection: 'column', gap: '6px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-          }}>
+        <div style={{ position: 'absolute', bottom: '24px', right: '24px', zIndex: 50, display: 'flex', flexDirection: 'column', gap: '8px', pointerEvents: 'auto' }}>
+          <div style={{ background: 'rgba(38,42,51,0.65)', backdropFilter: 'blur(10px)', borderRadius: '8px', padding: '6px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
             {[
-              { id: 'select', label: 'Select', key: 'S', icon: '↖' },
-              { id: 'rect',   label: 'Region', key: 'R', icon: '▭' },
+              { id: 'select', label: 'Select', key: 'V', icon: '↖' },
+              { id: 'rect',   label: 'Freeform', key: 'R', icon: '▭' },
+              { id: 'lasso',  label: 'Lasso', key: 'C', icon: '∿' },
+              { id: 'section',label: 'Section', key: 'S', icon: '⬍' },
               { id: 'remove', label: 'Remove', key: 'X', icon: '✕' },
             ].map(({ id, label, key, icon }) => (
-              <button key={id} onClick={() => setTool(id)} title={`${label} [${key}]`}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: '36px', height: '36px', borderRadius: '6px',
-                  border: `1px solid ${tool === id ? '#3B82F6' : 'transparent'}`,
-                  background: tool === id ? 'rgba(59,130,246,0.15)' : 'transparent',
-                  color: tool === id ? '#60A5FA' : '#9ca3af',
-                  cursor: 'pointer', fontSize: '18px', transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => { if (tool !== id) { e.currentTarget.style.color='#d1d5db'; e.currentTarget.style.background='rgba(255,255,255,0.05)'; } }}
-                onMouseLeave={e => { if (tool !== id) { e.currentTarget.style.color='#9ca3af'; e.currentTarget.style.background='transparent'; } }}
-              >
-                {icon}
-              </button>
+              <div key={id} style={{ position: 'relative' }}>
+                <button onClick={() => { if (tool === 'section' && id === 'section') setTool('select'); else setTool(id); }} title={`${label} [${key}]`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '6px', border: `1px solid ${tool === id ? '#3B82F6' : 'transparent'}`, background: tool === id ? 'rgba(59,130,246,0.2)' : 'transparent', color: tool === id ? '#93C5FD' : '#d1d5db', cursor: 'pointer', fontSize: '18px', transition: 'all 0.15s' }} onMouseEnter={e => { if (tool !== id) { e.currentTarget.style.color='#fff'; e.currentTarget.style.background='rgba(255,255,255,0.1)'; } }} onMouseLeave={e => { if (tool !== id) { e.currentTarget.style.color='#d1d5db'; e.currentTarget.style.background='transparent'; } }}>
+                  {icon}
+                </button>
+
+                {/* ── SECTION MINI MENU ── */}
+                {tool === 'section' && id === 'section' && (
+                  <div style={{ position: 'absolute', right: 'calc(100% + 12px)', top: '50%', transform: 'translateY(-50%)', background: 'rgba(38,42,51,0.85)', backdropFilter: 'blur(10px)', borderRadius: '8px', padding: '6px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', gap: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', alignItems: 'center' }}>
+                    {(() => {
+                      const color = sectionY.start !== null ? '#10B981' : '#F87171';
+                      const isActive = sectionTarget === 'start';
+                      return (<button onClick={() => setSectionTarget('start')} style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: `1px solid ${color}`, background: isActive ? `${color}40` : 'transparent', color: color, transition: 'all 0.15s' }}>Start</button>);
+                    })()}
+                    {(() => {
+                      const color = sectionY.end !== null ? '#10B981' : '#F87171';
+                      const isActive = sectionTarget === 'end';
+                      return (<button onClick={() => setSectionTarget('end')} style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: `1px solid ${color}`, background: isActive ? `${color}40` : 'transparent', color: color, transition: 'all 0.15s' }}>End</button>);
+                    })()}
+                    {(() => {
+                      const canConfirm = sectionY.start !== null && sectionY.end !== null;
+                      return (
+                        <>
+                          <button disabled={!canConfirm} onClick={() => {
+                              const y1 = Math.min(sectionY.start, sectionY.end);
+                              const y2 = Math.max(sectionY.start, sectionY.end);
+                              if (editingSectionId) {
+                                setRegions(prev => prev.map(r => r.id === editingSectionId ? { ...r, y: y1, h: y2 - y1 } : r));
+                                setSelectedRegionId(editingSectionId);
+                                setEditingSectionId(null);
+                              } else {
+                                const newId = `reg_${Date.now()}`;
+                                setRegions(prev => [...prev, { id: newId, type: 'section', x: 0, y: y1, w: 16, h: y2 - y1 }]);
+                                setSelectedRegionId(newId);
+                              }
+                              setTool('select');
+                            }}
+                            style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: canConfirm ? 'pointer' : 'not-allowed', border: `1px solid ${canConfirm ? '#3B82F6' : '#4b5563'}`, background: canConfirm ? 'rgba(59,130,246,0.2)' : 'transparent', color: canConfirm ? '#93C5FD' : '#6b7280', transition: 'all 0.15s' }}
+                          >
+                            {editingSectionId ? 'Update' : 'Confirm'}
+                          </button>
+
+                          <button onClick={() => { setEditingSectionId(null); setSectionY({ start: null, end: null }); setSectionTarget('start'); setTool('select'); }}
+                            style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: `1px solid #F87171`, background: 'transparent', color: '#F87171', transition: 'all 0.15s' }}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* ── SHAPE EDIT MINI MENU (Rect/Lasso) ── */}
+                {editingShapeId && tool === id && (id === 'rect' || id === 'lasso') && (
+                  <div style={{ position: 'absolute', right: 'calc(100% + 12px)', top: '50%', transform: 'translateY(-50%)', background: 'rgba(38,42,51,0.85)', backdropFilter: 'blur(10px)', borderRadius: '8px', padding: '6px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', gap: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', alignItems: 'center' }}>
+                    <button onClick={() => { setRegions(prev => prev.map(r => r.id === shapeBackup?.id ? shapeBackup : r)); setEditingShapeId(null); setShapeBackup(null); setTool('select'); }} style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: `1px solid #F87171`, background: 'transparent', color: '#F87171', transition: 'all 0.15s' }}>Cancel</button>
+                    <button onClick={() => { setEditingShapeId(null); setShapeBackup(null); setTool('select'); }} style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: `1px solid #3B82F6`, background: 'rgba(59,130,246,0.2)', color: '#93C5FD', transition: 'all 0.15s' }}>Update</button>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
 
-          {/* Zoom Group */}
-          <div style={{
-            background: 'rgba(26,29,36,0.95)', backdropFilter: 'blur(10px)',
-            borderRadius: '8px', padding: '6px', border: '1px solid #2a2d36',
-            display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-          }}>
-            <button onClick={() => setZoom(z => Math.min(z + 0.25, 3))} title="Zoom In" style={{
-              width: '32px', height: '32px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '18px', borderRadius: '4px'
-            }} onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-              +
-            </button>
-            <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: '500', margin: '2px 0' }}>
-              {Math.round(zoom * 100)}%
-            </span>
-            <button onClick={() => setZoom(z => Math.max(z - 0.25, 0.5))} title="Zoom Out" style={{
-              width: '32px', height: '32px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '18px', borderRadius: '4px'
-            }} onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.05)'} onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-              -
-            </button>
+          <div style={{ background: 'rgba(38,42,51,0.65)', backdropFilter: 'blur(10px)', borderRadius: '8px', padding: '6px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
+            <button onClick={() => setZoom(z => Math.min(z + 0.25, 3.0))} title="Zoom In" style={{ width: '32px', height: '32px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '18px', borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.1)'} onMouseLeave={e => e.currentTarget.style.background='transparent'}>+</button>
+            <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '500', margin: '2px 0' }}>{Math.round(zoom * 100)}%</span>
+            <button onClick={() => setZoom(z => Math.max(z - 0.25, 0.5))} title="Zoom Out" style={{ width: '32px', height: '32px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '18px', borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.1)'} onMouseLeave={e => e.currentTarget.style.background='transparent'}>-</button>
           </div>
         </div>
       </div>
 
-      {/* ── DIVIDER ── */}
       {selectedRegionId && (
-        <div
-          onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); }}
-          style={{
-            width: '6px', flexShrink: 0, cursor: 'col-resize', zIndex: 20,
-            background: isResizing ? '#3B82F6' : '#1e2128',
-            borderLeft: '1px solid #2a2d36', borderRight: '1px solid #2a2d36',
-            transition: isResizing ? 'none' : 'background 0.2s', position: 'relative',
-          }}
-        />
+        <div onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); }} style={{ width: '6px', flexShrink: 0, cursor: 'col-resize', zIndex: 20, background: isResizing ? '#3B82F6' : '#262a33', borderLeft: '1px solid #374151', borderRight: '1px solid #374151', transition: isResizing ? 'none' : 'background 0.2s', position: 'relative' }} />
       )}
 
-      {/* ── RIGHT: WHITEBOARD ── */}
       {selectedRegionId && (
-        <div style={{ flex: 1, height: '100%', minWidth: 0, position: 'relative' }}>
+        <div
+          onMouseEnter={() => setActivePane('whiteboard')}
+          onWheelCapture={(e) => {
+            if (e.nativeEvent.isTrusted && e.shiftKey && e.deltaY !== 0 && e.deltaX === 0) {
+              e.stopPropagation(); e.preventDefault();
+              const clone = new WheelEvent('wheel', { clientX: e.clientX, clientY: e.clientY, deltaX: e.deltaY, deltaY: 0, deltaMode: e.deltaMode, shiftKey: true, ctrlKey: e.ctrlKey, metaKey: e.metaKey, bubbles: true, cancelable: true });
+              e.target.dispatchEvent(clone);
+            }
+          }}
+          style={{ flex: 1, height: '100%', minWidth: 0, position: 'relative' }}
+        >
           <WhiteboardPane key={selectedRegionId} regionId={selectedRegionId} />
         </div>
       )}

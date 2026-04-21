@@ -3,21 +3,24 @@
  *
  * TWO storage backends, chosen deliberately:
  *
- *   localStorage  →  session metadata (regions, active region, scroll position,
- *                    PDF path, splitter position). Tiny JSON, synchronous reads
- *                    on startup with zero latency. Key: `lemmamap:session:<pdfKey>`
+ * localStorage  →  session metadata (regions, active region, scroll position,
+ * PDF path, splitter position). Tiny JSON, synchronous reads
+ * on startup with zero latency. Key: `lemmamap:session:<pdfKey>`
  *
- *   IndexedDB     →  Tldraw canvas snapshots, one record per region ID.
- *                    Tldraw snapshots contain the full shape/asset graph and can
- *                    be several hundred KB; IndexedDB has no practical size cap
- *                    and handles structured data natively.
- *                    DB: "LemmaMap", Store: "whiteboards", Key: regionId
+ * IndexedDB     →  Tldraw canvas snapshots, one record per region ID.
+ * Tldraw snapshots contain the full shape/asset graph and can
+ * be several hundred KB; IndexedDB has no practical size cap
+ * and handles structured data natively.
+ * DB: "LemmaMap", Store: "whiteboards", Key: regionId
  *
  * Auto-save is debounced at the call site — these functions are plain
  * read/write with no internal debouncing so callers control the frequency.
  */
 
 // ─── IndexedDB ────────────────────────────────────────────────────────────────
+import { writeTextFile, remove, exists } from '@tauri-apps/plugin-fs';
+import { join } from '@tauri-apps/api/path';
+
 
 const DB_NAME    = 'LemmaMap';
 const DB_VERSION = 1;
@@ -84,6 +87,94 @@ export async function deleteWhiteboard(regionId) {
   });
 }
 
+// ─── Data Export / Import ─────────────────────────────────────────────────────
+
+export async function getAllData() {
+  const data = { local: {}, idb: {} };
+  // 1. Gather all localStorage data
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k.startsWith('lemmamap:')) {
+      data.local[k] = localStorage.getItem(k);
+    }
+  }
+  // 2. Gather all IndexedDB whiteboard data
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.getAll();
+    const reqKeys = store.getAllKeys();
+
+    req.onsuccess = () => {
+      reqKeys.onsuccess = () => {
+        const values = req.result;
+        const keys = reqKeys.result;
+        keys.forEach((k, idx) => { data.idb[k] = values[idx]; });
+        resolve(data);
+      };
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function restoreAllData(data) {
+  // 1. Restore localStorage
+  if (data.local) {
+    for (const [k, v] of Object.entries(data.local)) {
+      localStorage.setItem(k, v);
+    }
+  }
+  // 2. Restore IndexedDB
+  if (data.idb) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      for (const [k, v] of Object.entries(data.idb)) {
+        store.put(v, k);
+      }
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+}
+
+// ─── Rolling Backup ───────────────────────────────────────────────────────────
+
+export async function performRollingBackup() {
+  const backupDir = localStorage.getItem('lemmamap:backupPath');
+  if (!backupDir) throw new Error("No backup folder selected. Please set one in Settings.");
+
+  let currentIndex = parseInt(localStorage.getItem('lemmamap:backupIndex') || '0', 10);
+  const nextIndex = currentIndex + 1;
+
+  const data = await getAllData();
+  const jsonStr = JSON.stringify(data, null, 2);
+
+  const newFileName = `backup_${nextIndex}.json`;
+  const newPath = await join(backupDir, newFileName);
+
+  await writeTextFile(newPath, jsonStr);
+
+  // Delete i - 1 (which is nextIndex - 2)
+  const oldIndex = nextIndex - 2;
+  if (oldIndex > 0) {
+    const oldFileName = `backup_${oldIndex}.json`;
+    const oldPath = await join(backupDir, oldFileName);
+    if (await exists(oldPath)) {
+      try {
+        await remove(oldPath);
+      } catch (err) {
+        console.warn("[LemmaMap] Failed to remove old backup:", err);
+      }
+    }
+  }
+
+  localStorage.setItem('lemmamap:backupIndex', nextIndex.toString());
+  return nextIndex;
+}
+
 // ─── localStorage — Session Metadata ─────────────────────────────────────────
 
 /**
@@ -95,25 +186,12 @@ export function sessionKey(pdfPath) {
   return `lemmamap:session:${clean}`;
 }
 
-/**
- * Session schema (all fields optional on read — apply defaults at call site):
- * {
- *   pdfPath:         string,   // path or URL of the PDF
- *   regions:         Region[], // [{id, x, y, w, h}, ...]
- *   selectedRegionId: string | null,
- *   scrollTop:       number,   // PDF pane scroll position (px)
- *   leftPct:         number,   // splitter position (%)
- *   savedAt:         number,   // Date.now() timestamp
- * }
- */
-
 export function saveSession(pdfPath, data) {
   try {
     const key     = sessionKey(pdfPath);
     const payload = { ...data, pdfPath, savedAt: Date.now() };
     localStorage.setItem(key, JSON.stringify(payload));
   } catch (err) {
-    // localStorage can throw in private browsing when storage is full
     console.warn('[LemmaMap] session save failed:', err);
   }
 }
@@ -131,17 +209,12 @@ export function loadSession(pdfPath) {
 
 // ─── Debounce utility ─────────────────────────────────────────────────────────
 
-/**
- * Returns a debounced version of `fn` that fires after `ms` ms of inactivity.
- * Used at the call site to throttle auto-saves without losing the final write.
- */
 export function debounce(fn, ms) {
   let timer = null;
   const debounced = (...args) => {
     clearTimeout(timer);
     timer = setTimeout(() => fn(...args), ms);
   };
-  // Flush immediately (e.g. on beforeunload)
   debounced.flush = (...args) => {
     clearTimeout(timer);
     fn(...args);
