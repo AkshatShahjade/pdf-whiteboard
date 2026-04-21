@@ -55,6 +55,43 @@ const REGION_COLORS = [
 const regionColor = (id) =>
   REGION_COLORS[parseInt(id.replace('reg_', ''), 10) % REGION_COLORS.length];
 
+// ─── LazyPage Component ────────────────────────────────────────────────────────
+// Only renders the heavy PDF canvas when it scrolls near the viewport.
+function LazyPage({ pageNumber, width, scale }) {
+  const [isVisible, setIsVisible] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // If the page comes within 800px of the screen, trigger the render
+        if (entry.isIntersecting) setIsVisible(true);
+      },
+      { rootMargin: '800px 0px' } 
+    );
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // Use the standard A4 ratio (1.414) to create a mathematically accurate 
+  // invisible placeholder. This keeps the scrollbar size perfect!
+  const placeholderHeight = width * scale * 1.414;
+
+  return (
+    <div ref={ref} style={{ minHeight: placeholderHeight, position: 'relative' }}>
+      {isVisible && (
+        <Page
+          pageNumber={pageNumber}
+          width={width}
+          scale={scale}
+          renderTextLayer={false}
+          renderAnnotationLayer={false}
+        />
+      )}
+    </div>
+  );
+}
+
 // ─── SaveIndicator ────────────────────────────────────────────────────────────
 // Small transient badge that appears whenever a save fires.
 function SaveIndicator({ savedAt }) {
@@ -401,7 +438,7 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
           <span style={{
             fontSize: '13px', color: '#e5e7eb', fontWeight: 500, letterSpacing: '0.02em',
           }}>
-            {pdfPath.split('/').pop()}
+            {decodeURIComponent(pdfPath).split(/[/\\]/).pop()}
           </span>
 
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -445,17 +482,23 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
             }}
           >
             <Document 
-            file={pdfPath} 
-            onLoadSuccess={({ numPages }) => setNumPages(numPages)}>
+              file={pdfPath} 
+              onLoadSuccess={({ numPages }) => {
+                setNumPages(numPages);
+                // Trigger scroll restoration immediately. Because our LazyPages 
+                // have perfect placeholder heights, the scroll jump will be perfectly accurate!
+                setPdfReady(true); 
+              }}
+              onLoadError={(error) => console.error("PDF Load Error:", error)}
+            >
               {Array.from({ length: numPages ?? 0 }, (_, i) => (
-                <Page
-                  key={i} pageNumber={i + 1}
-                  width={PDF_WIDTH} scale={zoom}
-                  renderTextLayer={false} renderAnnotationLayer={false}
-                  onRenderSuccess={() => { if (i === (numPages ?? 1) - 1) setPdfReady(true); }}
+                <LazyPage
+                  key={`${pdfPath}-${i}`}
+                  pageNumber={i + 1}
+                  width={PDF_WIDTH}
+                  scale={zoom}
                 />
               ))}
-            onLoadError={(error) => console.error("Failed to load PDF:", error)}
             </Document>
 
             {/* Scaled SVG overlay */}

@@ -1,6 +1,4 @@
 Functionality Important
-- fails to load pdf from recents tab.
-- treats the same file path as 2 different pdfs if opened twice
 - changes to tldraw settings:
     - text font to helvetica
     - remove artificial smoothening done to the pen tool
@@ -9,11 +7,9 @@ Functionality Important
     - Tldraw: v, d, t
     - PDF: s, ,x
     - Esc should deselect text box. If no text box then it should deselect region
-- Folder creation to store the locally stored file paths
-    it fails to load from the recent tab each time. Explain the architecture of how pdfs are stored. Are the stored or is only their file path stored. WHy don't recents open, even when their filepaths aren't modified. Should we decide to store file paths (I think so, and so then we should also create a proper file organization system in the app itself... folders, etc. - there should be a setting: PDF File Path, can can be configured any time, and then the app stores all the pdfs in that path. So if I want to import 10 pdfs, I just copy them in the file manager to that PDF file path and it can be accessed by the app. Create 3 options in the Homescreen - 1) Open from Library (library being the PDF File Path), 2) Import New PDF (can drag drop as well) and 3) Recents )
-    If Import new PDf is selected, and the new pdf is selected, create a copy of that pdf in the PDF FIle PAth
 
 UI imp
 - UI is too dark and hard to read. Also make it all translucent so you can see the pdf behind it
 UI not imp
 - Making the rectangle box boundaries thickness a little more
+- Page Numbers
