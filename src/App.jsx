@@ -9,7 +9,8 @@ import {
 } from './storage.js';
 import HomeScreen, { loadSettings } from './HomeScreen.jsx';
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+// Change to this:
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MIN_PANE_PCT     = 15;
@@ -177,7 +178,7 @@ export default function Root() {
 
 // ─── WorkspaceApp ─────────────────────────────────────────────────────────────
 function WorkspaceApp({ pdfPath, settings, onHome }) {
-  const PDF_WIDTH = settings?.pdfWidth ?? 800;
+  const PDF_WIDTH = 800;
 
   // ── Restore session synchronously from localStorage ──────────────────────
   const restoredSession = useMemo(() => loadSession(pdfPath), [pdfPath]);
@@ -443,7 +444,9 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
               boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
             }}
           >
-            <Document file={pdfPath} onLoadSuccess={({ numPages }) => setNumPages(numPages)}>
+            <Document 
+            file={pdfPath} 
+            onLoadSuccess={({ numPages }) => setNumPages(numPages)}>
               {Array.from({ length: numPages ?? 0 }, (_, i) => (
                 <Page
                   key={i} pageNumber={i + 1}
@@ -452,6 +455,7 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
                   onRenderSuccess={() => { if (i === (numPages ?? 1) - 1) setPdfReady(true); }}
                 />
               ))}
+            onLoadError={(error) => console.error("Failed to load PDF:", error)}
             </Document>
 
             {/* Scaled SVG overlay */}

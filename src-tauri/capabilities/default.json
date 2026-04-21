@@ -11,6 +11,7 @@
     "fs:allow-copy-file",
     "fs:allow-exists",
     "fs:allow-write-file",
+    "fs:allow-mkdir",
     {
       "identifier": "fs:scope",
       "allow": [{ "path": "**" }]

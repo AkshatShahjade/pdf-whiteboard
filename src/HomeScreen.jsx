@@ -10,11 +10,18 @@
  * Wires up to App.jsx via the `onOpen(pdfPath, pdfFile)` prop.
  * Pass a File object for local files, or a path string for /public assets.
  */
+/**
+ * HomeScreen.jsx — LemmaMap launch screen
+ */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { loadSession } from './storage.js';
+
+// ─── Tauri Imports ────────────────────────────────────────────────────────────
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { readDir, mkdir, copyFile, exists, writeFile } from '@tauri-apps/plugin-fs';
+import { join, basename, dirname } from '@tauri-apps/api/path';
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -78,7 +85,6 @@ function regionCount(path) {
 
 const SETTINGS_KEY = 'lemmamap:settings';
 const DEFAULT_SETTINGS = {
-  pdfWidth:    800,
   defaultSplit: 50,
   theme:        'dark',
   autosaveMs:   800,
@@ -130,54 +136,42 @@ function CornerMark({ pos }) {
   );
 }
 
-function DropZone({ onBrowseClick }) {
+// ── Drop Zone ─────────────────────────────────────────────────────────────────
+function DropZone({ onBrowseClick, onFileDrop, disabled }) {
   const [dragging, setDragging] = useState(false);
 
-  // Note: Web-based drag-and-drop is disabled in favor of native dialogs
   const handleDrop = useCallback((e) => {
     e.preventDefault(); setDragging(false);
-    alert("Please click to open files natively in Tauri.");
-  }, []);
+    if (disabled) return alert("Please set a Library Folder first!");
+    const file = [...e.dataTransfer.files].find(f => f.type === 'application/pdf');
+    if (file && onFileDrop) onFileDrop(file);
+  }, [onFileDrop, disabled]);
 
   return (
     <div
       onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
-      onClick={onBrowseClick}
+      onClick={disabled ? () => alert("Please set a Library Folder first!") : onBrowseClick}
       style={{
         position: 'relative',
         border: `1.5px ${dragging ? 'solid' : 'dashed'} ${dragging ? '#3B82F6' : '#2a2d36'}`,
-        borderRadius: '10px',
-        padding: '48px 32px',
-        textAlign: 'center',
-        cursor: 'pointer',
+        borderRadius: '10px', padding: '48px 32px', textAlign: 'center', cursor: 'pointer',
         background: dragging ? 'rgba(59,130,246,0.06)' : 'rgba(255,255,255,0.015)',
-        transition: 'all 0.2s',
-        backdropFilter: 'blur(4px)',
+        transition: 'all 0.2s', backdropFilter: 'blur(4px)', opacity: disabled ? 0.4 : 1
       }}
     >
       {dragging && (
-        <div style={{
-          position: 'absolute', inset: -1, borderRadius: '10px',
-          border: '1.5px solid #3B82F6',
-          animation: 'pulse-ring 1s ease-out infinite',
-          pointerEvents: 'none',
-        }} />
+        <div style={{ position: 'absolute', inset: -1, borderRadius: '10px', border: '1.5px solid #3B82F6', animation: 'pulse-ring 1s ease-out infinite', pointerEvents: 'none' }} />
       )}
-
       <div style={{ fontSize: '32px', marginBottom: '14px', opacity: dragging ? 1 : 0.4 }}>
         {dragging ? '⬇' : '📄'}
       </div>
-      <div style={{
-        fontSize: '13px', fontWeight: '600', letterSpacing: '0.08em',
-        color: dragging ? '#60A5FA' : '#9ca3af', textTransform: 'uppercase',
-        marginBottom: '6px',
-      }}>
-        {dragging ? 'Drop to open' : 'Open a PDF'}
+      <div style={{ fontSize: '13px', fontWeight: '600', letterSpacing: '0.08em', color: dragging ? '#60A5FA' : '#9ca3af', textTransform: 'uppercase', marginBottom: '6px' }}>
+        {dragging ? 'Drop to copy to library' : 'Import New PDF'}
       </div>
       <div style={{ fontSize: '11px', color: '#4b5563' }}>
-        click to browse your system files
+        drag & drop · or click to browse
       </div>
     </div>
   );
@@ -312,15 +306,6 @@ function SettingsDrawer({ open, onClose, settings, onChange }) {
 
         {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
-          <Field label="PDF render width" hint={`${settings.pdfWidth}px`}>
-            <input
-              type="range" min="500" max="1200" step="50"
-              value={settings.pdfWidth}
-              onChange={(e) => onChange({ ...settings, pdfWidth: +e.target.value })}
-              style={{ width: '100%', accentColor: '#3B82F6' }}
-            />
-          </Field>
 
           <Field label="Default split" hint={`${settings.defaultSplit}%`}>
             <input
@@ -490,36 +475,116 @@ export default function HomeScreen({ onOpen }) {
   const [settings, setSettings]       = useState(loadSettings);
   const [mounted, setMounted]         = useState(false);
 
-  useEffect(() => {
-    // Stagger-reveal animation trigger
-    setTimeout(() => setMounted(true), 30);
-  }, []);
+  const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
+  const [newFolderName, setNewFolderName]     = useState('');
+
+  // -- Library State
+  const [libraryPath, setLibraryPath] = useState(localStorage.getItem('lemmamap:library') || null);
+  const [currentDir, setCurrentDir]   = useState(localStorage.getItem('lemmamap:library') || null);
+  const [entries, setEntries]         = useState([]);
+
+  useEffect(() => { setTimeout(() => setMounted(true), 30); }, []);
 
   const handleSettingsChange = useCallback((s) => {
-    setSettings(s);
-    saveSettings(s);
+    setSettings(s); saveSettings(s);
   }, []);
 
-  // ── Native Tauri File Browser ──
-  const handleBrowseClick = useCallback(async () => {
+  // -- Directory Reading
+  const refreshDir = useCallback(async (dir) => {
+    if (!dir) return;
     try {
-      const selectedPath = await open({
-        multiple: false,
-        filters: [{ name: 'PDF', extensions: ['pdf'] }]
-      });
+      const items = await readDir(dir);
+      const sorted = items
+        .filter(i => i.isDirectory || (i.isFile && i.name.toLowerCase().endsWith('.pdf')))
+        .sort((a, b) => {
+          if (a.isDirectory && !b.isDirectory) return -1;
+          if (!a.isDirectory && b.isDirectory) return 1;
+          return a.name.localeCompare(b.name);
+        });
+      setEntries(sorted);
+    } catch (e) { console.error("Failed to read directory:", e); }
+  }, []);
 
-      if (selectedPath) {
-        const safeUrl = convertFileSrc(selectedPath);
-        const name = selectedPath.split(/[/\\]/).pop();
-        
-        const entry = { path: safeUrl, name: name, openedAt: Date.now(), isLocal: true };
-        pushRecent(entry);
+  useEffect(() => {
+    if (currentDir) refreshDir(currentDir);
+  }, [currentDir, refreshDir]);
+
+  // -- Handlers
+  const handleSetLibrary = async () => {
+    try {
+      const selected = await open({ directory: true });
+      if (selected) {
+        setLibraryPath(selected); setCurrentDir(selected);
+        localStorage.setItem('lemmamap:library', selected);
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const handleNewFolder = () => {
+    if (!currentDir) return;
+    setNewFolderName('');
+    setIsFolderModalOpen(true);
+  };
+
+  const confirmNewFolder = async () => {
+    if (!newFolderName.trim()) return;
+    try {
+      const newPath = await join(currentDir, newFolderName.trim());
+      if (!(await exists(newPath))) {
+        await mkdir(newPath);
+        refreshDir(currentDir);
+        setIsFolderModalOpen(false);
+      } else {
+        alert("A folder with that name already exists.");
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const handleImportBrowse = async () => {
+    try {
+      const file = await open({ multiple: false, filters: [{ name: 'PDF', extensions: ['pdf'] }] });
+      if (file && currentDir) {
+        const name = await basename(file);
+        const dest = await join(currentDir, name);
+        if (await exists(dest)) return alert("File already exists in this folder.");
+        await copyFile(file, dest);
+        refreshDir(currentDir);
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const handleImportDrop = async (file) => {
+    try {
+      const dest = await join(currentDir, file.name);
+      if (await exists(dest)) return alert("File already exists in this folder.");
+      const buffer = await file.arrayBuffer();
+      await writeFile(dest, new Uint8Array(buffer)); // Write web file directly to disk natively
+      refreshDir(currentDir);
+    } catch (err) { console.error(err); }
+  };
+
+  const handleEntryClick = async (entry) => {
+    try {
+      if (entry.isDirectory) {
+        const nextDir = await join(currentDir, entry.name);
+        setCurrentDir(nextDir);
+      } else {
+        const fullPath = await join(currentDir, entry.name);
+        const safeUrl = convertFileSrc(fullPath);
+        const recentEntry = { path: safeUrl, name: entry.name, openedAt: Date.now(), isLocal: true };
+        pushRecent(recentEntry);
         onOpen(safeUrl, null, settings);
       }
-    } catch (err) {
-      console.error("Failed to open file via Tauri native dialog:", err);
-    }
-  }, [onOpen, settings]);
+    } catch (err) { console.error(err); }
+  };
+
+  const handleUpDir = async () => {
+    if (currentDir === libraryPath) return;
+    try {
+      const parent = await dirname(currentDir);
+      setCurrentDir(parent);
+    } catch (err) { console.error(err); }
+  };
 
   const handleRecentOpen = useCallback((entry) => {
     pushRecent({ ...entry, openedAt: Date.now() });
@@ -527,14 +592,11 @@ export default function HomeScreen({ onOpen }) {
   }, [onOpen, settings]);
 
   const handleRemoveRecent = useCallback((path) => {
-    removeRecent(path);
-    setRecents(getRecents());
+    removeRecent(path); setRecents(getRecents());
   }, []);
 
-  // Fade-in animation style factory
   const fadeIn = (delay = 0) => ({
-    opacity: mounted ? 1 : 0,
-    transform: mounted ? 'translateY(0)' : 'translateY(12px)',
+    opacity: mounted ? 1 : 0, transform: mounted ? 'translateY(0)' : 'translateY(12px)',
     transition: `opacity 0.5s ${delay}s ease, transform 0.5s ${delay}s ease`,
   });
 
@@ -629,51 +691,88 @@ export default function HomeScreen({ onOpen }) {
           </p>
         </div>
 
-        {/* Drop zone */}
-        <div style={fadeIn(0.12)}>
-        <DropZone onBrowseClick={handleBrowseClick} />
-        </div>
-
-        {/* Recents */}
-        {recents.length > 0 && (
-          <div style={fadeIn(0.18)}>
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              marginBottom: '14px',
-            }}>
-              <span style={{ fontSize: '10px', color: '#374151', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                Recent
-              </span>
-              <button
-                onClick={() => { localStorage.removeItem(RECENTS_KEY); setRecents([]); }}
-                style={{ background: 'none', border: 'none', color: '#2a2d36', cursor: 'pointer', fontSize: '10px', fontFamily: 'inherit' }}
-              >
-                clear all
+        {/* ── Dashboard Grid ── */}
+        <div style={{ ...fadeIn(0.12), display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+          
+          {/* Left Col: Actions & Recents */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            
+            {/* Library Configuration */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <button onClick={handleSetLibrary} style={{
+                padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', background: '#1a1d24', border: '1px solid #2a2d36',
+                color: '#d1d5db', fontSize: '14px', fontFamily: "'IBM Plex Mono', monospace", transition: 'all 0.2s', textAlign: 'left'
+              }}>
+                📁 {libraryPath ? 'Change Library Folder' : 'Setup Library Folder'}
               </button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {recents.map(entry => (
-                <RecentCard
-                  key={entry.path}
-                  entry={entry}
-                  onOpen={handleRecentOpen}
-                  onRemove={(path) => { handleRemoveRecent(path); }}
-                />
-              ))}
-            </div>
-          </div>
-        )}
 
-        {/* Empty state hint */}
-        {recents.length === 0 && (
-          <div style={{ ...fadeIn(0.22), textAlign: 'center' }}>
-            <p style={{ fontSize: '11px', color: '#1e2128' }}>
-              No recent sessions · open a PDF to begin
-            </p>
-          </div>
-        )}
+            <DropZone 
+              onBrowseClick={handleImportBrowse} 
+              onFileDrop={handleImportDrop} 
+              disabled={!libraryPath} 
+            />
 
-        {/* Keyboard hint strip */}
+            {/* Recents */}
+            {recents.length > 0 && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                  <span style={{ fontSize: '10px', color: '#374151', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Recent</span>
+                  <button onClick={() => { localStorage.removeItem('lemmamap:recents'); setRecents([]); }} style={{ background: 'none', border: 'none', color: '#2a2d36', cursor: 'pointer', fontSize: '10px', fontFamily: 'inherit' }}>clear all</button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {recents.map(entry => <RecentCard key={entry.path} entry={entry} onOpen={handleRecentOpen} onRemove={handleRemoveRecent} />)}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right Col: Interactive Library Viewer */}
+          <div style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid #1e2128', borderRadius: '10px', padding: '24px', display: 'flex', flexDirection: 'column' }}>
+            {!libraryPath ? (
+               <div style={{ margin: 'auto', textAlign: 'center', color: '#4b5563', fontSize: '12px' }}>
+                 No Library Folder selected.<br/>Setup a library to organize PDFs.
+               </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <span style={{ fontSize: '10px', color: '#374151', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Library Explorer</span>
+                  <button onClick={handleNewFolder} style={{ background: 'none', border: '1px solid #2a2d36', borderRadius: '4px', color: '#9ca3af', cursor: 'pointer', fontSize: '10px', padding: '4px 8px' }}>+ New Folder</button>
+                </div>
+                
+                {/* Breadcrumbs */}
+                <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '12px', background: '#13161c', padding: '6px 10px', borderRadius: '6px', border: '1px solid #1e2128', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {currentDir !== libraryPath && <button onClick={handleUpDir} style={{ background: 'none', border: 'none', color: '#3B82F6', cursor: 'pointer', padding: 0 }}>↑ Back</button>}
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {currentDir.replace(libraryPath, 'Library')}
+                  </span>
+                </div>
+
+                {/* File List */}
+                <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '500px' }}>
+                  {entries.length === 0 ? (
+                    <span style={{ fontSize: '12px', color: '#6b7280', textAlign: 'center', padding: '20px' }}>Folder is empty.</span>
+                  ) : (
+                    entries.map(entry => (
+                      <button key={entry.name} onClick={() => handleEntryClick(entry)} style={{
+                        textAlign: 'left', padding: '12px', borderRadius: '6px', background: '#1a1d24', border: '1px solid #2a2d36',
+                        color: '#d1d5db', cursor: 'pointer', fontSize: '13px', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: '8px'
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#3B82F6'; e.currentTarget.style.color = '#fff'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2d36'; e.currentTarget.style.color = '#d1d5db'; }}
+                      >
+                        <span style={{ fontSize: '16px', opacity: 0.8 }}>{entry.isDirectory ? '📁' : '📄'}</span>
+                        <span>{entry.name}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Keyboard hint strip
         <div style={{
           ...fadeIn(0.26),
           display: 'flex', gap: '20px', justifyContent: 'center',
@@ -696,7 +795,7 @@ export default function HomeScreen({ onOpen }) {
               <span style={{ fontSize: '10px', color: '#2a2d36' }}>{hint}</span>
             </div>
           ))}
-        </div>
+        </div> */}
 
       </div>
 
@@ -708,6 +807,51 @@ export default function HomeScreen({ onOpen }) {
         onChange={handleSettingsChange}
       />
       <AboutPanel open={aboutOpen} onClose={() => setAboutOpen(false)} />
+
+      {/* ── New Folder Modal ── */}
+      {isFolderModalOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: '#1a1d24', border: '1px solid #2a2d36', borderRadius: '8px',
+            padding: '24px', width: '320px', display: 'flex', flexDirection: 'column', gap: '16px',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.5)', fontFamily: "'IBM Plex Mono', monospace"
+          }}>
+            <h3 style={{ margin: 0, fontSize: '14px', color: '#e2e8f0' }}>Create New Folder</h3>
+            <input
+              autoFocus
+              type="text"
+              placeholder="Folder name..."
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && confirmNewFolder()}
+              style={{
+                background: '#0f1117', border: '1px solid #2a2d36', color: '#e2e8f0',
+                padding: '10px 12px', borderRadius: '6px', outline: 'none',
+                fontFamily: 'inherit', fontSize: '13px'
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
+              <button 
+                onClick={() => setIsFolderModalOpen(false)} 
+                style={{ background: 'transparent', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '6px 12px', fontSize: '12px' }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmNewFolder} 
+                style={{ background: '#3B82F6', border: 'none', color: '#fff', cursor: 'pointer', padding: '6px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
