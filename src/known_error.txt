@@ -7,6 +7,7 @@ Functionality Important
     - Tldraw: v, d, t
     - PDF: s, ,x
     - Esc should deselect text box. If no text box then it should deselect region
+- Add freeform and section select tools
 
 UI imp
 - UI is too dark and hard to read. Also make it all translucent so you can see the pdf behind it

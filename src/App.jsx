@@ -8,6 +8,7 @@ import {
   debounce,
 } from './storage.js';
 import HomeScreen, { loadSettings } from './HomeScreen.jsx';
+import { confirm } from '@tauri-apps/plugin-dialog';
 
 // Change to this:
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -80,9 +81,7 @@ function LazyPage({ pageNumber, width, scale }) {
     <div ref={ref} style={{ 
       minHeight: placeholderHeight, 
       position: 'relative',
-      borderBottom: '2px solid rgba(242, 23, 23, 0.92)', // Faint divider line
-      marginBottom: '6px',
-      paddingBottom: '6px'
+      borderBottom: '2px solid rgba(0, 0, 0, 0.92)', // Faint divider line
     }}>
       {isVisible && (
         <Page
@@ -389,12 +388,21 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
     setMovingRegion(null);
   }, [currentDrag, zoom]);
 
-  const handleBorderClick = useCallback((e, regionId) => {
+  const handleBorderClick = useCallback(async (e, regionId) => {
     e.stopPropagation();
+    
     if (tool === 'remove') {
-      setRegions((prev) => prev.filter((r) => r.id !== regionId));
-      deleteWhiteboard(regionId);
-      if (selectedRegionId === regionId) setSelectedRegionId(null);
+      // Trigger the native OS confirmation dialog
+      const isConfirmed = await confirm(
+        'Are you sure you want to delete this region? Its whiteboard data will be permanently lost.', 
+        { title: 'Delete Whiteboard', kind: 'warning' }
+      );
+
+      if (isConfirmed) {
+        setRegions((prev) => prev.filter((r) => r.id !== regionId));
+        deleteWhiteboard(regionId);
+        if (selectedRegionId === regionId) setSelectedRegionId(null);
+      }
     } else if (tool === 'select') {
       setSelectedRegionId(regionId);
     }
