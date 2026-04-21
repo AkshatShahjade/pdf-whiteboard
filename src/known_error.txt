@@ -1,0 +1,8 @@
+- fails to load pdf from recents tab.
+- treats the same file path as 2 different pdfs if uploaded twice
+- Remove the keyboard shortcut UI (excluding ctrl+click and drag, and Esc for deselection)
+- UI is too dark and hard to read. Also make it all translucent so you can see the pdf behind it
+- changes to tldraw settings:
+    - text font to helvetica
+    - remove artificial smoothening done to the pen tool
+    - set default to pen tool when whiteboard it opened
