@@ -419,7 +419,17 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
   // Keyboard Shortcuts (Capture Phase)
   const handleKeyDown = useCallback((e) => {
     const target = e.target;
-    const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable || target.closest('.tl-layer');
+    const activeEl = document.activeElement;
+    const isTyping = (
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.tagName === 'SELECT' ||
+      target.isContentEditable ||
+      activeEl?.tagName === 'INPUT' ||
+      activeEl?.tagName === 'TEXTAREA' ||
+      activeEl?.tagName === 'SELECT' ||
+      activeEl?.isContentEditable
+    );
     if (isTyping) return;
 
     if (e.key === '\\' && (e.ctrlKey || e.metaKey)) {
@@ -433,6 +443,17 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
       e.preventDefault();
       setZoom(1);
       return;
+    }
+
+    // Global tool shortcuts: I->1, II->2, III->3, ...
+    if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+      const n = Number.parseInt(e.key, 10);
+      if (!Number.isNaN(n) && n >= 1 && n <= globalToolCount) {
+        e.preventDefault();
+        const btn = document.querySelector(`button[title="Global Whiteboard Tool ${n}"]`);
+        if (btn) btn.click();
+        return;
+      }
     }
 
     if (e.key === 'Enter') {
@@ -506,7 +527,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
       else if (k === 'x') setTool('remove');
       e.stopPropagation();
     }
-  }, [activePane, selectedRegionId, selectedGlobalToolIdx, editingShapeId, shapeBackup, editingSectionId, sectionY, tool, selectPanelToolIdx, viewStack]);
+  }, [activePane, selectedRegionId, selectedGlobalToolIdx, editingShapeId, shapeBackup, editingSectionId, sectionY, tool, selectPanelToolIdx, viewStack, globalToolCount]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown, true);
