@@ -221,3 +221,140 @@ export function debounce(fn, ms) {
   };
   return debounced;
 }
+
+// ─── Global Whiteboards Registry ──────────────────────────────────────────────
+
+const WHITEBOARDS_KEY = 'lemmamap:whiteboards';
+const WHITEBOARD_FOLDER_MAP_KEY = 'lemmamap:whiteboardFolders';
+const WHITEBOARD_FILE_EXT = '.whiteboard.json';
+
+export function getAllWhiteboards() {
+  try {
+    const raw = localStorage.getItem(WHITEBOARDS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return [];
+    const seen = new Set();
+    return parsed.filter((wb) => {
+      if (!wb?.id || seen.has(wb.id)) return false;
+      seen.add(wb.id);
+      return true;
+    });
+  } catch {
+    return [];
+  }
+}
+
+function saveAllWhiteboards(whiteboards) {
+  localStorage.setItem(WHITEBOARDS_KEY, JSON.stringify(whiteboards));
+}
+
+function getWhiteboardFolderMap() {
+  try {
+    const raw = localStorage.getItem(WHITEBOARD_FOLDER_MAP_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveWhiteboardFolderMap(folderMap) {
+  localStorage.setItem(WHITEBOARD_FOLDER_MAP_KEY, JSON.stringify(folderMap));
+}
+
+export function getWhiteboardsForFolder(folderPath) {
+  if (!folderPath) return [];
+  const whiteboards = getAllWhiteboards();
+  const folderMap = getWhiteboardFolderMap();
+  const ids = folderMap[folderPath] || [];
+  if (!Array.isArray(ids)) return [];
+  const byId = new Map(whiteboards.map((wb) => [wb.id, wb]));
+  const seen = new Set();
+  return ids.map((id) => byId.get(id)).filter((wb) => {
+    if (!wb || seen.has(wb.id)) return false;
+    seen.add(wb.id);
+    return true;
+  });
+}
+
+function safeFileSlug(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'whiteboard';
+}
+
+export async function createWhiteboard(name, folderPath = null) {
+  const finalName = (name || '').trim();
+  if (!finalName) throw new Error('Whiteboard name is required.');
+  const libraryPath = localStorage.getItem('lemmamap:library');
+  const targetFolder = folderPath || libraryPath;
+  if (!targetFolder) throw new Error('Library folder is not set.');
+
+  const whiteboards = getAllWhiteboards();
+  const newWhiteboard = {
+    id: `wb_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+    name: finalName,
+    type: 'standalone-whiteboard',
+    folderPath: targetFolder,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+  whiteboards.push(newWhiteboard);
+  saveAllWhiteboards(whiteboards);
+
+  const folderMap = getWhiteboardFolderMap();
+  const ids = Array.isArray(folderMap[targetFolder]) ? folderMap[targetFolder] : [];
+  folderMap[targetFolder] = [...ids, newWhiteboard.id];
+  saveWhiteboardFolderMap(folderMap);
+
+  // Persist each standalone whiteboard as its own typed file in the library tree.
+  const fileName = `${safeFileSlug(finalName)}${WHITEBOARD_FILE_EXT}`;
+  const filePath = await join(targetFolder, fileName);
+  const filePayload = {
+    kind: 'standalone-whiteboard',
+    id: newWhiteboard.id,
+    name: newWhiteboard.name,
+    createdAt: newWhiteboard.createdAt,
+    updatedAt: newWhiteboard.updatedAt,
+  };
+  await writeTextFile(filePath, JSON.stringify(filePayload, null, 2));
+
+  return newWhiteboard;
+}
+
+export function assignWhiteboardToFolder(whiteboardId, folderPath) {
+  if (!whiteboardId || !folderPath) return;
+  const folderMap = getWhiteboardFolderMap();
+  for (const key of Object.keys(folderMap)) {
+    const ids = Array.isArray(folderMap[key]) ? folderMap[key] : [];
+    folderMap[key] = ids.filter((id) => id !== whiteboardId);
+  }
+  const nextIds = Array.isArray(folderMap[folderPath]) ? folderMap[folderPath] : [];
+  folderMap[folderPath] = [...nextIds, whiteboardId];
+  saveWhiteboardFolderMap(folderMap);
+}
+
+export function deleteGlobalWhiteboard(whiteboardId) {
+  if (!whiteboardId) return;
+  const whiteboards = getAllWhiteboards().filter((wb) => wb.id !== whiteboardId);
+  saveAllWhiteboards(whiteboards);
+
+  const folderMap = getWhiteboardFolderMap();
+  for (const key of Object.keys(folderMap)) {
+    const ids = Array.isArray(folderMap[key]) ? folderMap[key] : [];
+    folderMap[key] = ids.filter((id) => id !== whiteboardId);
+  }
+  saveWhiteboardFolderMap(folderMap);
+  deleteWhiteboard(whiteboardId);
+}
+
+export function pruneWhiteboards(validIds) {
+  const allow = new Set(validIds || []);
+  const whiteboards = getAllWhiteboards().filter((wb) => allow.has(wb.id));
+  saveAllWhiteboards(whiteboards);
+
+  const folderMap = getWhiteboardFolderMap();
+  for (const key of Object.keys(folderMap)) {
+    const ids = Array.isArray(folderMap[key]) ? folderMap[key] : [];
+    folderMap[key] = ids.filter((id) => allow.has(id));
+  }
+  saveWhiteboardFolderMap(folderMap);
+}

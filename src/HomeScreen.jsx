@@ -3,12 +3,18 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { loadSession, getAllData, restoreAllData, performRollingBackup } from './storage.js';
+import {
+  loadSession,
+  getAllData,
+  restoreAllData,
+  performRollingBackup,
+  createWhiteboard,
+} from './storage.js';
 
 // ─── Tauri Imports ────────────────────────────────────────────────────────────
 import { open, save, confirm as tauriConfirm } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { readDir, mkdir, copyFile, exists, writeFile, writeTextFile, readTextFile } from '@tauri-apps/plugin-fs';
+import { readDir, mkdir, copyFile, exists, writeFile, writeTextFile, readTextFile, remove } from '@tauri-apps/plugin-fs';
 import { join, basename, dirname } from '@tauri-apps/api/path';
 
 // ─── constants ────────────────────────────────────────────────────────────────
@@ -62,6 +68,7 @@ function timeAgo(ts) {
 }
 
 function regionCount(path) {
+  if (!path || path.startsWith('whiteboard:')) return 0;
   const s = loadSession(path);
   return s?.regions?.length ?? 0;
 }
@@ -71,6 +78,7 @@ const DEFAULT_SETTINGS = {
   defaultSplit: 50,
   theme:        'dark',
   autosaveMs:   800,
+  maxGlobalPdfTools: 8,
 };
 
 export function loadSettings() {
@@ -321,6 +329,9 @@ function SettingsDrawer({ open: isOpen, onClose, settings, onChange, backupPath,
           <Field label="Autosave delay" hint={`${settings.autosaveMs}ms`}>
             <input type="range" min="200" max="2000" step="100" value={settings.autosaveMs} onChange={(e) => onChange({ ...settings, autosaveMs: +e.target.value })} style={{ width: '100%', accentColor: '#3B82F6' }} />
           </Field>
+          <Field label="Max global PDF tools" hint={`${settings.maxGlobalPdfTools}`}>
+            <input type="range" min="1" max="12" step="1" value={settings.maxGlobalPdfTools} onChange={(e) => onChange({ ...settings, maxGlobalPdfTools: +e.target.value })} style={{ width: '100%', accentColor: '#3B82F6' }} />
+          </Field>
 
           {/* Backup Section */}
           <div style={{ borderTop: '1px solid #374151', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -423,6 +434,8 @@ export default function HomeScreen({ onOpen }) {
 
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
   const [newFolderName, setNewFolderName]     = useState('');
+  const [isWhiteboardModalOpen, setIsWhiteboardModalOpen] = useState(false);
+  const [newWhiteboardName, setNewWhiteboardName] = useState('');
 
   const [libraryPath, setLibraryPath] = useState(localStorage.getItem('lemmamap:library') || null);
   const [backupPath, setBackupPath]   = useState(localStorage.getItem('lemmamap:backupPath') || null);
@@ -444,14 +457,14 @@ export default function HomeScreen({ onOpen }) {
     if (!dir) return;
     try {
       const items = await readDir(dir);
-      const sorted = items
-        .filter(i => i.isDirectory || (i.isFile && i.name.toLowerCase().endsWith('.pdf')))
+      const fsEntries = items
+        .filter(i => i.isDirectory || (i.isFile && (i.name.toLowerCase().endsWith('.pdf') || i.name.toLowerCase().endsWith('.whiteboard.json'))))
         .sort((a, b) => {
           if (a.isDirectory && !b.isDirectory) return -1;
           if (!a.isDirectory && b.isDirectory) return 1;
           return a.name.localeCompare(b.name);
         });
-      setEntries(sorted);
+      setEntries(fsEntries);
     } catch (e) { console.error("Failed to read directory:", e); }
   }, []);
 
@@ -481,6 +494,12 @@ export default function HomeScreen({ onOpen }) {
     if (!currentDir) return;
     setNewFolderName('');
     setIsFolderModalOpen(true);
+  };
+
+  const handleNewWhiteboard = () => {
+    if (!currentDir) return;
+    setNewWhiteboardName('');
+    setIsWhiteboardModalOpen(true);
   };
 
   const confirmNewFolder = async () => {
@@ -523,10 +542,20 @@ export default function HomeScreen({ onOpen }) {
         setCurrentDir(nextDir);
       } else {
         const fullPath = await join(currentDir, entry.name);
+        if (entry.name.toLowerCase().endsWith('.whiteboard.json')) {
+          const raw = await readTextFile(fullPath);
+          const meta = JSON.parse(raw);
+          if (!meta?.id) throw new Error('Invalid whiteboard file.');
+          const wbPath = `whiteboard:${meta.id}`;
+          const recentEntry = { path: wbPath, name: meta.name || entry.name.replace(/\.whiteboard\.json$/i, ''), openedAt: Date.now(), isWhiteboard: true, sourcePath: fullPath };
+          pushRecent(recentEntry);
+          onOpen(null, { id: meta.id, name: meta.name || 'Whiteboard' }, settings, null);
+          return;
+        }
         const safeUrl = convertFileSrc(fullPath);
-        const recentEntry = { path: safeUrl, name: entry.name, openedAt: Date.now(), isLocal: true };
+        const recentEntry = { path: safeUrl, name: entry.name, openedAt: Date.now(), isLocal: true, sourcePath: fullPath };
         pushRecent(recentEntry);
-        onOpen(safeUrl, null, settings);
+        onOpen(safeUrl, null, settings, fullPath);
       }
     } catch (err) { console.error(err); }
   };
@@ -541,8 +570,26 @@ export default function HomeScreen({ onOpen }) {
 
   const handleRecentOpen = useCallback((entry) => {
     pushRecent({ ...entry, openedAt: Date.now() });
-    onOpen(entry.path, null, settings);
+    if (entry.path.startsWith('whiteboard:')) {
+      const id = entry.path.replace('whiteboard:', '');
+      onOpen(null, { id, name: entry.name || 'Whiteboard' }, settings, null);
+      return;
+    }
+    onOpen(entry.path, null, settings, entry.sourcePath || null);
   }, [onOpen, settings]);
+
+  const confirmNewWhiteboard = async () => {
+    const trimmed = newWhiteboardName.trim();
+    if (!trimmed) return;
+    try {
+      await createWhiteboard(trimmed, currentDir);
+      setIsWhiteboardModalOpen(false);
+      refreshDir(currentDir);
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || 'Failed to create whiteboard.', 'error');
+    }
+  };
 
   const handleRemoveRecent = useCallback((path) => { removeRecent(path); setRecents(getRecents()); }, []);
 
@@ -631,7 +678,11 @@ export default function HomeScreen({ onOpen }) {
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                   <span style={{ fontSize: '10px', color: '#9ca3af', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Library Explorer</span>
-                  <button onClick={handleNewFolder} style={{ background: 'none', border: '1px solid #4b5563', borderRadius: '4px', color: '#d1d5db', cursor: 'pointer', fontSize: '10px', padding: '4px 8px' }}>+ New Folder</button>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button onClick={() => refreshDir(currentDir)} title="Refresh folder" style={{ background: 'none', border: '1px solid #4b5563', borderRadius: '4px', color: '#d1d5db', cursor: 'pointer', fontSize: '12px', padding: '4px 8px', lineHeight: 1 }}>↻</button>
+                    <button onClick={handleNewFolder} style={{ background: 'none', border: '1px solid #4b5563', borderRadius: '4px', color: '#d1d5db', cursor: 'pointer', fontSize: '10px', padding: '4px 8px' }}>+ New Folder</button>
+                    <button onClick={handleNewWhiteboard} style={{ background: 'none', border: '1px solid #3B82F6', borderRadius: '4px', color: '#93C5FD', cursor: 'pointer', fontSize: '10px', padding: '4px 8px' }}>+ Whiteboard</button>
+                  </div>
                 </div>
                 <div style={{ fontSize: '11px', color: '#d1d5db', marginBottom: '12px', background: '#252932', padding: '6px 10px', borderRadius: '6px', border: '1px solid #374151', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {currentDir !== libraryPath && <button onClick={handleUpDir} style={{ background: 'none', border: 'none', color: '#60A5FA', cursor: 'pointer', padding: 0 }}>↑ Back</button>}
@@ -642,10 +693,26 @@ export default function HomeScreen({ onOpen }) {
                     <span style={{ fontSize: '12px', color: '#9ca3af', textAlign: 'center', padding: '20px' }}>Folder is empty.</span>
                   ) : (
                     entries.map(entry => (
-                      <button key={entry.name} onClick={() => handleEntryClick(entry)} style={{ textAlign: 'left', padding: '12px', borderRadius: '6px', background: '#262a33', border: '1px solid #374151', color: '#e5e7eb', cursor: 'pointer', fontSize: '13px', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: '8px' }} onMouseEnter={e => { e.currentTarget.style.borderColor = '#3B82F6'; e.currentTarget.style.background = 'rgba(59,130,246,0.1)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = '#374151'; e.currentTarget.style.background = '#262a33'; }}>
-                        <span style={{ fontSize: '16px', opacity: 0.9 }}>{entry.isDirectory ? '📁' : '📄'}</span>
-                        <span>{entry.name}</span>
-                      </button>
+                      <div key={`${entry.name}-fs`} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button onClick={() => handleEntryClick(entry)} style={{ flex: 1, textAlign: 'left', padding: '12px', borderRadius: '6px', background: '#262a33', border: '1px solid #374151', color: '#e5e7eb', cursor: 'pointer', fontSize: '13px', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: '8px' }} onMouseEnter={e => { e.currentTarget.style.borderColor = '#3B82F6'; e.currentTarget.style.background = 'rgba(59,130,246,0.1)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = '#374151'; e.currentTarget.style.background = '#262a33'; }}>
+                          <span style={{ fontSize: '16px', opacity: 0.9 }}>{entry.isDirectory ? '📁' : entry.name.toLowerCase().endsWith('.whiteboard.json') ? '🧠' : '📄'}</span>
+                          <span>{entry.name.toLowerCase().endsWith('.whiteboard.json') ? entry.name.replace(/\.whiteboard\.json$/i, '') : entry.name}</span>
+                        </button>
+                        <button
+                          title="Delete"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const fullPath = await join(currentDir, entry.name);
+                            const yes = await tauriConfirm(`Delete ${entry.isDirectory ? 'folder' : 'file'} "${entry.name}"?`, { title: 'Confirm Delete', kind: 'warning' });
+                            if (!yes) return;
+                            await remove(fullPath, entry.isDirectory ? { recursive: true } : undefined);
+                            refreshDir(currentDir);
+                          }}
+                          style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid rgba(248,113,113,0.4)', background: 'rgba(248,113,113,0.08)', color: '#F87171', cursor: 'pointer' }}
+                        >
+                          ✕
+                        </button>
+                      </div>
                     ))
                   )}
                 </div>
@@ -666,6 +733,19 @@ export default function HomeScreen({ onOpen }) {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
               <button onClick={() => setIsFolderModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#d1d5db', cursor: 'pointer', padding: '6px 12px', fontSize: '12px' }}>Cancel</button>
               <button onClick={confirmNewFolder} style={{ background: '#3B82F6', border: 'none', color: '#fff', cursor: 'pointer', padding: '6px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}>Create</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isWhiteboardModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: '#262a33', border: '1px solid #374151', borderRadius: '8px', padding: '24px', width: '320px', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', fontFamily: "'IBM Plex Mono', monospace" }}>
+            <h3 style={{ margin: 0, fontSize: '14px', color: '#f3f4f6' }}>Create Whiteboard</h3>
+            <input autoFocus type="text" placeholder="Whiteboard name..." value={newWhiteboardName} onChange={(e) => setNewWhiteboardName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && confirmNewWhiteboard()} style={{ background: '#1c1f26', border: '1px solid #4b5563', color: '#e5e7eb', padding: '10px 12px', borderRadius: '6px', outline: 'none', fontFamily: 'inherit', fontSize: '13px' }} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
+              <button onClick={() => setIsWhiteboardModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#d1d5db', cursor: 'pointer', padding: '6px 12px', fontSize: '12px' }}>Cancel</button>
+              <button onClick={confirmNewWhiteboard} style={{ background: '#3B82F6', border: 'none', color: '#fff', cursor: 'pointer', padding: '6px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}>Create</button>
             </div>
           </div>
         </div>

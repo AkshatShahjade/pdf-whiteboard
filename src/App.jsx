@@ -5,10 +5,13 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import {
   saveSession, loadSession,
   saveWhiteboard, loadWhiteboard, deleteWhiteboard,
-  debounce, performRollingBackup
+  debounce, performRollingBackup,
+  createWhiteboard, pruneWhiteboards
 } from './storage.js';
 import HomeScreen, { loadSettings } from './HomeScreen.jsx';
 import { confirm } from '@tauri-apps/plugin-dialog';
+import { readDir, readTextFile } from '@tauri-apps/plugin-fs';
+import { join } from '@tauri-apps/api/path';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -73,6 +76,23 @@ const REGION_COLORS = [
   '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16',
 ];
 const regionColor = (id) => REGION_COLORS[parseInt(id.replace('reg_', ''), 10) % REGION_COLORS.length];
+
+function toRoman(n) {
+  const numerals = [
+    [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'],
+    [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'],
+    [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
+  ];
+  let num = n;
+  let out = '';
+  for (const [value, symbol] of numerals) {
+    while (num >= value) {
+      out += symbol;
+      num -= value;
+    }
+  }
+  return out || 'I';
+}
 
 // ─── LazyPage Component ────────────────────────────────────────────────────────
 function LazyPage({ pageNumber, width, scale }) {
@@ -184,13 +204,103 @@ function TldrawWithPersistence({ regionId, initialSnapshot }) {
 export default function Root() {
   const [session, setSession] = useState(null);
   if (!session) {
-    return <HomeScreen onOpen={(pdfPath, pdfFile, settings) => setSession({ pdfPath, settings })} />;
+    return (
+      <HomeScreen
+        onOpen={(pdfPath, whiteboard, settings, pdfLocalPath) => {
+          if (whiteboard?.id) {
+            setSession({ mode: 'whiteboard', whiteboardId: whiteboard.id, whiteboardName: whiteboard.name, settings });
+            return;
+          }
+          setSession({ mode: 'pdf', pdfPath, pdfLocalPath, settings });
+        }}
+      />
+    );
   }
-  return <WorkspaceApp pdfPath={session.pdfPath} settings={session.settings} onHome={() => setSession(null)} />;
+  if (session.mode === 'whiteboard') {
+    return (
+      <WhiteboardOnlyApp
+        whiteboardId={session.whiteboardId}
+        whiteboardName={session.whiteboardName}
+        onHome={() => setSession(null)}
+      />
+    );
+  }
+  return <WorkspaceApp pdfPath={session.pdfPath} pdfLocalPath={session.pdfLocalPath} settings={session.settings} onHome={() => setSession(null)} />;
+}
+
+function WorkspaceHeader({ title, onHome, onBackup, savedAt, headerVisible, setHeaderVisible }) {
+  return (
+    <div
+      onMouseEnter={() => setHeaderVisible(true)}
+      onMouseLeave={() => setHeaderVisible(false)}
+      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: headerVisible ? '48px' : '16px', zIndex: 10000, pointerEvents: 'none', display: 'flex', justifyContent: 'center' }}
+    >
+      <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'auto' }} />
+      <div style={{ position: 'relative', zIndex: 10001, display: 'flex', alignItems: 'center', gap: '16px', padding: '0 24px', height: '48px', background: 'rgba(38,42,51,0.65)', backdropFilter: 'blur(10px)', borderRadius: '0 0 12px 12px', border: '1px solid rgba(255,255,255,0.1)', borderTop: 'none', pointerEvents: 'auto', transform: headerVisible ? 'translateY(0)' : 'translateY(-100%)', opacity: headerVisible ? 1 : 0, transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+        <button
+          onClick={onHome}
+          title="Back to home"
+          style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #4b5563', background: 'transparent', color: '#e5e7eb', cursor: 'pointer', fontSize: '13px', transition: 'all 0.15s' }}
+          onMouseEnter={e => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = '#e5e7eb'; e.currentTarget.style.background = 'transparent'; }}
+        >
+          ⌂ Home
+        </button>
+        <span style={{ fontSize: '13px', color: '#f3f4f6', fontWeight: 500, letterSpacing: '0.02em', padding: '0 8px' }}>{title}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', paddingLeft: '8px', borderLeft: '1px solid rgba(255,255,255,0.1)' }}>
+          <button
+            onClick={onBackup}
+            title="Rolling Backup"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '6px', border: '1px solid #4b5563', background: 'transparent', color: '#d1d5db', cursor: 'pointer', fontSize: '11px', fontFamily: "'IBM Plex Mono', monospace", transition: 'all 0.15s' }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#93C5FD'; e.currentTarget.style.borderColor = '#3B82F6'; e.currentTarget.style.background = 'rgba(59,130,246,0.15)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#d1d5db'; e.currentTarget.style.borderColor = '#4b5563'; e.currentTarget.style.background = 'transparent'; }}
+          >
+            💾 Backup
+          </button>
+          <div style={{ minWidth: '55px' }}>
+            <SaveIndicator savedAt={savedAt} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WhiteboardOnlyApp({ whiteboardId, whiteboardName, onHome }) {
+  const [headerVisible, setHeaderVisible] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState(null);
+  const [toast, setToast] = useState(null);
+  const showToast = useCallback((msg, type = 'info') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  }, []);
+  const handleBackup = async () => {
+    try {
+      const idx = await performRollingBackup();
+      setLastSavedAt(Date.now());
+      showToast(`Workspace backed up! (backup_${idx}.json)`, 'success');
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  };
+
+  return (
+    <div style={{ width: '100%', height: '100vh', background: '#1c1f26', position: 'relative', overflow: 'hidden', fontFamily: "'IBM Plex Mono', monospace" }}>
+      {toast && (
+        <div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', background: toast.type === 'error' ? 'rgba(239, 68, 68, 0.95)' : 'rgba(16, 185, 129, 0.95)', backdropFilter: 'blur(8px)', border: `1px solid ${toast.type === 'error' ? '#F87171' : '#34D399'}`, color: '#fff', padding: '10px 20px', borderRadius: '8px', zIndex: 9999, fontSize: '12px', fontWeight: '500', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {toast.type === 'error' ? '⚠' : '✓'} {toast.msg}
+        </div>
+      )}
+      <WorkspaceHeader title={`Whiteboard: ${whiteboardName || 'Untitled'}`} onHome={onHome} onBackup={handleBackup} savedAt={lastSavedAt} headerVisible={headerVisible} setHeaderVisible={setHeaderVisible} />
+      <div style={{ width: '100%', height: '100%' }}>
+        <WhiteboardPane regionId={whiteboardId} />
+      </div>
+    </div>
+  );
 }
 
 // ─── WorkspaceApp ─────────────────────────────────────────────────────────────
-function WorkspaceApp({ pdfPath, settings, onHome }) {
+function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
   const PDF_WIDTH = 800;
 
   // PDF
@@ -217,6 +327,29 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
   const [tool, setTool]                   = useState('select');
   const [regions, setRegions]             = useState(restoredSession?.regions ?? []);
   const [selectedRegionId, setSelectedRegionId] = useState(restoredSession?.selectedRegionId ?? null);
+  const [selectedGlobalToolIdx, setSelectedGlobalToolIdx] = useState(restoredSession?.selectedGlobalToolIdx ?? null);
+  const [globalToolCount, setGlobalToolCount] = useState(
+    Math.max(1, Math.min(restoredSession?.globalToolCount ?? 1, settings?.maxGlobalPdfTools ?? 8))
+  );
+  const [globalToolLinks, setGlobalToolLinks] = useState(() => {
+    const max = settings?.maxGlobalPdfTools ?? 8;
+    const count = Math.max(1, Math.min(restoredSession?.globalToolCount ?? 1, max));
+    const restored = Array.isArray(restoredSession?.globalToolLinks) ? restoredSession.globalToolLinks : [];
+    return Array.from({ length: count }, (_, i) => restored[i] ?? null);
+  });
+  const [selectPanelToolIdx, setSelectPanelToolIdx] = useState(null);
+  const [activeGlobalToolControlsIdx, setActiveGlobalToolControlsIdx] = useState(null);
+  const [globalToolDraftId, setGlobalToolDraftId] = useState(null);
+  const [globalToolDraftName, setGlobalToolDraftName] = useState('');
+  const [newGlobalWhiteboardName, setNewGlobalWhiteboardName] = useState('');
+  const [viewStack, setViewStack] = useState([]);
+  const [availableWhiteboards, setAvailableWhiteboards] = useState([]);
+  const pdfDirectoryPath = useMemo(() => {
+    if (!pdfLocalPath) return null;
+    const slash = Math.max(pdfLocalPath.lastIndexOf('/'), pdfLocalPath.lastIndexOf('\\'));
+    if (slash < 0) return null;
+    return pdfLocalPath.slice(0, slash);
+  }, [pdfLocalPath]);
 
   // Tools Specific State
   const [sectionY, setSectionY] = useState({ start: null, end: null });
@@ -291,7 +424,7 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
 
     if (e.key === '\\' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
-      if (!selectedRegionId) return;
+      if (!selectedRegionId && selectedGlobalToolIdx === null) return;
       setLeftPct(55);
       return;
     }
@@ -339,6 +472,25 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
       } else if (editingSectionId) {
          setEditingSectionId(null);
          setTool('select');
+      } else if (selectPanelToolIdx !== null) {
+         setSelectPanelToolIdx(null);
+      } else if (selectedGlobalToolIdx !== null) {
+         const prevView = viewStack[viewStack.length - 1];
+         if (prevView) {
+           setViewStack(prev => prev.slice(0, -1));
+           if (prevView.type === 'global') {
+             setSelectedRegionId(null);
+             setSelectedGlobalToolIdx(prevView.idx);
+             setActiveGlobalToolControlsIdx(prevView.idx);
+           } else if (prevView.type === 'region') {
+             setSelectedGlobalToolIdx(null);
+             setActiveGlobalToolControlsIdx(null);
+             setSelectedRegionId(prevView.id);
+           }
+         } else {
+           setSelectedGlobalToolIdx(null);
+           setActiveGlobalToolControlsIdx(null);
+         }
       } else {
          setSelectedRegionId(null);
       }
@@ -354,7 +506,7 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
       else if (k === 'x') setTool('remove');
       e.stopPropagation();
     }
-  }, [activePane, selectedRegionId, editingShapeId, shapeBackup, editingSectionId, sectionY, tool]);
+  }, [activePane, selectedRegionId, selectedGlobalToolIdx, editingShapeId, shapeBackup, editingSectionId, sectionY, tool, selectPanelToolIdx, viewStack]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown, true);
@@ -391,6 +543,25 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
     }
   }, [tool]);
 
+  useEffect(() => {
+    const maxTools = Math.max(1, settings?.maxGlobalPdfTools ?? 8);
+    setGlobalToolCount((prev) => Math.min(prev, maxTools));
+  }, [settings?.maxGlobalPdfTools]);
+
+  useEffect(() => {
+    setGlobalToolLinks((prev) => {
+      const next = prev.slice(0, globalToolCount);
+      while (next.length < globalToolCount) next.push(null);
+      return next;
+    });
+  }, [globalToolCount]);
+
+  useEffect(() => {
+    if (selectedGlobalToolIdx === null) {
+      setActiveGlobalToolControlsIdx(null);
+    }
+  }, [selectedGlobalToolIdx]);
+
   const debouncedSaveSession = useMemo(
     () => debounce((data) => {
       saveSession(pdfPath, data);
@@ -402,17 +573,26 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
   const regionsRef          = useRef(regions);
   const selectedRegionIdRef = useRef(selectedRegionId);
   const leftPctRef          = useRef(leftPct);
+  const selectedGlobalToolIdxRef = useRef(selectedGlobalToolIdx);
+  const globalToolCountRef = useRef(globalToolCount);
+  const globalToolLinksRef = useRef(globalToolLinks);
 
   useEffect(() => { regionsRef.current = regions; }, [regions]);
   useEffect(() => { selectedRegionIdRef.current = selectedRegionId; }, [selectedRegionId]);
   useEffect(() => { leftPctRef.current = leftPct; }, [leftPct]);
+  useEffect(() => { selectedGlobalToolIdxRef.current = selectedGlobalToolIdx; }, [selectedGlobalToolIdx]);
+  useEffect(() => { globalToolCountRef.current = globalToolCount; }, [globalToolCount]);
+  useEffect(() => { globalToolLinksRef.current = globalToolLinks; }, [globalToolLinks]);
 
   const persistSession = useCallback(() => {
     debouncedSaveSession({
       regions:          regionsRef.current,
       selectedRegionId: selectedRegionIdRef.current,
+      selectedGlobalToolIdx: selectedGlobalToolIdxRef.current,
       scrollTop:        pdfScrollRef.current?.scrollTop ?? 0,
       leftPct:          leftPctRef.current,
+      globalToolCount: globalToolCountRef.current,
+      globalToolLinks: globalToolLinksRef.current,
     });
   }, [debouncedSaveSession]);
 
@@ -423,8 +603,11 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
       debouncedSaveSession.flush({
         regions:          regionsRef.current,
         selectedRegionId: selectedRegionIdRef.current,
+        selectedGlobalToolIdx: selectedGlobalToolIdxRef.current,
         scrollTop:        pdfScrollRef.current?.scrollTop ?? 0,
         leftPct:          leftPctRef.current,
+        globalToolCount: globalToolCountRef.current,
+        globalToolLinks: globalToolLinksRef.current,
       });
     };
     window.addEventListener('beforeunload', onUnload);
@@ -706,6 +889,10 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
         if (selectedRegionId === regionId) setSelectedRegionId(null);
       }
     } else if (tool === 'select') {
+      setSelectedGlobalToolIdx(null);
+      setActiveGlobalToolControlsIdx(null);
+      setSelectPanelToolIdx(null);
+      setViewStack([]);
       setSelectedRegionId(regionId);
     }
   }, [tool, selectedRegionId]);
@@ -718,6 +905,114 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
       showToast(e.message, 'error');
     }
   };
+
+  const refreshAvailableWhiteboards = useCallback(async () => {
+    const libraryPath = localStorage.getItem('lemmamap:library');
+    if (!libraryPath) {
+      setAvailableWhiteboards([]);
+      return;
+    }
+
+    const collected = [];
+    const walk = async (dir) => {
+      const items = await readDir(dir);
+      for (const item of items) {
+        const fullPath = await join(dir, item.name);
+        if (item.isDirectory) {
+          await walk(fullPath);
+          continue;
+        }
+        if (!item.isFile || !item.name.toLowerCase().endsWith('.whiteboard.json')) continue;
+        try {
+          const raw = await readTextFile(fullPath);
+          const meta = JSON.parse(raw);
+          if (meta?.id && meta?.name) collected.push({ id: meta.id, name: meta.name, path: fullPath });
+        } catch {
+          // Ignore malformed whiteboard files.
+        }
+      }
+    };
+
+    try {
+      await walk(libraryPath);
+      const byId = new Map();
+      for (const wb of collected) if (!byId.has(wb.id)) byId.set(wb.id, wb);
+      const deduped = [...byId.values()];
+      pruneWhiteboards(deduped.map((wb) => wb.id));
+      setAvailableWhiteboards(deduped);
+    } catch (err) {
+      console.warn('Failed to scan whiteboard files:', err);
+      setAvailableWhiteboards([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshAvailableWhiteboards();
+  }, [refreshAvailableWhiteboards]);
+
+  const allWhiteboards = availableWhiteboards;
+
+  const pushCurrentViewToStack = useCallback((nextView) => {
+    const currentView = selectedGlobalToolIdx !== null
+      ? { type: 'global', idx: selectedGlobalToolIdx }
+      : (selectedRegionId ? { type: 'region', id: selectedRegionId } : null);
+    if (!currentView) return;
+    const isSame = currentView.type === nextView.type && (currentView.type === 'global' ? currentView.idx === nextView.idx : currentView.id === nextView.id);
+    if (!isSame) {
+      setViewStack((prev) => {
+        const filtered = prev.filter((v) => !(v.type === currentView.type && (v.type === 'global' ? v.idx === currentView.idx : v.id === currentView.id)));
+        return [...filtered, currentView];
+      });
+    }
+  }, [selectedGlobalToolIdx, selectedRegionId]);
+
+  const handleOpenGlobalTool = useCallback((idx) => {
+    setTool('select');
+    const linked = globalToolLinks[idx];
+    if (!linked) {
+      setSelectPanelToolIdx(idx);
+      setActiveGlobalToolControlsIdx(null);
+      setNewGlobalWhiteboardName('');
+      setGlobalToolDraftId(null);
+      setGlobalToolDraftName('');
+      return;
+    }
+
+    pushCurrentViewToStack({ type: 'global', idx });
+    setSelectPanelToolIdx(null);
+    setSelectedRegionId(null);
+    setSelectedGlobalToolIdx(idx);
+    setActiveGlobalToolControlsIdx(idx);
+    const found = allWhiteboards.find((wb) => wb.id === linked);
+    setGlobalToolDraftId(linked);
+    setGlobalToolDraftName(found?.name || 'Whiteboard');
+  }, [globalToolLinks, allWhiteboards, pushCurrentViewToStack]);
+
+  const handleApplyGlobalToolSelection = useCallback((idx, whiteboardId, whiteboardName = null) => {
+    if (!whiteboardId) return;
+    setGlobalToolLinks((prev) => prev.map((id, i) => (i === idx ? whiteboardId : id)));
+    pushCurrentViewToStack({ type: 'global', idx });
+    setSelectedRegionId(null);
+    setSelectedGlobalToolIdx(idx);
+    setActiveGlobalToolControlsIdx(idx);
+    setSelectPanelToolIdx(null);
+    setGlobalToolDraftId(whiteboardId);
+    if (whiteboardName) setGlobalToolDraftName(whiteboardName);
+  }, [pushCurrentViewToStack]);
+
+  const handleCreateFromPanel = useCallback(async () => {
+    if (selectPanelToolIdx === null) return;
+    const trimmed = newGlobalWhiteboardName.trim();
+    if (!trimmed) return;
+    try {
+      const wb = await createWhiteboard(trimmed, pdfDirectoryPath);
+      setNewGlobalWhiteboardName('');
+      await refreshAvailableWhiteboards();
+      handleApplyGlobalToolSelection(selectPanelToolIdx, wb.id, wb.name);
+    } catch (err) {
+      showToast(err.message || 'Could not create whiteboard.', 'error');
+    }
+  }, [selectPanelToolIdx, newGlobalWhiteboardName, pdfDirectoryPath, handleApplyGlobalToolSelection, refreshAvailableWhiteboards, showToast]);
 
   // --- Dynamic Cursors ---
   const deleteCursor = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%23EF4444'><path d='M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z'/></svg>") 12 12, auto`;
@@ -733,6 +1028,8 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
   else if (tool === 'lasso') pdfCursor = lassoCursor;
   else if (tool === 'section') pdfCursor = sectionTarget === 'start' ? sectionStartCursor : sectionEndCursor;
   else if (tool === 'rect') pdfCursor = 'crosshair';
+
+  const activeWhiteboardId = selectedRegionId ?? (selectedGlobalToolIdx !== null ? globalToolLinks[selectedGlobalToolIdx] : null);
 
   return (
     <div
@@ -761,54 +1058,19 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
       )}
       <style>{`@keyframes fadeInUp { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }`}</style>
 
-      {/* ── TOP HEADER BAR (Aligned left, right is click-through for Tldraw) ── */}
-      <div
-        onMouseEnter={() => setHeaderVisible(true)} onMouseLeave={() => setHeaderVisible(false)}
-        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: headerVisible ? '48px' : '16px', zIndex: 100, pointerEvents: 'none', display: 'flex', justifyContent: 'flex-start' }}
-      >
-        {/* Invisible hit area to ensure the hover action is perfectly caught on the transparent gap */}
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'auto' }} />
-
-        <div style={{ position: 'relative', zIndex: 101, display: 'flex', alignItems: 'center', gap: '16px', padding: '0 24px', height: '48px', background: 'rgba(38,42,51,0.65)', backdropFilter: 'blur(10px)', borderBottomRightRadius: '12px', borderRight: '1px solid rgba(255,255,255,0.1)', borderBottom: '1px solid rgba(255,255,255,0.1)', pointerEvents: 'auto', transform: headerVisible ? 'translateY(0)' : 'translateY(-100%)', opacity: headerVisible ? 1 : 0, transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
-          <button
-            onClick={onHome} title="Back to home"
-            style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #4b5563', background: 'transparent', color: '#e5e7eb', cursor: 'pointer', fontSize: '13px', transition: 'all 0.15s' }}
-            onMouseEnter={e => { e.currentTarget.style.color='#fff'; e.currentTarget.style.background='rgba(255,255,255,0.1)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color='#e5e7eb'; e.currentTarget.style.background='transparent'; }}
-          >
-            ⌂ Home
-          </button>
-
-          <span style={{ fontSize: '13px', color: '#f3f4f6', fontWeight: 500, letterSpacing: '0.02em', padding: '0 8px' }}>
-            {decodeURIComponent(pdfPath).split(/[/\\]/).pop()}
-          </span>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', paddingLeft: '8px', borderLeft: '1px solid rgba(255,255,255,0.1)' }}>
-            <button
-              onClick={handleBackup}
-              title="Rolling Backup"
-              style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                padding: '4px 10px', borderRadius: '6px', border: '1px solid #4b5563',
-                background: 'transparent', color: '#d1d5db', cursor: 'pointer', fontSize: '11px',
-                fontFamily: "'IBM Plex Mono', monospace", transition: 'all 0.15s'
-              }}
-              onMouseEnter={e => { e.currentTarget.style.color='#93C5FD'; e.currentTarget.style.borderColor='#3B82F6'; e.currentTarget.style.background='rgba(59,130,246,0.15)'; }}
-              onMouseLeave={e => { e.currentTarget.style.color='#d1d5db'; e.currentTarget.style.borderColor='#4b5563'; e.currentTarget.style.background='transparent'; }}
-            >
-              💾 Backup
-            </button>
-            <div style={{ minWidth: '55px' }}>
-              <SaveIndicator savedAt={lastSavedAt} />
-            </div>
-          </div>
-        </div>
-      </div>
+      <WorkspaceHeader
+        title={decodeURIComponent(pdfPath).split(/[/\\]/).pop()}
+        onHome={onHome}
+        onBackup={handleBackup}
+        savedAt={lastSavedAt}
+        headerVisible={headerVisible}
+        setHeaderVisible={setHeaderVisible}
+      />
 
       {/* ── LEFT: PDF PANE WRAPPER ── */}
       <div
         onMouseEnter={() => setActivePane('pdf')}
-        style={{ width: selectedRegionId ? `${leftPct}%` : '100%', height: '100%', flexShrink: 0, position: 'relative', transition: selectedRegionId ? 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'width 0.3s ease' }}
+        style={{ width: activeWhiteboardId ? `${leftPct}%` : '100%', height: '100%', flexShrink: 0, position: 'relative', transition: activeWhiteboardId ? 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'width 0.3s ease' }}
       >
         <div ref={pdfScrollRef} onScroll={handleScroll} style={{ width: '100%', height: '100%', overflow: 'auto', textAlign: 'center', background: '#262a33', position: 'relative' }}>
           <div ref={pdfContentRef} onMouseDown={handleDivMouseDown} onMouseMove={handleDivMouseMove} onMouseUp={handleDivMouseUp} style={{ position: 'relative', margin: '24px', background: 'white', display: 'inline-block', textAlign: 'left', cursor: pdfCursor, boxShadow: '0 8px 40px rgba(0,0,0,0.6)' }}>
@@ -920,7 +1182,7 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
               { id: 'remove', label: 'Remove', key: 'X', icon: '✕' },
             ].map(({ id, label, key, icon }) => (
               <div key={id} style={{ position: 'relative' }}>
-                <button onClick={() => { if (tool === 'section' && id === 'section') setTool('select'); else setTool(id); }} title={`${label} [${key}]`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '6px', border: `1px solid ${tool === id ? '#3B82F6' : 'transparent'}`, background: tool === id ? 'rgba(59,130,246,0.2)' : 'transparent', color: tool === id ? '#93C5FD' : '#d1d5db', cursor: 'pointer', fontSize: '18px', transition: 'all 0.15s' }} onMouseEnter={e => { if (tool !== id) { e.currentTarget.style.color='#fff'; e.currentTarget.style.background='rgba(255,255,255,0.1)'; } }} onMouseLeave={e => { if (tool !== id) { e.currentTarget.style.color='#d1d5db'; e.currentTarget.style.background='transparent'; } }}>
+                <button onClick={() => { setSelectedGlobalToolIdx(null); setActiveGlobalToolControlsIdx(null); setSelectPanelToolIdx(null); if (tool === 'section' && id === 'section') setTool('select'); else setTool(id); }} title={`${label} [${key}]`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '6px', border: `1px solid ${tool === id ? '#3B82F6' : 'transparent'}`, background: tool === id ? 'rgba(59,130,246,0.2)' : 'transparent', color: tool === id ? '#93C5FD' : '#d1d5db', cursor: 'pointer', fontSize: '18px', transition: 'all 0.15s' }} onMouseEnter={e => { if (tool !== id) { e.currentTarget.style.color='#fff'; e.currentTarget.style.background='rgba(255,255,255,0.1)'; } }} onMouseLeave={e => { if (tool !== id) { e.currentTarget.style.color='#d1d5db'; e.currentTarget.style.background='transparent'; } }}>
                   {icon}
                 </button>
 
@@ -947,11 +1209,13 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
                               if (editingSectionId) {
                                 setRegions(prev => prev.map(r => r.id === editingSectionId ? { ...r, y: y1, h: y2 - y1 } : r));
                                 setSelectedRegionId(editingSectionId);
+                                setSelectedGlobalToolIdx(null);
                                 setEditingSectionId(null);
                               } else {
                                 const newId = `reg_${Date.now()}`;
                                 setRegions(prev => [...prev, { id: newId, type: 'section', x: 0, y: y1, w: 16, h: y2 - y1 }]);
                                 setSelectedRegionId(newId);
+                                setSelectedGlobalToolIdx(null);
                               }
                               setTool('select');
                             }}
@@ -982,6 +1246,102 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
             ))}
           </div>
 
+          <div style={{ background: 'rgba(38,42,51,0.65)', backdropFilter: 'blur(10px)', borderRadius: '8px', padding: '6px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
+            {Array.from({ length: globalToolCount }, (_, idx) => {
+              const linkedId = globalToolLinks[idx];
+              const isActive = selectedGlobalToolIdx === idx;
+              const showControls = activeGlobalToolControlsIdx === idx && !!linkedId;
+              const showSelectPanel = selectPanelToolIdx === idx;
+              return (
+                <div key={`gtool-${idx}`} style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => handleOpenGlobalTool(idx)}
+                    title={`Global Whiteboard Tool ${idx + 1}`}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '6px', border: `1px solid ${isActive ? '#3B82F6' : 'transparent'}`, background: isActive ? 'rgba(59,130,246,0.2)' : 'transparent', color: isActive ? '#93C5FD' : '#d1d5db', cursor: 'pointer', fontSize: '16px' }}
+                  >
+                    {toRoman(idx + 1)}
+                  </button>
+                  {showControls && (
+                    <div style={{ position: 'absolute', right: 'calc(100% + 12px)', top: '50%', transform: 'translateY(-50%)', background: 'rgba(38,42,51,0.9)', backdropFilter: 'blur(10px)', borderRadius: '8px', padding: '6px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', gap: '8px', alignItems: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
+                      <button onClick={() => {
+                        setSelectPanelToolIdx(idx);
+                        setActiveGlobalToolControlsIdx(null);
+                        const found = allWhiteboards.find((wb) => wb.id === linkedId);
+                        setGlobalToolDraftId(linkedId);
+                        setGlobalToolDraftName(found?.name || 'Whiteboard');
+                      }} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #3B82F6', background: 'rgba(59,130,246,0.2)', color: '#93C5FD', cursor: 'pointer' }}>Update</button>
+                      <button onClick={() => {
+                        setSelectedGlobalToolIdx(null);
+                        setSelectedRegionId(null);
+                        setActiveGlobalToolControlsIdx(null);
+                        setSelectPanelToolIdx(null);
+                        setViewStack([]);
+                      }} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #4b5563', background: 'transparent', color: '#d1d5db', cursor: 'pointer' }}>Close</button>
+                      {globalToolCount > 1 && (
+                        <button onClick={async () => {
+                          const yes = await confirm('Delete this global whiteboard tool?', { title: 'Delete Tool', kind: 'warning' });
+                          if (!yes) return;
+                          setGlobalToolLinks((prev) => prev.filter((_, i) => i !== idx));
+                          setGlobalToolCount((c) => Math.max(1, c - 1));
+                          setActiveGlobalToolControlsIdx(null);
+                          setSelectPanelToolIdx(null);
+                          setViewStack([]);
+                          if (selectedGlobalToolIdx === idx) setSelectedGlobalToolIdx(null);
+                          else if (selectedGlobalToolIdx > idx) setSelectedGlobalToolIdx((prev) => (prev === null ? null : prev - 1));
+                        }} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #F87171', background: 'transparent', color: '#F87171', cursor: 'pointer' }}>Delete Tool</button>
+                      )}
+                    </div>
+                  )}
+
+                  {showSelectPanel && (
+                    <div style={{ position: 'absolute', right: 'calc(100% + 12px)', top: '50%', transform: 'translateY(-50%)', zIndex: 80, width: '320px', background: 'rgba(28,31,38,0.96)', border: '1px solid #374151', borderRadius: '8px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <div style={{ fontSize: '10px', color: '#9ca3af', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Tool {toRoman(idx + 1)}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <button onClick={handleCreateFromPanel} style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid #3B82F6', background: 'rgba(59,130,246,0.2)', color: '#93C5FD', cursor: 'pointer', fontSize: '11px' }}>Create</button>
+                          <button onClick={() => { setSelectPanelToolIdx(null); setNewGlobalWhiteboardName(''); }} style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid #F87171', background: 'transparent', color: '#F87171', cursor: 'pointer', fontSize: '11px' }}>Cancel</button>
+                          {globalToolCount > 1 && (
+                            <button
+                              onClick={async () => {
+                                const yes = await confirm('Delete this global whiteboard tool?', { title: 'Delete Tool', kind: 'warning' });
+                                if (!yes) return;
+                                setGlobalToolLinks((prev) => prev.filter((_, i) => i !== idx));
+                                setGlobalToolCount((c) => Math.max(1, c - 1));
+                                setSelectPanelToolIdx(null);
+                                setViewStack([]);
+                                if (selectedGlobalToolIdx === idx) setSelectedGlobalToolIdx(null);
+                                else if (selectedGlobalToolIdx > idx) setSelectedGlobalToolIdx((prev) => (prev === null ? null : prev - 1));
+                              }}
+                              style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid #F87171', background: 'transparent', color: '#F87171', cursor: 'pointer', fontSize: '11px' }}
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ maxHeight: '182px', overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {allWhiteboards.map((wb) => (
+                          <button
+                            key={wb.id}
+                            onClick={() => handleApplyGlobalToolSelection(idx, wb.id, wb.name)}
+                            style={{ textAlign: 'left', padding: '8px 10px', borderRadius: '6px', border: `1px solid ${globalToolDraftId === wb.id ? '#3B82F6' : '#374151'}`, background: globalToolDraftId === wb.id ? 'rgba(59,130,246,0.18)' : '#262a33', color: '#e5e7eb', cursor: 'pointer', fontSize: '12px', minHeight: '30px' }}
+                          >
+                            {wb.name}
+                          </button>
+                        ))}
+                        {allWhiteboards.length === 0 && <span style={{ fontSize: '11px', color: '#9ca3af', textAlign: 'center', padding: '8px' }}>No whiteboards yet.</span>}
+                      </div>
+                      <input value={newGlobalWhiteboardName} onChange={(e) => setNewGlobalWhiteboardName(e.target.value)} placeholder="New whiteboard name..." style={{ width: '100%', background: '#1c1f26', border: '1px solid #4b5563', color: '#e5e7eb', borderRadius: '6px', padding: '6px 8px', fontSize: '11px', outline: 'none' }} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {globalToolCount < (settings?.maxGlobalPdfTools ?? 8) && (
+              <button onClick={() => setGlobalToolCount((c) => c + 1)} title="Add global whiteboard tool" style={{ width: '36px', height: '32px', borderRadius: '6px', border: '1px dashed #4b5563', background: 'transparent', color: '#d1d5db', cursor: 'pointer', fontSize: '16px' }}>+</button>
+            )}
+          </div>
+
           <div style={{ background: 'rgba(38,42,51,0.65)', backdropFilter: 'blur(10px)', borderRadius: '8px', padding: '6px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
             <button onClick={() => setZoom(z => Math.min(z + 0.25, 3.0))} title="Zoom In" style={{ width: '32px', height: '32px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '18px', borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.1)'} onMouseLeave={e => e.currentTarget.style.background='transparent'}>+</button>
             <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '500', margin: '2px 0' }}>{Math.round(zoom * 100)}%</span>
@@ -990,11 +1350,11 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
         </div>
       </div>
 
-      {selectedRegionId && (
+      {activeWhiteboardId && (
         <div onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); }} style={{ width: '6px', flexShrink: 0, cursor: 'col-resize', zIndex: 20, background: isResizing ? '#3B82F6' : '#262a33', borderLeft: '1px solid #374151', borderRight: '1px solid #374151', transition: isResizing ? 'none' : 'background 0.2s', position: 'relative' }} />
       )}
 
-      {selectedRegionId && (
+      {activeWhiteboardId && (
         <div
           onMouseEnter={() => setActivePane('whiteboard')}
           onWheelCapture={(e) => {
@@ -1006,11 +1366,11 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
           }}
           style={{ flex: 1, height: '100%', minWidth: 0, position: 'relative' }}
         >
-          <WhiteboardPane key={selectedRegionId} regionId={selectedRegionId} />
+          <WhiteboardPane key={activeWhiteboardId} regionId={activeWhiteboardId} />
         </div>
       )}
 
-      {!selectedRegionId && (
+      {!activeWhiteboardId && (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '0px', overflow: 'hidden' }} />
       )}
     </div>
