@@ -14,7 +14,7 @@ import {
   useDefaultColorTheme,
 } from 'tldraw'
 
-const MIN_POINT_DISTANCE = 0.2
+const MIN_POINT_DISTANCE = 0.01
 
 const STROKE_SIZES = {
   s: 2,
@@ -34,9 +34,28 @@ function getStrokePath(points) {
   if (points.length === 1) return `M ${points[0].x} ${points[0].y}`
 
   let path = `M ${points[0].x} ${points[0].y}`
-  for (let i = 1; i < points.length; i += 1) {
-    path += ` L ${points[i].x} ${points[i].y}`
+  
+  // for (let i = 1; i < points.length; i += 1) {
+  //   path += ` L ${points[i].x} ${points[i].y}`
+  // }
+
+  for (let i = 1; i < points.length; i++) {
+    const p0 = points[i - 1]
+    const p1 = points[i]
+    
+    // Mix linear and quadratic for reduced smoothing
+    // We'll move towards the midpoint but use it as a control point for a shorter curve
+    const midX = (p0.x + p1.x) / 2
+    const midY = (p0.y + p1.y) / 2
+    
+    // Instead of a full curve to the midpoint, we'll do a small curve then a line
+    // This keeps it smoother than pure lines but sharper than full mid-point curves
+    path += ` Q ${p0.x} ${p0.y}, ${midX} ${midY}`
   }
+  
+  const last = points[points.length - 1]
+  path += ` L ${last.x} ${last.y}`
+  
   return path
 }
 
@@ -216,7 +235,7 @@ export const handwritingToolUiOverrides = {
       handwriting: {
         id: 'handwriting',
         label: 'tool.handwriting',
-        icon: 'tool-handwriting',
+        icon: 'tool-highlight',
         kbd: 'w',
         onSelect() {
           editor.setCurrentTool('handwriting')
@@ -227,9 +246,9 @@ export const handwritingToolUiOverrides = {
   toolbar(editor, toolbarItems, helpers) {
     const drawIndex = toolbarItems.findIndex((item) => item.id === 'draw')
     if (drawIndex !== -1) {
-      toolbarItems.splice(drawIndex, 0, helpers.toolItem(editor.getTool('handwriting')))
+      toolbarItems.splice(drawIndex, 0, helpers.toolItem(helpers.tools.handwriting))
     } else {
-      toolbarItems.push(helpers.toolItem(editor.getTool('handwriting')))
+      toolbarItems.push(helpers.toolItem(helpers.tools.handwriting))
     }
     return toolbarItems
   },

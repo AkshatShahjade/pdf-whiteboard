@@ -79,6 +79,7 @@ const DEFAULT_SETTINGS = {
   theme:        'dark',
   autosaveMs:   800,
   maxGlobalPdfTools: 8,
+  defaultTool: 'draw',
 };
 
 export function loadSettings() {
@@ -331,6 +332,21 @@ function SettingsDrawer({ open: isOpen, onClose, settings, onChange, backupPath,
           </Field>
           <Field label="Max global PDF tools" hint={`${settings.maxGlobalPdfTools}`}>
             <input type="range" min="1" max="12" step="1" value={settings.maxGlobalPdfTools} onChange={(e) => onChange({ ...settings, maxGlobalPdfTools: +e.target.value })} style={{ width: '100%', accentColor: '#3B82F6' }} />
+          </Field>
+          <Field label="Default Tool">
+            <select 
+              value={settings.defaultTool} 
+              onChange={(e) => onChange({ ...settings, defaultTool: e.target.value })}
+              style={{ width: '100%', background: '#1c1f26', border: '1px solid #4b5563', color: '#e5e7eb', padding: '8px', borderRadius: '6px', fontSize: '12px', outline: 'none', fontFamily: 'inherit' }}
+            >
+              <option value="select">Select</option>
+              <option value="draw">Draw (Pencil)</option>
+              <option value="handwriting">Handwriting</option>
+              <option value="eraser">Eraser</option>
+              <option value="arrow">Arrow</option>
+              <option value="text">Text</option>
+              <option value="note">Sticky Note</option>
+            </select>
           </Field>
 
           {/* Backup Section */}

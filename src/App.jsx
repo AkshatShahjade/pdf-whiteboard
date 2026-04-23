@@ -146,7 +146,7 @@ function SaveIndicator({ savedAt }) {
 }
 
 // ─── WhiteboardPane ───────────────────────────────────────────────────────────
-function WhiteboardPane({ regionId }) {
+function WhiteboardPane({ regionId, settings }) {
   const [snapshot, setSnapshot] = useState(null);
   const [loaded, setLoaded]     = useState(false);
 
@@ -169,17 +169,17 @@ function WhiteboardPane({ regionId }) {
     );
   }
 
-  return <TldrawWithPersistence regionId={regionId} initialSnapshot={snapshot} />;
+  return <TldrawWithPersistence regionId={regionId} initialSnapshot={snapshot} settings={settings} />;
 }
 
-function TldrawWithPersistence({ regionId, initialSnapshot }) {
+function TldrawWithPersistence({ regionId, initialSnapshot, settings }) {
   const debouncedSave = useMemo(() => debounce((snap) => saveWhiteboard(regionId, snap), 800), [regionId]);
 
   const handleMount = useCallback((editor) => {
     if (initialSnapshot) {
       try { editor.loadSnapshot(initialSnapshot); } catch (err) { console.warn(err); }
     }
-    editor.setCurrentTool('draw');
+    editor.setCurrentTool(settings?.defaultTool || 'draw');
     editor.updateInstanceState({ exportBackground: false });
 
     // (The invalid updateUserPreferences call that caused the crash was removed from here)
@@ -234,6 +234,7 @@ export default function Root() {
       <WhiteboardOnlyApp
         whiteboardId={session.whiteboardId}
         whiteboardName={session.whiteboardName}
+        settings={session.settings}
         onHome={() => setSession(null)}
       />
     );
@@ -279,7 +280,7 @@ function WorkspaceHeader({ title, onHome, onBackup, savedAt, headerVisible, setH
   );
 }
 
-function WhiteboardOnlyApp({ whiteboardId, whiteboardName, onHome }) {
+function WhiteboardOnlyApp({ whiteboardId, whiteboardName, settings, onHome }) {
   const [headerVisible, setHeaderVisible] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const [toast, setToast] = useState(null);
@@ -306,7 +307,7 @@ function WhiteboardOnlyApp({ whiteboardId, whiteboardName, onHome }) {
       )}
       <WorkspaceHeader title={`Whiteboard: ${whiteboardName || 'Untitled'}`} onHome={onHome} onBackup={handleBackup} savedAt={lastSavedAt} headerVisible={headerVisible} setHeaderVisible={setHeaderVisible} />
       <div style={{ width: '100%', height: '100%' }}>
-        <WhiteboardPane regionId={whiteboardId} />
+        <WhiteboardPane regionId={whiteboardId} settings={settings} />
       </div>
     </div>
   );
@@ -1400,7 +1401,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
           }}
           style={{ flex: 1, height: '100%', minWidth: 0, position: 'relative' }}
         >
-          <WhiteboardPane key={activeWhiteboardId} regionId={activeWhiteboardId} />
+          <WhiteboardPane key={activeWhiteboardId} regionId={activeWhiteboardId} settings={settings} />
         </div>
       )}
 
