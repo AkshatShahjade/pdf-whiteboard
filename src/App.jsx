@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Tldraw, useEditor } from 'tldraw';
+import { Tldraw, DefaultToolbar, DefaultToolbarContent, TldrawUiMenuItem, useTools, useIsToolSelected } from 'tldraw';
 import 'tldraw/tldraw.css';
 import { Document, Page, pdfjs } from 'react-pdf';
 import {
@@ -12,6 +12,13 @@ import HomeScreen, { loadSettings } from './HomeScreen.jsx';
 import { confirm } from '@tauri-apps/plugin-dialog';
 import { readDir, readTextFile } from '@tauri-apps/plugin-fs';
 import { join } from '@tauri-apps/api/path';
+import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './HandwritingTool.jsx';
+
+const handwritingAssetUrls = {
+  icons: {
+    'tool-handwriting': 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0zIDEyYzMtMyAzIDMgNiAwczMtMyA2IDAgMyAzIDYgMCIvPjwvc3ZnPg==',
+  },
+};
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -195,7 +202,13 @@ function TldrawWithPersistence({ regionId, initialSnapshot }) {
           --tl-font-mono: 'Helvetica', Arial, sans-serif;
         }
       `}</style>
-      <Tldraw onMount={handleMount} />
+      <Tldraw
+        onMount={handleMount}
+        tools={[HandwritingTool]}
+        shapeUtils={[HandwritingShapeUtil]}
+        overrides={handwritingToolUiOverrides}
+        assetUrls={handwritingAssetUrls}
+      />
     </>
   );
 }
