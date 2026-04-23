@@ -235,7 +235,7 @@ export const handwritingToolUiOverrides = {
       handwriting: {
         id: 'handwriting',
         label: 'tool.handwriting',
-        icon: 'pencil',
+        icon: 'tool-laser',
         kbd: 'w',
         onSelect() {
           editor.setCurrentTool('handwriting')
