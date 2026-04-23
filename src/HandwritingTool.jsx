@@ -235,7 +235,7 @@ export const handwritingToolUiOverrides = {
       handwriting: {
         id: 'handwriting',
         label: 'tool.handwriting',
-        icon: 'tool-highlight',
+        icon: 'pencil',
         kbd: 'w',
         onSelect() {
           editor.setCurrentTool('handwriting')
@@ -244,11 +244,14 @@ export const handwritingToolUiOverrides = {
     }
   },
   toolbar(editor, toolbarItems, helpers) {
-    const drawIndex = toolbarItems.findIndex((item) => item.id === 'draw')
-    if (drawIndex !== -1) {
-      toolbarItems.splice(drawIndex, 0, helpers.toolItem(helpers.tools.handwriting))
-    } else {
-      toolbarItems.push(helpers.toolItem(helpers.tools.handwriting))
+    const handwriting = helpers.tools.handwriting
+    if (handwriting) {
+      const drawIndex = toolbarItems.findIndex((item) => item.id === 'draw')
+      if (drawIndex !== -1) {
+        toolbarItems.splice(drawIndex, 0, helpers.toolItem(handwriting))
+      } else {
+        toolbarItems.push(helpers.toolItem(handwriting))
+      }
     }
     return toolbarItems
   },

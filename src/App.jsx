@@ -191,6 +191,19 @@ function TldrawWithPersistence({ regionId, initialSnapshot, settings }) {
     return () => { unsub(); debouncedSave.flush(editor.getSnapshot()); };
   }, [initialSnapshot, debouncedSave, regionId]);
 
+  const handwritingComponents = {
+    Toolbar: (props) => {
+      const tools = useTools();
+      const isSelected = useIsToolSelected(tools['handwriting']);
+      return (
+        <DefaultToolbar {...props}>
+          <TldrawUiMenuItem {...tools['handwriting']} isSelected={isSelected} />
+          <DefaultToolbarContent />
+        </DefaultToolbar>
+      );
+    },
+  };
+
   return (
     <>
       <style>{`
@@ -208,6 +221,7 @@ function TldrawWithPersistence({ regionId, initialSnapshot, settings }) {
         shapeUtils={[HandwritingShapeUtil]}
         overrides={handwritingToolUiOverrides}
         assetUrls={handwritingAssetUrls}
+        components={handwritingComponents}
       />
     </>
   );
