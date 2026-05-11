@@ -8,17 +8,19 @@ export interface Window {
     multipane_preset: MultiPanePreset
 }
 
-export type MultiPanePreset = NoMultiPane | LinkAndTray
+export type MultiPanePreset = NoneSpecial | OnlyLink | LinkAndTray
 
-export interface NoMultiPane{}
+export interface NoneSpecial{}
+export interface OnlyLink{}
 export interface LinkAndTray{}
 
+// If it is the core slot, it will handle the back_navigation_stack, else null. 
 export interface Slot{
     id: UUID
-    content: ContentPaneType
-    back_navigation_list: ContentPaneType[]
+    loaded_pane?: Pane | null // null if nothing loaded in
     is_core: boolean
-    roopa_slot_config: null
+    back_navigation_stack: ContentPane[] // Not Pane[] intentionally
+    roopa_slot_config: null // Later feature. ignore for now
 }
 
 // export interface Content{
@@ -27,29 +29,29 @@ export interface Slot{
 
 // }
 
-export type ContentPaneType = DerivedContent | SourceContent
+export type Pane = ContentPane | SystemPane
+export type ContentPane_Type = 'derived' | 'source'
 
-export interface DerivedContent {
+export interface ContentPane {
     id: UUID
-    content_type: DerivedContentType
-    parent_content: ContentPaneType
-}
-
-export interface SourceContent {
-    id: UUID
-    content_type: SourceContentType
+    content_type: ContentPane_Type
+    parent_content?: ContentPane | null // null if source type
     file_name: string
-    file_path: FilePath
+    blob_storage_path: BlobPath
 }
 
-export type FilePath = string // TODO
+export interface SystemPane {
 
-export type SourceContentType = PDF | WhiteBoard //| CodeEditor | BlockText | Image | Video | PPT | Spreadsheet | KeyboardMindMap
-export type DerivedContentType = WhiteBoard //| CodeEditor | BlockText | Image | Video | Spreadsheet | KeyboardMindMap
+}
 
-export interface PDF{
+export type BlobPath = string // TODO
+
+export type SourceContentType = PDF | WhiteBoard //| CodeEditor | BlockText | Image | Video | PPT | Spreadsheet | KeyboardMindMap | ObsidianCanvas
+export type DerivedContentType = WhiteBoard //| CodeEditor | BlockText | Image | Video | Spreadsheet | KeyboardMindMap | ObsidianCanvas
+
+export interface PDF : ContentTypeImplementation{
     id: UUID
-    content_pane_type: ContentPaneType
+    content_pane_type: ContentPane
     file_name: string
     file_path: FilePath
 }

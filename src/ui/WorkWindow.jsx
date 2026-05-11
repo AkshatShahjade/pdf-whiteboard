@@ -1,5 +1,3 @@
-
-
 function WorkWindowHeader({ title, onHome, onBackup, savedAt, headerVisible, setHeaderVisible }) {
   return (
     <div
@@ -38,7 +36,10 @@ function WorkWindowHeader({ title, onHome, onBackup, savedAt, headerVisible, set
   );
 }
 
-// ─── WorkspaceApp ─────────────────────────────────────────────────────────────
+
+// Opens initially, just a single slot with the content (doesn't have to be a pdf, can also be any other content type)
+// Then based on user actions, can also load other contents on another slot that is then made visible.
+// There is single slot mode, and then n-slot mode. Extend the logic for 2-slot into n slots (n-1 dividers, and min width for each slot is 100/(n+4) % screen width).
 function WorkWindow({ pdfPath, pdfLocalPath, settings, onHome }) {
   const PDF_WIDTH = 800;
 
