@@ -7,12 +7,12 @@ import {
   saveWhiteboard, loadWhiteboard, deleteWhiteboard,
   debounce, performRollingBackup,
   createWhiteboard, pruneWhiteboards
-} from './storage.js';
+} from '../storage_adapter/storage.js';
 import HomeScreen, { loadSettings } from './HomeScreen.jsx';
 import { confirm } from '@tauri-apps/plugin-dialog';
 import { readDir, readTextFile } from '@tauri-apps/plugin-fs';
 import { join } from '@tauri-apps/api/path';
-import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './HandwritingTool.jsx';
+import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from '../contents/whiteboard/whiteboard_editing_tools/handwriting_whiteboard_editing_tool.jsx';
 
 const handwritingAssetUrls = {
   icons: {
@@ -54,8 +54,7 @@ const isNearBorder = (coords, r, threshold = STROKE_HIT_WIDTH / 2) => {
 };
 
 const sqr = (x) => x * x;
-const dist2 = (v, w) => sqr(v.x - w.x) + sqr(v.y - w.y);
-
+src/ui_old_version_stuff/storage.js
 const distToSegmentSquared = (p, v, w) => {
   const l2 = dist2(v, w);
   if (l2 === 0) return dist2(p, v);

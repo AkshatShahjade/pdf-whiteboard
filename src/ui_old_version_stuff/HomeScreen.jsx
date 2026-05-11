@@ -9,7 +9,7 @@ import {
   restoreAllData,
   performRollingBackup,
   createWhiteboard,
-} from './storage.js';
+} from '../storage_adapter/storage.js';
 
 // ─── Tauri Imports ────────────────────────────────────────────────────────────
 import { open, save, confirm as tauriConfirm } from '@tauri-apps/plugin-dialog';
