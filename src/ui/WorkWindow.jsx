@@ -41,15 +41,6 @@ function WorkWindowHeader({ title, onHome, onBackup, savedAt, headerVisible, set
 // Then based on user actions, can also load other contents on another slot that is then made visible.
 // There is single slot mode, and then n-slot mode. Extend the logic for 2-slot into n slots (n-1 dividers, and min width for each slot is 100/(n+4) % screen width).
 function WorkWindow({ pdfPath, pdfLocalPath, settings, onHome }) {
-  const PDF_WIDTH = 800;
-
-  // PDF
-  const [numPages, setNumPages]   = useState(null);
-  const [pdfReady, setPdfReady]   = useState(false);
-  const [pdfData, setPdfData]     = useState(null);
-  const pdfScrollRef = useRef(null);
-  const documentFile = useMemo(() => pdfData ? { data: pdfData } : null, [pdfData]);
-  const restoredSession = useMemo(() => loadSession(pdfPath), [pdfPath]);
 
   // Layout & UI State
   const [leftPct, setLeftPct]       = useState(restoredSession?.leftPct ?? settings?.defaultSplit ?? 50);
@@ -1111,9 +1102,14 @@ function WorkWindow({ pdfPath, pdfLocalPath, settings, onHome }) {
         </div>
       </div>
 
+      {/* If right pane is open: */}
+
+      {/* The divider */}
       {activeWhiteboardId && (
         <div onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); }} style={{ width: '6px', flexShrink: 0, cursor: 'col-resize', zIndex: 20, background: isResizing ? '#3B82F6' : '#262a33', borderLeft: '1px solid #374151', borderRight: '1px solid #374151', transition: isResizing ? 'none' : 'background 0.2s', position: 'relative' }} />
       )}
+
+      {/* The right Pane */}
 
       {activeWhiteboardId && (
         <div
@@ -1130,6 +1126,8 @@ function WorkWindow({ pdfPath, pdfLocalPath, settings, onHome }) {
           <WhiteboardPane key={activeWhiteboardId} regionId={activeWhiteboardId} settings={settings} />
         </div>
       )}
+
+      {/* Most probably unnecesary code: */}
 
       {!activeWhiteboardId && (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '0px', overflow: 'hidden' }} />

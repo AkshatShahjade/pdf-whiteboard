@@ -54,7 +54,7 @@ const isNearBorder = (coords, r, threshold = STROKE_HIT_WIDTH / 2) => {
 };
 
 const sqr = (x) => x * x;
-src/ui_old_version_stuff/storage.js
+
 const distToSegmentSquared = (p, v, w) => {
   const l2 = dist2(v, w);
   if (l2 === 0) return dist2(p, v);
@@ -125,6 +125,7 @@ function LazyPage({ pageNumber, width, scale }) {
   );
 }
 
+// OOGA BOOGA
 // ─── SaveIndicator ────────────────────────────────────────────────────────────
 function SaveIndicator({ savedAt }) {
   const [visible, setVisible] = useState(false);

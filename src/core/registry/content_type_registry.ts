@@ -1,12 +1,23 @@
-import {Slot} from '../models.ts'
+export type ContentRegistry = Map<string, ContentImplementation>
 
-// You have one instance of a content type per blob file of that type. So if I have 3 images, when I load each, a new ImageContentImplementation instance would be created, 3 in total. The instance is linked to the file blob.
-export interface ContentTypeImplementation {
-    // Id of slot the content will be loaded into
-    slot_id : Slot 
-
-    // Location of the storage of the blob associated with the content instance
-    blob_storage : string
-
+export interface ContentImplementation {
     
+    id: string
+    name: string
+    
+    can_be_source: boolean
+    can_be_derived: boolean
+
+    // Stuff not existing in all contents
+    capabilities: {
+        importFile?: ImportCapability
+        exportFile?: ExportCapability
+    } 
 }
+
+export interface ImportCapability {
+
+}
+
+export interface ExportCapability{}
+

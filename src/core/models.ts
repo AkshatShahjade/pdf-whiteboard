@@ -3,16 +3,13 @@ type ISOTimestamp = string
 
 export interface Window {
     id: UUID
+    kind: WindowTypes
     slots: Slot[]
     roopa_window_config: null
-    multipane_preset: MultiPanePreset
 }
 
-export type MultiPanePreset = NoneSpecial | OnlyLink | LinkAndTray
+export type WindowTypes = 'standard' | 'CenterToolBar' | 'CenterToolBarAndTray'
 
-export interface NoneSpecial{}
-export interface OnlyLink{}
-export interface LinkAndTray{}
 
 // If it is the core slot, it will handle the back_navigation_stack, else null. 
 export interface Slot{
