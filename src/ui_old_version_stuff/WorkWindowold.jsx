@@ -12,7 +12,7 @@ import HomeScreen, { loadSettings } from './HomeScreen.jsx';
 
 
 import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from '../contents/whiteboard/whiteboard_editing_tools/handwriting_whiteboard_editing_tool.jsx';
-import { confirmErrorDialog, jjoin, rdTextFile, readDirAKS } from '../platform/switch.js';
+import { confirmErrorDialog, jjoin, rdTextFile, readDirAKS } from '../platform/switch.ts';
 
 const handwritingAssetUrls = {
   icons: {

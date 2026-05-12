@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:tauri": "VITE_PLATFORM=tauri vite build",
+    "build:android": "VITE_PLATFORM=android vite build",
+    "build:web": "VITE_PLATFORM=web vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
