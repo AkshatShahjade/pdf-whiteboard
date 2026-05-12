@@ -9,10 +9,10 @@ import {
   createWhiteboard, pruneWhiteboards
 } from '../storage_adapter/storage.js';
 import HomeScreen, { loadSettings } from './HomeScreen.jsx';
-import { confirm } from '@tauri-apps/plugin-dialog';
-import { readDir, readTextFile } from '@tauri-apps/plugin-fs';
-import { join } from '@tauri-apps/api/path';
+
+
 import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from '../contents/whiteboard/whiteboard_editing_tools/handwriting_whiteboard_editing_tool.jsx';
+import { confirmErrorDialog, jjoin, rdTextFile, readDirAKS } from '../platform/switch.js';
 
 const handwritingAssetUrls = {
   icons: {
@@ -927,7 +927,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     e.stopPropagation();
 
     if (tool === 'remove') {
-      const isConfirmed = await confirm(
+      const isConfirmed = await confirmErrorDialog(
         'Are you sure you want to delete this region? Its whiteboard data will be permanently lost.',
         { title: 'Delete Whiteboard', kind: 'warning' }
       );
@@ -964,16 +964,16 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
     const collected = [];
     const walk = async (dir) => {
-      const items = await readDir(dir);
+      const items = await readDirAKS(dir);
       for (const item of items) {
-        const fullPath = await join(dir, item.name);
+        const fullPath = await jjoin(dir, item.name);
         if (item.isDirectory) {
           await walk(fullPath);
           continue;
         }
         if (!item.isFile || !item.name.toLowerCase().endsWith('.whiteboard.json')) continue;
         try {
-          const raw = await readTextFile(fullPath);
+          const raw = await rdTextFile(fullPath);
           const meta = JSON.parse(raw);
           if (meta?.id && meta?.name) collected.push({ id: meta.id, name: meta.name, path: fullPath });
         } catch {
@@ -1168,7 +1168,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                 }
 
                 if (r.type === 'lasso') {
-                  const pointsStr = r.points.map(p => `${rx + (p.x * zoom)},${ry + (p.y * zoom)}`).join(' ');
+                  const pointsStr = r.points.map(p => `${rx + (p.x * zoom)},${ry + (p.y * zoom)}`).jjoin(' ');
                   return (
                     <g key={r.id}>
                       <g style={{ pointerEvents: 'auto' }} onMouseDown={(e) => { if (e.ctrlKey || e.metaKey) return; if (tool === 'rect' || tool === 'section' || tool === 'lasso') return; e.stopPropagation(); }} onClick={(e) => { if (e.ctrlKey || e.metaKey) return; handleBorderClick(e, r.id); }}>
@@ -1201,7 +1201,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
               })()}
 
               {lassoPoints && lassoPoints.length > 0 && (
-                <polyline points={lassoPoints.map(p => `${p.x * zoom},${p.y * zoom}`).join(' ')} fill="rgba(59,130,246,0.1)" stroke="#3B82F6" strokeWidth={1.5} strokeDasharray="5 4" style={{ pointerEvents: 'none' }} />
+                <polyline points={lassoPoints.map(p => `${p.x * zoom},${p.y * zoom}`).jjoin(' ')} fill="rgba(59,130,246,0.1)" stroke="#3B82F6" strokeWidth={1.5} strokeDasharray="5 4" style={{ pointerEvents: 'none' }} />
               )}
             </svg>
           </div>
@@ -1328,7 +1328,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                       }} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #4b5563', background: 'transparent', color: '#d1d5db', cursor: 'pointer' }}>Close</button>
                       {globalToolCount > 1 && (
                         <button onClick={async () => {
-                          const yes = await confirm('Delete this global whiteboard tool?', { title: 'Delete Tool', kind: 'warning' });
+                          const yes = await confirmErrorDialog('Delete this global whiteboard tool?', { title: 'Delete Tool', kind: 'warning' });
                           if (!yes) return;
                           setGlobalToolLinks((prev) => prev.filter((_, i) => i !== idx));
                           setGlobalToolCount((c) => Math.max(1, c - 1));
@@ -1352,7 +1352,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                           {globalToolCount > 1 && (
                             <button
                               onClick={async () => {
-                                const yes = await confirm('Delete this global whiteboard tool?', { title: 'Delete Tool', kind: 'warning' });
+                                const yes = await confirmErrorDialog('Delete this global whiteboard tool?', { title: 'Delete Tool', kind: 'warning' });
                                 if (!yes) return;
                                 setGlobalToolLinks((prev) => prev.filter((_, i) => i !== idx));
                                 setGlobalToolCount((c) => Math.max(1, c - 1));
