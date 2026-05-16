@@ -11,8 +11,8 @@ import {
 import HomeScreen, { loadSettings } from './HomeScreen.jsx';
 
 
-import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from '../contents/whiteboard/whiteboard_editing_tools/handwriting_whiteboard_editing_tool.jsx';
-import { confirmErrorDialog, jjoin, rdTextFile, readDirAKS } from '../platform/switch.ts';
+import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from '../capabilty_registry/implementations/contents/whiteboard/whiteboard_editing_tools/handwriting_whiteboard_editing_tool.js';
+import { confirmErrorDialog, jjoin, rdTextFile, readDirAKS } from '../platform_adapter/switch.ts';
 
 const handwritingAssetUrls = {
   icons: {

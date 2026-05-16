@@ -28,27 +28,8 @@ export interface Section {
 
 export type Region = Rect | Lasso | Section
 
-export const markRegistry = new Map<string, MarkImplementation>();
-
-
-export interface MarkImplementation {
+export interface MarkType {
     id: string
 
     hasSelectedBorder: (pt: Point, r: Region, border_width: number) => boolean   
-}
-
-export function registerMark(impl: MarkImplementation): void {
-    if (markRegistry.has(impl.id)) {
-        throw new Error(`Duplicate mark implementation: ${impl.id}`)
-    }
-    markRegistry.set(impl.id, impl)
-}
-
-export function getMarkImplementation (id: string): MarkImplementation {
-    const imp = markRegistry.get(id)
-
-    if(!imp){
-        throw new Error(`No mark implementation of id: ${id}`)
-    }
-    return imp 
 }

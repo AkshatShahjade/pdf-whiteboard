@@ -1,30 +1,4 @@
-type UUID = string
-type ISOTimestamp = string
-
-export interface Window {
-    id: UUID
-    kind: WindowTypes
-    slots: Slot[]
-    roopa_window_config: null
-}
-
-export type WindowTypes = 'standard' | 'CenterToolBar' | 'CenterToolBarAndTray'
-
-
-// If it is the core slot, it will handle the back_navigation_stack, else null. 
-export interface Slot{
-    id: UUID
-    loaded_pane?: Pane | null // null if nothing loaded in
-    is_core: boolean
-    back_navigation_stack: ContentPane[] // Not Pane[] intentionally
-    roopa_slot_config: null // Later feature. ignore for now
-}
-
-// export interface Content{
-//     id: UUID
-//     pane_type: ContentPaneType
-
-// }
+import { UUID } from "./window_slot_model"
 
 export type Pane = ContentPane | SystemPane
 export type ContentPane_Type = 'derived' | 'source'
@@ -46,12 +20,7 @@ export type BlobPath = string // TODO
 export type SourceContentType = PDF | WhiteBoard //| CodeEditor | BlockText | Image | Video | PPT | Spreadsheet | KeyboardMindMap | ObsidianCanvas
 export type DerivedContentType = WhiteBoard //| CodeEditor | BlockText | Image | Video | Spreadsheet | KeyboardMindMap | ObsidianCanvas
 
-export interface PDF : ContentTypeImplementation{
-    id: UUID
-    content_pane_type: ContentPane
-    file_name: string
-    file_path: FilePath
-}
+export interface PDF {}
 
 export interface WhiteBoard{}
 

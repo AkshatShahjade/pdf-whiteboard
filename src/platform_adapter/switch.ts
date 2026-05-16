@@ -1,3 +1,5 @@
+// TODO: Understand this switch. 
+
 import type { PlatformAdapter, PlatformName } from './interface';
 import tauriPlatform from './tauri';
 

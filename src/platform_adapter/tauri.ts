@@ -57,8 +57,7 @@ function normalizeDirEntry(entry: DirEntry): FsEntry {
         name: entry.name,
         isDirectory: entry.isDirectory,
         isFile: entry.isFile,
-        isSymlink: entry.isSymlink,
-        children: entry.children?.map(normalizeDirEntry),
+        isSymlink: entry.isSymlink
     };
 }
 
