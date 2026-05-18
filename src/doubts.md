@@ -17,7 +17,6 @@ persistance validation: database schema
 We group common behaviours together, splitting the components.
     Mark object in domain model, creation in object factory, storage in repo, etc. so for RectangleMark, it is split and managed in different places - however those places are intentional and not random in the codebase.
 
-firstly, this is coding implementation architecture, not the actual software architecture which is about functional decisions. This is about the organization of the code itself for scalability.
 
 
 Storage Structure:
@@ -37,3 +36,50 @@ Instead of:
     Mark->Tool->....
 And somethings are disconnected, so are easier to do:
     Platform Adapter
+
+
+
+Coding implementation architecture is about the organization of the code itself for scalability, ease of understanding - but it doesn't change the functioning of the architecture in the momemt. However, since it determines how easy it is to modify, add, update, replace features, it impacts the trajectory of the project over time indirectly. Also, it is usually the basis for human resource division in larger tech companies, and once teams are allotted those boundaries are usually frozen (especially in hierarchical companies). Pure Software architecture though is more directly about functional decisions.
+
+Code Implementation Architecture Mental Model:
+
+There are categories of patterns / Layers:
+    
+    Centralizer / EndPoint Patterns:
+        Factory - objects
+        Repository - domain oriented, for storage utilties 
+        Service - multi-step processes
+    
+    Registry Pattern - managing capabilities of elements that have many types
+    
+    Adapter Pattern (1 interface, many implementations)
+        - easy switching between and adding of different implementations for one common interface
+
+    Mapper / Anti-Corruption Layer
+
+    History Patterns
+        Command
+    
+    Performance Patterns
+
+    Domain Model Layer
+
+    Obfuscation Patterns
+        .gitignore + dotenv / pydantic ??
+
+    UI Layer
+
+
+2 architectural styles:
+
+    1) OOP Classes (keep capabilities and model variables together)
+        more intuitve
+    2) Interfaces and Instances : Data Models and Capabilities separate
+        Better for larger systems
+        Becomes intuitive after some learning.
+
+    2>1
+
+
+How would Roopa function internally:
+    - Adapter Pattern on UI
