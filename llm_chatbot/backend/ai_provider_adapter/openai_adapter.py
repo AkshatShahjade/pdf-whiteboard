@@ -25,5 +25,9 @@ class OpenAIAdapter(LLMAdapter):
         result = self.chat_model.invoke(messages)
         return result.content
 
+    def generate_structured(self, messages: list[Any], schema: Type[T]) -> T:
+        structured_model = self.chat_model.with_structured_output(schema)
+        return structured_model.invoke(messages)
+
     def get_embeddings(self):
         return self.embedding_model

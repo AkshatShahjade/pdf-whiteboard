@@ -1,11 +1,10 @@
 from ai_provider_adapter.switch import get_llm_adapter
-from factories.vector_store_factory import get_vector_store
+from factories.vector_store_factory import get_vector_store, get_vector_store_retriever
 
 def answer_question(question: str, provider: str = "ollama"):
     adapter = get_llm_adapter(provider)
 
-    vector_store = get_vector_store(provider)
-    retriever = vector_store.as_retriever(search_kwargs={"k": 5}) # DOUBT what is retriever and I didnt' define as_retriever anywhere...
+    retriever = get_vector_store_retriever(provider)
 
     docs = retriever.invoke(question)
 
