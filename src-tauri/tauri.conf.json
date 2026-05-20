@@ -27,8 +27,8 @@
     }
   },
   "plugins": {
-  "fs": {}
-},
+    "fs": {}
+  },
   "bundle": {
     "active": true,
     "targets": "all",

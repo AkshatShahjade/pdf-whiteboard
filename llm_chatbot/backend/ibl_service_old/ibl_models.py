@@ -15,7 +15,6 @@ class QuestionPaneInput(BaseModel):
     node_type: Literal["target"]
     title: Optional[str] = None
     questions: list[QuestionItem]
-    context_refs: list[str] = Field(default_factory=list)
     provider: str = "ollama"
 
 

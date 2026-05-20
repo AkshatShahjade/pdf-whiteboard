@@ -1,21 +1,18 @@
-# app/inquiry/graph.py
-
 from typing import Optional, Literal
 from typing_extensions import TypedDict
 from uuid import uuid4
 
 from langgraph.graph import StateGraph, START, END
 
-from llm.registry import get_llm_adapter
-from indexing.vector_store import get_vector_store
-from inquiry.models import (
+from ai_provider_adapter.switch import get_llm_adapter
+from factories.vector_store_factory import get_vector_store_retriever
+from ..ibl_models import (
     QuestionItem,
     InquiryResponseNode,
     QuestionGroupResponse,
     SourceRef,
 )
-from inquiry.prompts import QUESTION_GROUP_PROMPT
-
+from ..ibl_prompts import QUESTION_GROUP_PROMPT
 
 class SummaryRunState(TypedDict):
     pass
