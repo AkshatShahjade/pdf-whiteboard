@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { sqlStorage } from '../storage_adapter/switch';
 import { open } from '@tauri-apps/plugin-dialog';
+import { basename } from '@tauri-apps/api/path';
 
 export default function HomeWindow({ onSelectWindow }) {
   const [recentWindows, setRecentWindows] = useState([]);
@@ -43,12 +44,14 @@ export default function HomeWindow({ onSelectWindow }) {
     });
 
     if (selected) {
+      const fileName = await basename(selected);
+
       // Create a new window with 2 slots: PDF and Whiteboard (Legacy behavior)
       const pdfPaneId = `pane_${Date.now()}_pdf`;
       const pdfPane = {
         id: pdfPaneId,
         content_type: 'source',
-        file_name: selected.split('/').pop() || 'Untitled',
+        file_name: fileName || 'Untitled',
         blob_storage_path: selected,
         parent_content: null
       };
