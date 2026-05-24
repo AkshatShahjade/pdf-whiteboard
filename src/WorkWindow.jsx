@@ -1171,7 +1171,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                 }
 
                 if (r.type === 'lasso') {
-                  const pointsStr = r.points.map(p => `${rx + (p.x * zoom)},${ry + (p.y * zoom)}`).jjoin(' ');
+                  const pointsStr = r.points.map(p => `${rx + (p.x * zoom)},${ry + (p.y * zoom)}`).join(' ');
                   return (
                     <g key={r.id}>
                       <g style={{ pointerEvents: 'auto' }} onMouseDown={(e) => { if (e.ctrlKey || e.metaKey) return; if (tool === 'rect' || tool === 'section' || tool === 'lasso') return; e.stopPropagation(); }} onClick={(e) => { if (e.ctrlKey || e.metaKey) return; handleBorderClick(e, r.id); }}>
@@ -1204,7 +1204,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
               })()}
 
               {lassoPoints && lassoPoints.length > 0 && (
-                <polyline points={lassoPoints.map(p => `${p.x * zoom},${p.y * zoom}`).jjoin(' ')} fill="rgba(59,130,246,0.1)" stroke="#3B82F6" strokeWidth={1.5} strokeDasharray="5 4" style={{ pointerEvents: 'none' }} />
+                <polyline points={lassoPoints.map(p => `${p.x * zoom},${p.y * zoom}`).join(' ')} fill="rgba(59,130,246,0.1)" stroke="#3B82F6" strokeWidth={1.5} strokeDasharray="5 4" style={{ pointerEvents: 'none' }} />
               )}
             </svg>
           </div>
