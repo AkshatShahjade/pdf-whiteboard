@@ -25,15 +25,22 @@ class AppState(BaseModel):
     # latest_input: str | None = None
     latest_memory_path: str
 
-class BaseNode(BaseModel):
-    id: str
-    node_type: NodeType
-    title: str = ""
-class SummaryNode(BaseNode):
-    node_type: Literal["summary"] = "summary"
-    parent_memory_path: str | None = None
-    summary_text: str = ""
-    response_id: str | None = None
+# HERE:
+# class BaseNode(BaseModel):
+#     id: str
+#     node_type: NodeType
+#     title: str = ""
+# class SummaryNode(BaseNode):
+#     node_type: Literal["summary"] = "summary"
+#     parent_memory_path: str | None = None
+#     summary_text: str = ""
+#     response_id: str | None = None
+# class QuestionNode(BaseNode):
+#     node_type: Literal["question"] = "question"
+#     parent_memory_path: str | None = None
+#     raw_text: str = ""
+#     groups: list[list[str]] = Field(default_factory=list)
+#     response_ids: list[str] = Field(default_factory=list)
 
 class InquiryHubNode(BaseNode):
     node_type: Literal["inquiry_hub"] = "inquiry_hub"
@@ -43,14 +50,6 @@ class ResponseHubNode(BaseNode):
     node_type: Literal["response_hub"] = "response_hub"
     response_ids: list[str] = Field(default_factory=list)
 
-
-
-class QuestionNode(BaseNode):
-    node_type: Literal["question"] = "question"
-    parent_memory_path: str | None = None
-    raw_text: str = ""
-    groups: list[list[str]] = Field(default_factory=list)
-    response_ids: list[str] = Field(default_factory=list)
 
 
 class ResponseNode(BaseNode):

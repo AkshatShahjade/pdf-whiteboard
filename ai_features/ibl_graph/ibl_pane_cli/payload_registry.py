@@ -1,9 +1,9 @@
 from tkinter import N
-from llm_chatbot.backend.ibl_pane_cli.domain_models import BaseNode, NodeType
+from ai_features.rag_backend.ibl_pane_cli.domain_models import BaseNode, NodeType
 from typing import Callable
 
-from llm_chatbot.backend.ibl_pane_cli.local_json_io_helpers import remove_from_forefront
-from llm_chatbot.backend.ibl_pane_cli.main import AppState
+from ai_features.rag_backend.ibl_pane_cli.local_json_io_helpers import remove_from_forefront
+from ai_features.rag_backend.ibl_pane_cli.main import AppState
 
 PayloadFunction = Callable[[AppState], AppState]
 

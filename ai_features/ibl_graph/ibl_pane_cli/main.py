@@ -1,7 +1,7 @@
 from platform import node
 from dataclasses import dataclass
 from typing import Any, Literal
-from llm_chatbot.backend.ibl_pane_cli.local_json_io_helpers import existsFileOrDir, retrieveNode
+from ai_features.rag_backend.ibl_pane_cli.local_json_io_helpers import existsFileOrDir, retrieveNode
 from payload_registry import node_setup
 from pydantic import BaseModel
 from domain_models import BaseNode, AppState
