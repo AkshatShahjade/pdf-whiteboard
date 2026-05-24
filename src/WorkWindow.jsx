@@ -7,12 +7,12 @@ import {
   saveWhiteboard, loadWhiteboard, deleteWhiteboard,
   debounce, performRollingBackup,
   createWhiteboard, pruneWhiteboards
-} from '../storage_adapter/storage.js';
+} from './storage.js';
 import HomeScreen, { loadSettings } from './HomeScreen.jsx';
 
 
-import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from '../capabilty_registry/implementations/contents/whiteboard/whiteboard_editing_tools/handwriting_whiteboard_editing_tool.js';
-import { confirmErrorDialog, jjoin, rdTextFile, readDirAKS } from '../platform_adapter/switch.ts';
+import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './refactored_arch/implementations/tools/content_specific/whiteboard/handwriting_whiteboard_editing_tool.jsx';
+import { confirmErrorDialog, jjoin, rdTextFile, readDirAKS } from './refactored_arch/platform_adapter/switch.ts';
 
 const handwritingAssetUrls = {
   icons: {
@@ -20,7 +20,7 @@ const handwritingAssetUrls = {
   },
 };
 
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MIN_PANE_PCT     = 15;

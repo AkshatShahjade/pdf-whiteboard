@@ -9,8 +9,8 @@ import {
   restoreAllData,
   performRollingBackup,
   createWhiteboard,
-} from '../storage_adapter/storage.js';
-import { basenamee, confirmErrorDialog, convertFileSrcAKS, cpyFile, dirnamee, existsAKS, jjoin, makeDirectory, openFile1, openFile2, rdTextFile, readDirAKS, remmove, saveFile, wrtFile, wrtTextFile } from '../platform_adapter/switch.ts';
+} from './storage.js';
+import { basenamee, confirmErrorDialog, convertFileSrcAKS, cpyFile, dirnamee, existsAKS, jjoin, makeDirectory, openFile1, openFile2, rdTextFile, readDirAKS, remmove, saveFile, wrtFile, wrtTextFile } from './refactored_arch/platform_adapter/switch.js';
 
 // ─── Tauri Imports ────────────────────────────────────────────────────────────
 // ─── constants ────────────────────────────────────────────────────────────────
@@ -524,7 +524,7 @@ export default function HomeScreen({ onOpen }) {
 
   const handleImportBrowse = async () => {
     try {
-      const file = await openFile1( name = 'PDF', extensions = ['pdf'], true );
+      const file = await openFile1('PDF', ['pdf'], true);
       if (file && currentDir) {
         const name = await basenamee(file);
         const dest = await jjoin(currentDir, name);
