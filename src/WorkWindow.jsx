@@ -13,6 +13,11 @@ import HomeScreen, { loadSettings } from './HomeScreen.jsx';
 
 import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './implementations/whiteboard/tools/editing/handwriting_whiteboard_editing_tool.jsx';
 import { confirmErrorDialog, jjoin, rdTextFile, readDirAKS } from './platform_adapter/switch.ts';
+import { getMarkType } from './capabilty_registry/pdf/mark_registry.ts';
+import { setupAllRegistries } from './capabilty_registry/setup_all.ts';
+
+setupAllRegistries(); //TODO, find proper place
+
 
 const handwritingAssetUrls = {
   icons: {
@@ -233,6 +238,7 @@ function TldrawWithPersistence({ regionId, initialSnapshot, settings }) {
 // ─── Root ─────────────────────────────────────────────────────────────────────
 export default function Root() {
   const [session, setSession] = useState(null);
+
   if (!session) {
     return (
       <HomeScreen
@@ -356,8 +362,8 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
   // Tools & Regions
   const [tool, setTool]                   = useState('select');
-  const [regions, setRegions]             = useState(restoredSession?.regions ?? []);
-  const [selectedRegionId, setSelectedRegionId] = useState(restoredSession?.selectedRegionId ?? null);
+  const [regions, setMarks]             = useState(restoredSession?.regions ?? []);
+  const [selectedRegionId, setSelectedMarkId] = useState(restoredSession?.selectedRegionId ?? null);
   const [selectedGlobalToolIdx, setSelectedGlobalToolIdx] = useState(restoredSession?.selectedGlobalToolIdx ?? null);
   const [globalToolCount, setGlobalToolCount] = useState(
     Math.max(1, Math.min(restoredSession?.globalToolCount ?? 1, settings?.maxGlobalPdfTools ?? 8))
@@ -394,6 +400,8 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
   // Drag / move state
   const [currentDrag, setCurrentDrag]   = useState(null);
+  const [currentSelection, setCurrentSelection]  = useState(null);
+
   const [movingRegion, setMovingRegion] = useState(null);
 
   const [lastSavedAt, setLastSavedAt] = useState(null);
@@ -401,7 +409,8 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
   const mousePosRef = useRef({ x: 0, y: 0 });
   const scrollAnimRef = useRef(null);
-  const dragStateRef = useRef({ currentDrag, movingRegion, lassoPoints });
+  const dragStateRef = useRef({ currentSelection, currentDrag, movingRegion, lassoPoints });
+
   const zoomTimeoutRef = useRef(null);
 
   // Toast State
@@ -411,7 +420,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  useEffect(() => { dragStateRef.current = { currentDrag, movingRegion, lassoPoints }; }, [currentDrag, movingRegion, lassoPoints]);
+  useEffect(() => { dragStateRef.current = { currentSelection, currentDrag, movingRegion, lassoPoints }; }, [currentSelection, currentDrag, movingRegion, lassoPoints]);
 
   // Native Ctrl+Scroll for zooming / Shift+Scroll for horizontal pan
   useEffect(() => {
@@ -497,13 +506,13 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
          const y1 = Math.min(sectionY.start, sectionY.end);
          const y2 = Math.max(sectionY.start, sectionY.end);
          if (editingSectionId) {
-             setRegions(prev => prev.map(r => r.id === editingSectionId ? { ...r, y: y1, h: y2 - y1 } : r));
-             setSelectedRegionId(editingSectionId);
+             setMarks(prev => prev.map(r => r.id === editingSectionId ? { ...r, y: y1, h: y2 - y1 } : r));
+             setSelectedMarkId(editingSectionId);
              setEditingSectionId(null);
          } else {
              const newId = `reg_${Date.now()}`;
-             setRegions(prev => [...prev, { id: newId, type: 'section', x: 0, y: y1, w: 16, h: y2 - y1 }]);
-             setSelectedRegionId(newId);
+             setMarks(prev => [...prev, { id: newId, type: 'section', x: 0, y: y1, w: 16, h: y2 - y1 }]);
+             setSelectedMarkId(newId);
          }
          setTool('select');
       }
@@ -512,7 +521,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
     if (e.key === 'Escape') {
       if (editingShapeId) {
-         setRegions(prev => prev.map(r => r.id === shapeBackup?.id ? shapeBackup : r));
+         setMarks(prev => prev.map(r => r.id === shapeBackup?.id ? shapeBackup : r));
          setEditingShapeId(null);
          setShapeBackup(null);
          setTool('select');
@@ -531,20 +540,20 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
          if (prevView) {
            setViewStack(prev => prev.slice(0, -1));
            if (prevView.type === 'global') {
-             setSelectedRegionId(null);
+             setSelectedMarkId(null);
              setSelectedGlobalToolIdx(prevView.idx);
              setActiveGlobalToolControlsIdx(prevView.idx);
            } else if (prevView.type === 'region') {
              setSelectedGlobalToolIdx(null);
              setActiveGlobalToolControlsIdx(null);
-             setSelectedRegionId(prevView.id);
+             setSelectedMarkId(prevView.id);
            }
          } else {
            setSelectedGlobalToolIdx(null);
            setActiveGlobalToolControlsIdx(null);
          }
       } else {
-         setSelectedRegionId(null);
+         setSelectedMarkId(null);
       }
       return;
     }
@@ -678,6 +687,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
   const handleScroll = useCallback(() => {
     debouncedScrollSave();
     if (pdfScrollRef.current) {
+      // TODO add support for custom sized pages not only A4
       const pageHeight = PDF_WIDTH * zoom * 1.414;
       const newPage = Math.floor(pdfScrollRef.current.scrollTop / pageHeight) + 1;
       setCurrentPage(newPage);
@@ -735,7 +745,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     return getUnscaledCoordsFromClient(e.clientX, e.clientY);
   }, [getUnscaledCoordsFromClient]);
 
-  const handleDivMouseDown = useCallback((e) => {
+  const handleDivPointerDown = useCallback((e) => {
     if (e.button !== 0) return;
     const coords = getUnscaledCoords(e);
     const hitThreshold = (STROKE_HIT_WIDTH / 2) / zoom;
@@ -775,6 +785,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     }
 
     if (tool === 'section' && sectionTarget) {
+      e.currentTarget.setPointerCapture?.(e.pointerId);
       setSectionY(prev => ({ ...prev, [sectionTarget]: coords.y }));
       if (sectionTarget === 'start' && sectionY.end === null) setSectionTarget('end');
       else if (sectionTarget === 'end' && sectionY.start === null) setSectionTarget('start');
@@ -782,33 +793,49 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     }
 
     if (tool === 'lasso') {
-      setLassoPoints([{ x: coords.x, y: coords.y }]);
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+      setLassoPoints({type: 'lasso',  points:[{ x: coords.x, y: coords.y }]});
+      // setCurrentSelection(getMarkType(currentSelection.type).initiateShape(coords))
       return;
     }
 
     if (tool === 'rect') {
-      setCurrentDrag({ startX: coords.x, startY: coords.y, currentX: coords.x, currentY: coords.y });
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+      setCurrentDrag({ type:'rect', startX: coords.x, startY: coords.y, currentX: coords.x, currentY: coords.y });
+      // setCurrentSelection(getMarkType(currentSelection.type).initiateShape(coords))
     }
+
   }, [tool, regions, zoom, getUnscaledCoords, sectionTarget, sectionY, sectionWidths, editingShapeId]);
 
-  const handleDivMouseMove = useCallback((e) => {
+  const handleDivPointerMove = useCallback((e) => {
     mousePosRef.current = { x: e.clientX, y: e.clientY };
     const coords = getUnscaledCoords(e);
 
+    // if(currentSelection) {
+    //   setCurrentSelection((prev) =>
+    //     prev ? getMarkType(prev.type).updateSelection(prev, coords, {
+    //       minPointDistance: 2 / zoom, // TODO: remove hardcoding 2, create variable
+    //     }) : prev
+    //   );    
+    // }
+    
     if (currentDrag) setCurrentDrag((p) => ({ ...p, currentX: coords.x, currentY: coords.y }));
 
     if (lassoPoints) {
       setLassoPoints((prev) => {
-        const last = prev[prev.length - 1];
+        if (!prev || prev.points.length === 0) {
+          return prev;
+        }
+        const last = prev.points[prev.points.length - 1];
         if (Math.abs(last.x - coords.x) > 2 / zoom || Math.abs(last.y - coords.y) > 2 / zoom) {
-          return [...prev, { x: coords.x, y: coords.y }];
+          return {...prev, points: [...prev.points, { x: coords.x, y: coords.y }]};
         }
         return prev;
       });
     }
 
     if (movingRegion) {
-      setRegions((prev) =>
+      setMarks((prev) =>
         prev.map((r) => {
           if (r.id === movingRegion.id) {
             if (r.type === 'section') return { ...r, y: coords.y - movingRegion.offsetY };
@@ -818,54 +845,63 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
         })
       );
     }
-  }, [currentDrag, movingRegion, lassoPoints, zoom, getUnscaledCoords]);
+  }, [currentSelection, currentDrag, movingRegion, lassoPoints, zoom, getUnscaledCoords]);
 
-  const handleDivMouseUp = useCallback(() => {
+  const handleDivPointerUp = useCallback((e) => {
+    if (e?.currentTarget?.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    // if(currentSelection){
+    //   shape = getMarkType(currentSelection.type).createShape(currentSelection)
+    //   if (shape && shape.w > 10 / zoom && shape.h > 10 / zoom) {
+    //     if(editingShapeId && tool === currentSelection.type) {
+    //       setMarks(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
+    //     } else {
+    //       const newId = `reg_${Date.now()}`; // TODO: create proper ID creation place....
+    //       setMarks((prev) => [...prev, { id: newId, type: currentSelection.type, ...shape }]);
+    //       setSelectedMarkId(newId);
+    //     }
+    //   }
+    //   setCurrentSelection(null);
+    // }
+    
     if (currentDrag) {
-      const shape = rectFromDrag(currentDrag);
+      const shape = getMarkType('rect').createFinalizedShape(currentDrag)
+      if (!shape) {
+        setCurrentDrag(null);
+        return;
+      }
       if (shape.w > 10 / zoom && shape.h > 10 / zoom) {
         if (editingShapeId && tool === 'rect') {
-           setRegions(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
+           setMarks(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
         } else {
            const newId = `reg_${Date.now()}`;
-           setRegions((prev) => [...prev, { id: newId, type: 'rect', ...shape }]);
-           setSelectedRegionId(newId);
+           setMarks((prev) => [...prev, { id: newId, type: 'rect', ...shape }]);
+           setSelectedMarkId(newId);
         }
       }
       setCurrentDrag(null);
     }
 
     if (lassoPoints) {
-      if (lassoPoints.length > 5) {
-        const xs = lassoPoints.map(p => p.x);
-        const ys = lassoPoints.map(p => p.y);
-        const minX = Math.min(...xs);
-        const maxX = Math.max(...xs);
-        const minY = Math.min(...ys);
-        const maxY = Math.max(...ys);
-        const w = maxX - minX;
-        const h = maxY - minY;
-
-        if (w > 10 / zoom && h > 10 / zoom) {
-          const relativePoints = lassoPoints.map(p => ({ x: p.x - minX, y: p.y - minY }));
-          const shape = { x: minX, y: minY, w, h, points: relativePoints };
+        const shape = getMarkType('lasso').createFinalizedShape(lassoPoints)
+        if (shape && shape.w > 10 / zoom && shape.h > 10 / zoom) {
           if (editingShapeId && tool === 'lasso') {
-             setRegions(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
+             setMarks(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
           } else {
              const newId = `reg_${Date.now()}`;
-             setRegions(prev => [...prev, { id: newId, type: 'lasso', ...shape }]);
-             setSelectedRegionId(newId);
+             setMarks(prev => [...prev, { id: newId, type: 'lasso', ...shape }]);
+             setSelectedMarkId(newId);
           }
         }
+        setLassoPoints(null);
       }
-      setLassoPoints(null);
-    }
 
     setMovingRegion(null);
-  }, [currentDrag, lassoPoints, zoom, editingShapeId, tool]);
+  }, [currentSelection, currentDrag, lassoPoints, zoom, editingShapeId, tool]);
 
   useEffect(() => {
-    const isDragging = !!currentDrag || !!movingRegion || !!lassoPoints;
+    const isDragging = !!currentSelection || !!currentDrag || !!movingRegion || !!lassoPoints;
 
     if (!isDragging) {
       if (scrollAnimRef.current) cancelAnimationFrame(scrollAnimRef.current);
@@ -894,20 +930,31 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
           const coords = getUnscaledCoordsFromClient(clientX, clientY);
           const state = dragStateRef.current;
 
-          if (state.currentDrag) {
-            setCurrentDrag(p => p ? { ...p, currentX: coords.x, currentY: coords.y } : p);
-          }
-          if (state.lassoPoints) {
+          // if(currentSelection) {
+          //   setCurrentSelection((prev) =>
+          //     prev ? getMarkType(prev.type).updateSelection(prev, coords, {
+          //       minPointDistance: 2 / zoom, // TODO: remove hardcoding 2, create variable
+          //     }) : prev
+          //   );    
+          // }
+
+          if (currentDrag) setCurrentDrag((p) => ({ ...p, currentX: coords.x, currentY: coords.y }));
+
+          if (lassoPoints) {
             setLassoPoints((prev) => {
-              const last = prev[prev.length - 1];
+              if (!prev || prev.points.length === 0) {
+                return prev;
+              }
+              const last = prev.points[prev.points.length - 1];
               if (Math.abs(last.x - coords.x) > 2 / zoom || Math.abs(last.y - coords.y) > 2 / zoom) {
-                return [...prev, { x: coords.x, y: coords.y }];
+                return { ...prev, points: [...prev.points, { x: coords.x, y: coords.y }] };
               }
               return prev;
             });
           }
+          
           if (state.movingRegion) {
-            setRegions((prev) =>
+            setMarks((prev) =>
               prev.map((r) => {
                 if (r.id === state.movingRegion.id) {
                   if (r.type === 'section') return { ...r, y: coords.y - state.movingRegion.offsetY };
@@ -924,7 +971,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
     scrollAnimRef.current = requestAnimationFrame(scrollStep);
     return () => cancelAnimationFrame(scrollAnimRef.current);
-  }, [currentDrag, movingRegion, lassoPoints, zoom, getUnscaledCoordsFromClient]);
+  }, [currentSelection, currentDrag, movingRegion, lassoPoints, zoom, getUnscaledCoordsFromClient]);
 
   const handleBorderClick = useCallback(async (e, regionId) => {
     e.stopPropagation();
@@ -936,16 +983,16 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
       );
 
       if (isConfirmed) {
-        setRegions((prev) => prev.filter((r) => r.id !== regionId));
+        setMarks((prev) => prev.filter((r) => r.id !== regionId));
         deleteWhiteboard(regionId);
-        if (selectedRegionId === regionId) setSelectedRegionId(null);
+        if (selectedRegionId === regionId) setSelectedMarkId(null);
       }
     } else if (tool === 'select') {
       setSelectedGlobalToolIdx(null);
       setActiveGlobalToolControlsIdx(null);
       setSelectPanelToolIdx(null);
       setViewStack([]);
-      setSelectedRegionId(regionId);
+      setSelectedMarkId(regionId);
     }
   }, [tool, selectedRegionId]);
 
@@ -1032,7 +1079,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
     pushCurrentViewToStack({ type: 'global', idx });
     setSelectPanelToolIdx(null);
-    setSelectedRegionId(null);
+    setSelectedMarkId(null);
     setSelectedGlobalToolIdx(idx);
     setActiveGlobalToolControlsIdx(idx);
     const found = allWhiteboards.find((wb) => wb.id === linked);
@@ -1044,7 +1091,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     if (!whiteboardId) return;
     setGlobalToolLinks((prev) => prev.map((id, i) => (i === idx ? whiteboardId : id)));
     pushCurrentViewToStack({ type: 'global', idx });
-    setSelectedRegionId(null);
+    setSelectedMarkId(null);
     setSelectedGlobalToolIdx(idx);
     setActiveGlobalToolControlsIdx(idx);
     setSelectPanelToolIdx(null);
@@ -1125,7 +1172,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
         style={{ width: activeWhiteboardId ? `${leftPct}%` : '100%', height: '100%', flexShrink: 0, position: 'relative', transition: activeWhiteboardId ? 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'width 0.3s ease' }}
       >
         <div ref={pdfScrollRef} onScroll={handleScroll} style={{ width: '100%', height: '100%', overflow: 'auto', textAlign: 'center', background: '#262a33', position: 'relative' }}>
-          <div ref={pdfContentRef} onMouseDown={handleDivMouseDown} onMouseMove={handleDivMouseMove} onMouseUp={handleDivMouseUp} style={{ position: 'relative', margin: '24px', background: 'white', display: 'inline-block', textAlign: 'left', cursor: pdfCursor, boxShadow: '0 8px 40px rgba(0,0,0,0.6)' }}>
+          <div ref={pdfContentRef} onPointerDown={handleDivPointerDown} onPointerMove={handleDivPointerMove} onPointerUp={handleDivPointerUp} style={{ position: 'relative', margin: '24px', background: 'white', display: 'inline-block', textAlign: 'left', cursor: pdfCursor, boxShadow: '0 8px 40px rgba(0,0,0,0.6)' }}>
             {documentFile ? (
               <Document file={documentFile} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setPdfReady(true); }} onLoadError={(error) => console.error("PDF Load Error:", error)}>
                 {Array.from({ length: numPages ?? 0 }, (_, i) => (
@@ -1196,6 +1243,10 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                 );
               })}
 
+              {/* {currentSelection && (() => {
+                getMarkType(selection.type).renderSelectionPreview(selection, {zoom: zoom}) ?? null
+              })()} */}
+              
               {currentDrag && (() => {
                 const { x, y, w, h } = rectFromDrag(currentDrag);
                 return (
@@ -1203,9 +1254,10 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                 );
               })()}
 
-              {lassoPoints && lassoPoints.length > 0 && (
-                <polyline points={lassoPoints.map(p => `${p.x * zoom},${p.y * zoom}`).join(' ')} fill="rgba(59,130,246,0.1)" stroke="#3B82F6" strokeWidth={1.5} strokeDasharray="5 4" style={{ pointerEvents: 'none' }} />
+              {lassoPoints && lassoPoints.points.length > 0 && (
+                <polyline points={lassoPoints.points.map(p => `${p.x * zoom},${p.y * zoom}`).join(' ')} fill="rgba(59,130,246,0.1)" stroke="#3B82F6" strokeWidth={1.5} strokeDasharray="5 4" style={{ pointerEvents: 'none' }} />
               )}
+
             </svg>
           </div>
         </div>
@@ -1259,14 +1311,14 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                               const y1 = Math.min(sectionY.start, sectionY.end);
                               const y2 = Math.max(sectionY.start, sectionY.end);
                               if (editingSectionId) {
-                                setRegions(prev => prev.map(r => r.id === editingSectionId ? { ...r, y: y1, h: y2 - y1 } : r));
-                                setSelectedRegionId(editingSectionId);
+                                setMarks(prev => prev.map(r => r.id === editingSectionId ? { ...r, y: y1, h: y2 - y1 } : r));
+                                setSelectedMarkId(editingSectionId);
                                 setSelectedGlobalToolIdx(null);
                                 setEditingSectionId(null);
                               } else {
                                 const newId = `reg_${Date.now()}`;
-                                setRegions(prev => [...prev, { id: newId, type: 'section', x: 0, y: y1, w: 16, h: y2 - y1 }]);
-                                setSelectedRegionId(newId);
+                                setMarks(prev => [...prev, { id: newId, type: 'section', x: 0, y: y1, w: 16, h: y2 - y1 }]);
+                                setSelectedMarkId(newId);
                                 setSelectedGlobalToolIdx(null);
                               }
                               setTool('select');
@@ -1290,7 +1342,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                 {/* ── SHAPE EDIT MINI MENU (Rect/Lasso) ── */}
                 {editingShapeId && tool === id && (id === 'rect' || id === 'lasso') && (
                   <div style={{ position: 'absolute', right: 'calc(100% + 12px)', top: '50%', transform: 'translateY(-50%)', background: 'rgba(38,42,51,0.85)', backdropFilter: 'blur(10px)', borderRadius: '8px', padding: '6px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', gap: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', alignItems: 'center' }}>
-                    <button onClick={() => { setRegions(prev => prev.map(r => r.id === shapeBackup?.id ? shapeBackup : r)); setEditingShapeId(null); setShapeBackup(null); setTool('select'); }} style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: `1px solid #F87171`, background: 'transparent', color: '#F87171', transition: 'all 0.15s' }}>Cancel</button>
+                    <button onClick={() => { setMarks(prev => prev.map(r => r.id === shapeBackup?.id ? shapeBackup : r)); setEditingShapeId(null); setShapeBackup(null); setTool('select'); }} style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: `1px solid #F87171`, background: 'transparent', color: '#F87171', transition: 'all 0.15s' }}>Cancel</button>
                     <button onClick={() => { setEditingShapeId(null); setShapeBackup(null); setTool('select'); }} style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: `1px solid #3B82F6`, background: 'rgba(59,130,246,0.2)', color: '#93C5FD', transition: 'all 0.15s' }}>Update</button>
                   </div>
                 )}
@@ -1324,7 +1376,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                       }} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #3B82F6', background: 'rgba(59,130,246,0.2)', color: '#93C5FD', cursor: 'pointer' }}>Update</button>
                       <button onClick={() => {
                         setSelectedGlobalToolIdx(null);
-                        setSelectedRegionId(null);
+                        setSelectedMarkId(null);
                         setActiveGlobalToolControlsIdx(null);
                         setSelectPanelToolIdx(null);
                         setViewStack([]);

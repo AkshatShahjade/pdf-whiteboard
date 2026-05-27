@@ -83,3 +83,21 @@ There are categories of patterns / Layers:
 
 How would Roopa function internally:
     - Adapter Pattern on UI
+
+
+IIFE pattern:
+
+(() => { ... }) is just an anonymous function. By itself, it does nothing. (() => { ... })() means “define the function, then immediately call it.” That pattern is called an IIFE.
+
+In JSX, people use an IIFE when they want to put multiple statements inside an expression position, for example:
+
+    {currentDrag && (() => {
+        const { x, y, w, h } = rectFromDrag(currentDrag);
+        return (
+            <rect x={x * zoom} y={y * zoom} width={w * zoom} height={h * zoom} fill="rgba(59,130,246,0.1)" stroke="#3B82F6" strokeWidth={1.5} strokeDasharray="5 4" rx={2} style={{ pointerEvents: 'none' }} />
+        );
+    })()}
+
+
+
+Understand CDN, and how to make my app truly local without any CDN connection requests.
