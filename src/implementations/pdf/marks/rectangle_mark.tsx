@@ -1,4 +1,4 @@
-import { Selection, MarkType, Point, Mark, STROKE_HIT_WIDTH, RectDrag, RectMark, SelectionContext } from "../../../domain_models/mark_model";
+import { Selection, MarkType, Point, Mark, STROKE_HIT_WIDTH, RectDrag, RectMark, SelectionContext, RenderMarkContext } from "../../../domain_models/mark_model";
 
 export const rectangleMark: MarkType = {
     id : 'rect',
@@ -41,7 +41,21 @@ export const rectangleMark: MarkType = {
       }
     },
 
-    render(){}    
+    render(r: Mark, ctx: RenderMarkContext){
+      if(r.type === 'rect'){
+        const rx = r.x * ctx.zoom, ry = r.y * ctx.zoom, rw = r.w * ctx.zoom, rh = r.h * ctx.zoom;
+        return (
+          <g key={r.id}>
+            <g style={{ pointerEvents: 'auto' }} onMouseDown={(e) => { if (e.ctrlKey || e.metaKey) return; if (ctx.tool === 'rect' || ctx.tool === 'section' || ctx.tool === 'lasso') return; e.stopPropagation(); }} onClick={(e) => { if (e.ctrlKey || e.metaKey) return; ctx.onClick(e, r.id); }}>
+              <rect x={rx} y={ry} width={rw} height={rh} fill="none" stroke="transparent" strokeWidth={STROKE_HIT_WIDTH} style={{ pointerEvents: 'stroke', cursor: ctx.tool === 'select' ? 'pointer' : 'crosshair' }} />
+            </g>
+            <rect x={rx} y={ry} width={rw} height={rh} fill={ctx.isSelected ? `${ctx.color}1A` : 'none'} stroke={ctx.color} strokeWidth={ctx.isSelected ? 2 : 1.5} strokeDasharray={ctx.isSelected ? 'none' : '7 3'} rx={2} style={{ pointerEvents: 'none', transition: 'fill 0.15s, stroke-width 0.1s' }} />
+            <rect x={rx + 1} y={ry + 1} width={28} height={15} fill={ctx.color} rx={2} style={{ pointerEvents: 'none' }} />
+            <text x={rx + 15} y={ry + 11} textAnchor="middle" fill="white" fontSize={9} fontFamily="'IBM Plex Mono', monospace" fontWeight="700" style={{ pointerEvents: 'none' }}>{`R${ctx.idx + 1}`}</text>
+          </g>
+        );
+    }    
+  }
 
 }
 

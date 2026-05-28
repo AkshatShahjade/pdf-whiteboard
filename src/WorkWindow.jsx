@@ -1117,27 +1117,22 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
               {regions.map((r, idx) => {
                 const color      = regionColor(r.id);
                 const isSelected = selectedRegionId === r.id;
-                const rx = r.x * zoom, ry = r.y * zoom, rw = r.w * zoom, rh = r.h * zoom;
-
+                let renderCtx = {zoom:zoom, PDFWIDTH: PDF_WIDTH, tool:tool, color: color, idx:idx, onClick: handleBorderClick, isSelected:isSelected, };
+                
                 if (r.type === 'section') {
                   const sw = sectionWidths[r.id];
-                  return getMarkType(r.type).render(r, {zoom:zoom, PDFWIDTH: PDF_WIDTH, borderWidth: sw, tool:tool, color: color, idx:idx, onClick: handleBorderClick, isSelected:isSelected, });
+                  renderCtx = {...renderCtx, borderWidth: sw};
+                  return getMarkType(r.type).render(r, renderCtx);
                 }
 
                 if (r.type === 'lasso') {
-                  const pointsStr = r.points.map(p => `${rx + (p.x * zoom)},${ry + (p.y * zoom)}`).join(' ');
-                  return (
-                    <g key={r.id}>
-                      <g style={{ pointerEvents: 'auto' }} onMouseDown={(e) => { if (e.ctrlKey || e.metaKey) return; if (tool === 'rect' || tool === 'section' || tool === 'lasso') return; e.stopPropagation(); }} onClick={(e) => { if (e.ctrlKey || e.metaKey) return; handleBorderClick(e, r.id); }}>
-                        <polygon points={pointsStr} fill="transparent" stroke="transparent" strokeWidth={STROKE_HIT_WIDTH} style={{ pointerEvents: 'stroke', cursor: tool === 'select' ? 'pointer' : 'crosshair' }} />
-                      </g>
-                      <polygon points={pointsStr} fill={isSelected ? `${color}1A` : 'none'} stroke={color} strokeWidth={isSelected ? 2 : 1.5} strokeDasharray={isSelected ? 'none' : '7 3'} style={{ pointerEvents: 'none', transition: 'fill 0.15s, stroke-width 0.1s' }} />
-                      <rect x={rx + 1} y={ry + 1} width={28} height={15} fill={color} rx={2} style={{ pointerEvents: 'none' }} />
-                      <text x={rx + 15} y={ry + 11} textAnchor="middle" fill="white" fontSize={9} fontFamily="'IBM Plex Mono', monospace" fontWeight="700" style={{ pointerEvents: 'none' }}>{`R${idx + 1}`}</text>
-                    </g>
-                  );
+                  renderCtx = {...renderCtx, borderWidth: STROKE_HIT_WIDTH,}
+                  return getMarkType(r.type).render(r, renderCtx)
+                } 
+                if(r.type === 'rect'){
+                  renderCtx = {...renderCtx, borderWidth: STROKE_HIT_WIDTH,}
+                  return getMarkType(r.type).render(r, renderCtx)
                 }
-                // This is Rect:
                 return (
                   <g key={r.id}>
                     <g style={{ pointerEvents: 'auto' }} onMouseDown={(e) => { if (e.ctrlKey || e.metaKey) return; if (tool === 'rect' || tool === 'section' || tool === 'lasso') return; e.stopPropagation(); }} onClick={(e) => { if (e.ctrlKey || e.metaKey) return; handleBorderClick(e, r.id); }}>
