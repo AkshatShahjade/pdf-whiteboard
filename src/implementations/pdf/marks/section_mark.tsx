@@ -26,14 +26,36 @@ export const sectionMark: MarkType = {
     },
 
     renderSelectionPreview(selection, ctx) {
-        if(selection.type==="rect" && ctx.zoom){
-        const { x, y, w, h } = createRectMarkShape(selection);
+        if(selection.type==="section" && ctx.zoom && ctx.PDFWIDTH){
             return (
-            <rect x={x * ctx.zoom} y={y * ctx.zoom} width={w * ctx.zoom} height={h * ctx.zoom} fill="rgba(59,130,246,0.1)" stroke="#3B82F6" strokeWidth={1.5} strokeDasharray="5 4" rx={2} style={{ pointerEvents: 'none' }} />
+                <>
+                    {selection.start !== null && (
+                        <line
+                            x1={0}
+                            x2={ctx.PDFWIDTH * ctx.zoom}
+                            y1={selection.start * ctx.zoom}
+                            y2={selection.start * ctx.zoom}
+                            stroke="#10B981"
+                            strokeWidth={1.5}
+                            strokeDasharray="6 4"
+                        />
+                    )}
+
+                    {selection.end !== null && (
+                        <line
+                            x1={0}
+                            x2={ctx.PDFWIDTH * ctx.zoom}
+                            y1={selection.end * ctx.zoom}
+                            y2={selection.end * ctx.zoom}
+                            stroke="#10B981"
+                            strokeWidth={1.5}
+                            strokeDasharray="6 4"
+                        />
+                    )}
+                </>
             );
         }else{
-        console.error("BAAGU BOGU");
-        
+            console.error("BAAGU BOGU");
         }
     },
 

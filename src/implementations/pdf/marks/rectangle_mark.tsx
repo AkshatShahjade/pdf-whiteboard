@@ -30,7 +30,7 @@ export const rectangleMark: MarkType = {
 
     renderSelectionPreview(selection, ctx) {
       if(selection.type==="rect" && ctx.zoom){
-        const { x, y, w, h } = createRectMarkShape(selection);
+          const { x, y, w, h } = createRectMarkShape(selection);
           return (
             <rect x={x * ctx.zoom} y={y * ctx.zoom} width={w * ctx.zoom} height={h * ctx.zoom} fill="rgba(59,130,246,0.1)" stroke="#3B82F6" strokeWidth={1.5} strokeDasharray="5 4" rx={2} style={{ pointerEvents: 'none' }} />
           );
