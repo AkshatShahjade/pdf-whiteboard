@@ -43,7 +43,7 @@ export const rectangleMark: MarkType = {
     },
 
     render(r: Mark, ctx: RenderMarkContext){
-      if(r.type === 'rect'){
+      if(r.type === 'rect' && ctx.zoom !== undefined && ctx.idx !== undefined){
         const rx = r.x * ctx.zoom, ry = r.y * ctx.zoom, rw = r.w * ctx.zoom, rh = r.h * ctx.zoom;
         return (
           <g key={r.id}>
