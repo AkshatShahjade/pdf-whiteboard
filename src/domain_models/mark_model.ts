@@ -3,7 +3,6 @@ export interface Point {
     y: number;
 }
 
-export type Selection = RectDrag | LassoPoints
 
 export interface RectMark {
     id: string;
@@ -26,8 +25,9 @@ export interface LassoMark {
 export interface SectionMark {
     id: string;
     type: 'section'
-    y_st: number
-    y_en: number
+    y: number
+    h: number
+    w: number
 }
 
 
@@ -36,7 +36,7 @@ export type Mark = RectMark | LassoMark | SectionMark
 export interface MarkType {
     id: string
 
-    hasSelectedBorder: (pt: Point, r: Mark, border_width: number) => boolean   
+    hasSelectedBorder: (pt: Point, r: Mark, ctx: SelectionContext) => boolean   
 
     createFinalizedShape: (selection: Selection) => any
 
@@ -58,6 +58,8 @@ export interface MarkType {
 //     { id: newId, type: 'lasso', ...shape }
 // }
 
+export type Selection = RectDrag | LassoPoints | SectionRange
+
 export interface RectDrag {
     type: 'rect'
     startX: number
@@ -71,9 +73,17 @@ export interface LassoPoints {
     points: Point[]
 }
 
+export interface SectionRange {
+    type: 'section'
+    start: number
+    end: number
+}
+
 export interface SelectionContext {
     minPointDistance?: number
     zoom?: number
+    borderWidth?: number
+    PDFWIDTH?: number // TODO... renmove this....
 }
 
 export const STROKE_HIT_WIDTH = 12;

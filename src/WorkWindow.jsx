@@ -340,18 +340,19 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     return pdfLocalPath.slice(0, slash);
   }, [pdfLocalPath]);
 
-  // Tools Specific State
-  const [sectionY, setSectionY] = useState({ start: null, end: null });
-  const [sectionTarget, setSectionTarget] = useState('start');
-  const [editingSectionId, setEditingSectionId] = useState(null);
-
+  
   // Edit mode for Rect and Lasso
   const [editingShapeId, setEditingShapeId] = useState(null);
   const [shapeBackup, setShapeBackup]       = useState(null);
+  
+  
+  // Tools Specific State
+  const [sectionTarget, setSectionTarget] = useState('start');
+  const [editingSectionId, setEditingSectionId] = useState(null);
+  
   const [lassoPoints, setLassoPoints] = useState(null);
-
-  // Drag / move state
   const [currentDrag, setCurrentDrag]   = useState(null);
+  const [sectionY, setSectionY] = useState({ type: 'section', start: null, end: null });
   const [currentSelection, setCurrentSelection]  = useState(null);
 
   const [movingRegion, setMovingRegion] = useState(null);
@@ -457,13 +458,14 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
       } else if (tool === 'section' && sectionY.start !== null && sectionY.end !== null) {
          const y1 = Math.min(sectionY.start, sectionY.end);
          const y2 = Math.max(sectionY.start, sectionY.end);
-         if (editingSectionId) {
+        //  const shape = {type: 'section', y: y1, h: y2-y1};
+         if (editingSectionId) { 
              setMarks(prev => prev.map(r => r.id === editingSectionId ? { ...r, y: y1, h: y2 - y1 } : r));
              setSelectedMarkId(editingSectionId);
              setEditingSectionId(null);
          } else {
              const newId = `reg_${Date.now()}`;
-             setMarks(prev => [...prev, { id: newId, type: 'section', x: 0, y: y1, w: 16, h: y2 - y1 }]);
+             setMarks(prev => [...prev, { id: newId, type: 'section', y: y1, h: y2 - y1, w: 16 }]);
              setSelectedMarkId(newId);
          }
          setTool('select');
@@ -479,7 +481,8 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
          setTool('select');
       } else if (tool === 'section' && (editingSectionId || sectionY.start !== null || sectionY.end !== null)) {
          setEditingSectionId(null);
-         setSectionY({ start: null, end: null });
+         setSectionY({ type: 'section', start: null, end: null });
+        //  setSelection({ type: 'section', start: null, end: null });
          setSectionTarget('start');
          setTool('select');
       } else if (editingSectionId) {
@@ -513,10 +516,10 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     if (activePane === 'pdf') {
       const k = e.key.toLowerCase();
       if (k === 'v') setTool('select');
-      else if (k === 'r') setTool('rect');
-      else if (k === 'c') setTool('lasso');
+      else if (k === 'r') setTool(t => t === 'rect' ? 'select' : 'rect');
+      else if (k === 'c') setTool(t => t === 'lasso' ? 'select' : 'lasso');
       else if (k === 's') setTool(t => t === 'section' ? 'select' : 'section');
-      else if (k === 'x') setTool('remove');
+      else if (k === 'x') setTool(t => t === 'remove' ? 'select' : 'remove');
       e.stopPropagation();
     }
   }, [activePane, selectedRegionId, selectedGlobalToolIdx, editingShapeId, shapeBackup, editingSectionId, sectionY, tool, selectPanelToolIdx, viewStack, globalToolCount]);
@@ -545,7 +548,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
   useEffect(() => {
     if (tool !== 'section') {
-      setSectionY({ start: null, end: null });
+      setSectionY({ type: 'section', start: null, end: null });
       setSectionTarget('start');
       setEditingSectionId(null);
     }
@@ -706,17 +709,14 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
       const hit = [...regions].reverse().find((r) => {
         if (r.type === 'section') {
           const sw = sectionWidths[r.id] || 24;
-          const inY = coords.y >= r.y && coords.y <= r.y + r.h;
-          const inLeft = coords.x >= 0 && coords.x <= sw;
-          const inRight = coords.x >= (PDF_WIDTH - sw) && coords.x <= PDF_WIDTH;
-          return inY && (inLeft || inRight);
+          return getMarkType(r.type).hasSelectedBorder(coords, r, {borderWidth: sw, PDFWIDTH: PDF_WIDTH});
         }
         if (r.type === 'lasso') {
-          return getMarkType(r.type).hasSelectedBorder(coords, r, hitThreshold);
-          // return isNearLassoBorder(coords, r, hitThreshold);
+          return getMarkType(r.type).hasSelectedBorder(coords, r, {borderWidth: hitThreshold});
+          // return isNearLassoBorder(coords, r, {borderWidth: hitThreshold});
         }
         if(r.type === 'rect') {
-          return getMarkType(r.type).hasSelectedBorder(coords, r, hitThreshold);
+          return getMarkType(r.type).hasSelectedBorder(coords, r, {borderWidth: hitThreshold});
         }
       });
 
@@ -724,7 +724,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
         e.preventDefault();
         if (hit.type === 'section') {
           setTool('section');
-          setSectionY({ start: hit.y, end: hit.y + hit.h });
+          setSectionY({ type:'section', start: hit.y, end: hit.y + hit.h });
           setEditingSectionId(hit.id);
           setSectionTarget('start');
         } else {
@@ -741,6 +741,8 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
     if (tool === 'section' && sectionTarget) {
       e.currentTarget.setPointerCapture?.(e.pointerId);
+      // if(currentSelection === null) setCurrentSelection({type:'section', start: null, end: null});
+      // setCurrentSelection(prev => ({ ...prev, [sectionTarget]: coords.y }));
       setSectionY(prev => ({ ...prev, [sectionTarget]: coords.y }));
       if (sectionTarget === 'start' && sectionY.end === null) setSectionTarget('end');
       else if (sectionTarget === 'end' && sectionY.start === null) setSectionTarget('start');
@@ -819,38 +821,6 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
       }
       setCurrentSelection(null);
     }
-    
-    // if (currentDrag) {
-    //   const shape = getMarkType('rect').createFinalizedShape(currentDrag)
-    //   if (!shape) {
-    //     setCurrentDrag(null);
-    //     return;
-    //   }
-    //   if (shape.w > 10 / zoom && shape.h > 10 / zoom) {
-    //     if (editingShapeId && tool === 'rect') {
-    //        setMarks(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
-    //     } else {
-    //        const newId = `reg_${Date.now()}`;
-    //        setMarks((prev) => [...prev, { id: newId, type: 'rect', ...shape }]);
-    //        setSelectedMarkId(newId);
-    //     }
-    //   }
-    //   setCurrentDrag(null);
-    // }
-
-    // if (lassoPoints) {
-    //     const shape = getMarkType('lasso').createFinalizedShape(lassoPoints)
-    //     if (shape && shape.w > 10 / zoom && shape.h > 10 / zoom) {
-    //       if (editingShapeId && tool === 'lasso') {
-    //          setMarks(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
-    //       } else {
-    //          const newId = `reg_${Date.now()}`;
-    //          setMarks(prev => [...prev, { id: newId, type: 'lasso', ...shape }]);
-    //          setSelectedMarkId(newId);
-    //       }
-    //     }
-    //     setLassoPoints(null);
-    //   }
 
     setMovingRegion(null);
   }, [currentSelection, currentDrag, lassoPoints, zoom, editingShapeId, tool]);
@@ -1283,7 +1253,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                             {editingSectionId ? 'Update' : 'Confirm'}
                           </button>
 
-                          <button onClick={() => { setEditingSectionId(null); setSectionY({ start: null, end: null }); setSectionTarget('start'); setTool('select'); }}
+                          <button onClick={() => { setEditingSectionId(null); setSectionY({ type:'section', start: null, end: null }); setSectionTarget('start'); setTool('select'); }}
                             style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: `1px solid #F87171`, background: 'transparent', color: '#F87171', transition: 'all 0.15s' }}
                           >
                             Cancel

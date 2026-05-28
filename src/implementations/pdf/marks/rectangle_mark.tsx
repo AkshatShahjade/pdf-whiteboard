@@ -1,10 +1,11 @@
-import { Selection, MarkType, Point, Mark, STROKE_HIT_WIDTH, RectDrag, RectMark } from "../../../domain_models/mark_model";
+import { Selection, MarkType, Point, Mark, STROKE_HIT_WIDTH, RectDrag, RectMark, SelectionContext } from "../../../domain_models/mark_model";
 
 export const rectangleMark: MarkType = {
     id : 'rect',
     
-    hasSelectedBorder(point: Point, region: Mark, width: number) {
-        return isInRectBorder(point, region, width)
+    hasSelectedBorder(point: Point, region: Mark, ctx: SelectionContext) {
+      if(ctx.borderWidth === undefined) return false  
+      return isInRectBorder(point, region, ctx.borderWidth)
     },
 
     createFinalizedShape(selection) {

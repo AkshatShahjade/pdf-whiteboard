@@ -1,11 +1,12 @@
-import { LassoPoints, Mark, MarkType, Point, Selection } from "../../../domain_models/mark_model";
+import { LassoPoints, Mark, MarkType, Point, Selection, SelectionContext } from "../../../domain_models/mark_model";
 import { distToSegmentSquared } from "../../../helper";
 
 export const lassoMark: MarkType = {
     id : 'lasso',
 
-    hasSelectedBorder(point: Point, region: Mark, width: number) {
-            return isInLassoBorder(point, region, width)
+    hasSelectedBorder(point: Point, region: Mark, ctx: SelectionContext) {
+        if(ctx.borderWidth === undefined) return false  
+        return isInLassoBorder(point, region, ctx.borderWidth)
     },
 
     createFinalizedShape(selection: Selection) {

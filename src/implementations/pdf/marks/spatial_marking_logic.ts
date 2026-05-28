@@ -10,10 +10,3 @@ const getLocalCoords = (e: React.MouseEvent<HTMLDivElement>,
   return { x: e.clientX - rect.left, y: e.clientY - rect.top };
 };
 
-
-
-
-
-export const isInSectionBorder = (coords: Point, r: Region, threshold: number) => {
-
-}
