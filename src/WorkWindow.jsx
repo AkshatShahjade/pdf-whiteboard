@@ -518,7 +518,10 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
       if (k === 'v') setTool('select');
       else if (k === 'r') setTool(t => t === 'rect' ? 'select' : 'rect');
       else if (k === 'c') setTool(t => t === 'lasso' ? 'select' : 'lasso');
-      else if (k === 's') setTool(t => t === 'section' ? 'select' : 'section');
+      else if (k === 's'){
+         setTool(t => t === 'section' ? 'select' : 'section');
+         setCurrentSelection({type:'section', start: null, end: null});
+      }
       else if (k === 'x') setTool(t => t === 'remove' ? 'select' : 'remove');
       e.stopPropagation();
     }
@@ -741,9 +744,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
     if (tool === 'section' && sectionTarget) {
       e.currentTarget.setPointerCapture?.(e.pointerId);
-      const currentSelection = currentSelection?.type === 'section'
-                          ? currentSelection
-                          : { type: 'section', start: null, end: null };
+      
       setCurrentSelection(prev => ({ ...prev, [sectionTarget]: coords.y }));
       // setSectionY(prev => ({ ...prev, [sectionTarget]: coords.y }));
       if (sectionTarget === 'start' && currentSelection.end === null) setSectionTarget('end');
@@ -770,7 +771,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     mousePosRef.current = { x: e.clientX, y: e.clientY };
     const coords = getUnscaledCoords(e);
 
-    if(currentSelection) {
+    if(currentSelection && getMarkType(currentSelection.type).isDrawable) {
       setCurrentSelection((prev) =>
         prev ? getMarkType(prev.type).updateSelection(prev, coords, {
           minPointDistance: 2 / zoom, // TODO: remove hardcoding 2, create variable
@@ -810,19 +811,19 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     if (e?.currentTarget?.hasPointerCapture?.(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
-    if(currentSelection){
-      const shape = getMarkType(currentSelection.type).createFinalizedShape(currentSelection)
-      if (shape && shape.w > 10 / zoom && shape.h > 10 / zoom) {
-        if(editingShapeId && tool === currentSelection.type) {
-          setMarks(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
-        } else {
-          const newId = `reg_${Date.now()}`; // TODO: create proper ID creation place....
-          setMarks((prev) => [...prev, { id: newId, type: currentSelection.type, ...shape }]);
-          setSelectedMarkId(newId);
+    if(currentSelection && getMarkType(currentSelection.type).isDrawable){
+        const shape = getMarkType(currentSelection.type).createFinalizedShape(currentSelection)
+        if (shape && shape.w > 10 / zoom && shape.h > 10 / zoom) {
+          if(editingShapeId && tool === currentSelection.type) {
+            setMarks(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
+          } else {
+            const newId = `reg_${Date.now()}`; // TODO: create proper ID creation place....
+            setMarks((prev) => [...prev, { id: newId, type: currentSelection.type, ...shape }]);
+            setSelectedMarkId(newId);
+          }
         }
+        setCurrentSelection(null);
       }
-      setCurrentSelection(null);
-    }
 
     setMovingRegion(null);
   }, [currentSelection, currentDrag, lassoPoints, zoom, editingShapeId, tool]);
@@ -857,7 +858,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
           const coords = getUnscaledCoordsFromClient(clientX, clientY);
           const state = dragStateRef.current;
 
-          if(currentSelection) {
+          if(currentSelection && getMarkType(currentSelection.type).isDrawable) {
             setCurrentSelection((prev) =>
               prev ? getMarkType(prev.type).updateSelection(prev, coords, {
                 minPointDistance: 2 / zoom, // TODO: remove hardcoding 2, create variable
@@ -1173,7 +1174,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
               {/* {tool === 'section' && sectionY.start !== null && <line x1={0} x2={PDF_WIDTH * zoom} y1={sectionY.start * zoom} y2={sectionY.start * zoom} stroke="#10B981" strokeWidth={1.5} strokeDasharray="6 4" />}
               {tool === 'section' && sectionY.end !== null && <line x1={0} x2={PDF_WIDTH * zoom} y1={sectionY.end * zoom} y2={sectionY.end * zoom} stroke="#10B981" strokeWidth={1.5} strokeDasharray="6 4" />} */}
-
+              
             </svg>
           </div>
         </div>
@@ -1205,35 +1206,24 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                 <button onClick={() => { setSelectedGlobalToolIdx(null); setActiveGlobalToolControlsIdx(null); setSelectPanelToolIdx(null); if (tool === 'section' && id === 'section') setTool('select'); else setTool(id); }} title={`${label} [${key}]`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '6px', border: `1px solid ${tool === id ? '#3B82F6' : 'transparent'}`, background: tool === id ? 'rgba(59,130,246,0.2)' : 'transparent', color: tool === id ? '#93C5FD' : '#d1d5db', cursor: 'pointer', fontSize: '18px', transition: 'all 0.15s' }} onMouseEnter={e => { if (tool !== id) { e.currentTarget.style.color='#fff'; e.currentTarget.style.background='rgba(255,255,255,0.1)'; } }} onMouseLeave={e => { if (tool !== id) { e.currentTarget.style.color='#d1d5db'; e.currentTarget.style.background='transparent'; } }}>
                   {icon}
                 </button>
-{/* ABO: const currentSelection =
-    currentSelection?.type === 'section'
-      ? currentSelection
-      : { type: 'section', start: null, end: null };
- */}
+{/* ABO: Instead check tool === section area.... */}
                 {/* ── SECTION MINI MENU ── */}
                 {tool === 'section' && id === 'section' && (
                   <div style={{ position: 'absolute', right: 'calc(100% + 12px)', top: '50%', transform: 'translateY(-50%)', background: 'rgba(38,42,51,0.85)', backdropFilter: 'blur(10px)', borderRadius: '8px', padding: '6px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', gap: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', alignItems: 'center' }}>
                     {(() => {
-                      const currentSelection = currentSelection?.type === 'section'
-                          ? currentSelection
-                          : { type: 'section', start: null, end: null };
-
+                      
                       const color = currentSelection.start !== null ? '#10B981' : '#F87171';
                       const isActive = sectionTarget === 'start';
                       return (<button onClick={() => setSectionTarget('start')} style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: `1px solid ${color}`, background: isActive ? `${color}40` : 'transparent', color: color, transition: 'all 0.15s' }}>Start</button>);
                     })()}
                     {(() => {
-                      const currentSelection = currentSelection?.type === 'section'
-                          ? currentSelection
-                          : { type: 'section', start: null, end: null };
+                      
                       const color = currentSelection.end !== null ? '#10B981' : '#F87171';
                       const isActive = sectionTarget === 'end';
                       return (<button onClick={() => setSectionTarget('end')} style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: `1px solid ${color}`, background: isActive ? `${color}40` : 'transparent', color: color, transition: 'all 0.15s' }}>End</button>);
                     })()}
                     {(() => {
-                      const currentSelection = currentSelection?.type === 'section'
-                          ? currentSelection
-                          : { type: 'section', start: null, end: null };
+                      
                       const canConfirm = currentSelection.start !== null && currentSelection.end !== null;
                       return (
                         <>

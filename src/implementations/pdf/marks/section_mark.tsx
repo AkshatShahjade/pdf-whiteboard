@@ -1,28 +1,11 @@
-import { Mark, MarkType, Point, SectionRange, SelectionContext } from "../../../domain_models/mark_model";
+import { Mark, MarkType, Point, Selection, SectionRange, SelectionContext } from "../../../domain_models/mark_model";
 
 export const sectionMark: MarkType = {
     id: 'section',
+    isDrawable: false,
 
     hasSelectedBorder(point: Point, region: Mark, ctx: SelectionContext) {
         return isInSectionBorder(point, region, ctx)
-    },
-
-    createFinalizedShape(selection) {
-        return null
-    },
-
-    initiateShape(coords) {
-        return { type:'rect', startX: coords.x, startY: coords.y, currentX: coords.x, currentY: coords.y };
-    },
-
-    updateSelection(prev: Selection, coords: Point) {
-        if(prev.type === 'rect'){
-            return { ...prev, currentX: coords.x, currentY: coords.y }
-        }
-        else{
-            console.error("BOOGA OOGA ERR");
-            return prev
-        }
     },
 
     renderSelectionPreview(selection, ctx) {

@@ -2,6 +2,7 @@ import { Selection, MarkType, Point, Mark, STROKE_HIT_WIDTH, RectDrag, RectMark,
 
 export const rectangleMark: MarkType = {
     id : 'rect',
+    isDrawable: true,
     
     hasSelectedBorder(point: Point, region: Mark, ctx: SelectionContext) {
       if(ctx.borderWidth === undefined) return false  

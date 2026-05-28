@@ -3,6 +3,7 @@ import { distToSegmentSquared } from "../../../helper";
 
 export const lassoMark: MarkType = {
     id : 'lasso',
+    isDrawable: true,
 
     hasSelectedBorder(point: Point, region: Mark, ctx: SelectionContext) {
         if(ctx.borderWidth === undefined) return false  

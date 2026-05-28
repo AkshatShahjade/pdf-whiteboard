@@ -35,14 +35,15 @@ export type Mark = RectMark | LassoMark | SectionMark
 
 export interface MarkType {
     id: string
+    isDrawable: boolean
 
     hasSelectedBorder: (pt: Point, r: Mark, ctx: SelectionContext) => boolean   
 
-    createFinalizedShape: (selection: Selection) => any
+    createFinalizedShape?: (selection: Selection) => any
 
-    initiateShape: (coords: Point) => Selection
+    initiateShape?: (coords: Point) => Selection
 
-    updateSelection: (prev: Selection, coords: Point, ctx: SelectionContext) => Selection
+    updateSelection?: (prev: Selection, coords: Point, ctx: SelectionContext) => Selection
 
     renderSelectionPreview: (selection: Selection, ctx: SelectionContext) => any
 
