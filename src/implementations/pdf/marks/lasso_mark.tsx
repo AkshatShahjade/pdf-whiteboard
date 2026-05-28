@@ -1,4 +1,4 @@
-import { LassoPoints, Mark, MarkType, Point, RenderMarkContext, Selection, SelectionContext } from "../../../domain_models/mark_model";
+import { LassoPoints, Mark, MarkType, Point, RenderMarkContext, Selection, SelectionContext, STROKE_HIT_WIDTH } from "../../../domain_models/mark_model";
 import { distToSegmentSquared } from "../../../helper";
 
 export const lassoMark: MarkType = {
@@ -6,8 +6,9 @@ export const lassoMark: MarkType = {
     isDrawable: true,
 
     hasSelectedBorder(point: Point, region: Mark, ctx: SelectionContext) {
-        if(ctx.borderWidth === undefined) return false  
-        return isInLassoBorder(point, region, ctx.borderWidth)
+        if(ctx.zoom === undefined) return false  
+        const hitThreshold = (STROKE_HIT_WIDTH / 2) / ctx.zoom;
+        return isInLassoBorder(point, region, hitThreshold)
     },
 
     createFinalizedShape(selection: Selection) {
@@ -77,14 +78,15 @@ export const lassoMark: MarkType = {
     
     render(r:Mark, ctx: RenderMarkContext){
         if (r.type === 'lasso'
-            && ctx.borderWidth !== undefined && ctx.zoom !== undefined && ctx.color !== undefined && ctx.tool !== undefined && ctx.idx !== undefined && ctx.isSelected !== undefined && ctx.onClick !== undefined
+            && ctx.zoom !== undefined && ctx.color !== undefined && ctx.tool !== undefined && ctx.idx !== undefined && ctx.isSelected !== undefined && ctx.onClick !== undefined
         ) {
+            const borderWidth = STROKE_HIT_WIDTH;
             const rx = r.x * ctx.zoom, ry = r.y * ctx.zoom, rw = r.w * ctx.zoom, rh = r.h * ctx.zoom;
             const pointsStr = r.points.map(p => `${rx + (p.x * ctx.zoom)},${ry + (p.y * ctx.zoom)}`).join(' ');
             return (
             <g key={r.id}>
                 <g style={{ pointerEvents: 'auto' }} onMouseDown={(e) => { if (e.ctrlKey || e.metaKey) return; if (ctx.tool === 'rect' || ctx.tool === 'section' || ctx.tool === 'lasso') return; e.stopPropagation(); }} onClick={(e) => { if (e.ctrlKey || e.metaKey) return; ctx.onClick(e, r.id); }}>
-                <polygon points={pointsStr} fill="transparent" stroke="transparent" strokeWidth={ctx.borderWidth} style={{ pointerEvents: 'stroke', cursor: ctx.tool === 'select' ? 'pointer' : 'crosshair' }} />
+                <polygon points={pointsStr} fill="transparent" stroke="transparent" strokeWidth={borderWidth} style={{ pointerEvents: 'stroke', cursor: ctx.tool === 'select' ? 'pointer' : 'crosshair' }} />
                 </g>
                 <polygon points={pointsStr} fill={ctx.isSelected ? `${ctx.color}1A` : 'none'} stroke={ctx.color} strokeWidth={ctx.isSelected ? 2 : 1.5} strokeDasharray={ctx.isSelected ? 'none' : '7 3'} style={{ pointerEvents: 'none', transition: 'fill 0.15s, stroke-width 0.1s' }} />
                 <rect x={rx + 1} y={ry + 1} width={28} height={15} fill={ctx.color} rx={2} style={{ pointerEvents: 'none' }} />

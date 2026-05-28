@@ -44,8 +44,8 @@ export const sectionMark: MarkType = {
 
     render(r: Mark, ctx: RenderMarkContext){
         if (r.type === 'section' 
-            && ctx.PDFWIDTH !== undefined && ctx.borderWidth !== undefined && ctx.zoom !== undefined && ctx.color !== undefined && ctx.tool !== undefined && ctx.idx !== undefined && ctx.isSelected !== undefined && ctx.onClick !== undefined) {
-            const leftW = ctx.borderWidth * ctx.zoom;
+            && ctx.PDFWIDTH !== undefined && ctx.zoom !== undefined && ctx.color !== undefined && ctx.tool !== undefined && ctx.idx !== undefined && ctx.isSelected !== undefined && ctx.onClick !== undefined) {
+            const leftW = r.w * ctx.zoom;
             const rightX = ctx.PDFWIDTH * ctx.zoom - leftW;
             const ry = r.y * ctx.zoom, rh = r.h * ctx.zoom;
 
@@ -90,11 +90,11 @@ export const isInSectionBorder = (coords: Point, r: Mark, ctx: SelectionContext)
     if(r.type !== 'section'){
         throw new Error(" must pass Section into isInSectionBorder ")
     }
-    if(ctx.PDFWIDTH === undefined || ctx.borderWidth === undefined) return false
+    if(ctx.PDFWIDTH === undefined) return false
     
     const inY = coords.y >= r.y && coords.y <= r.y + r.h;
-    const inLeft = coords.x >= 0 && coords.x <= ctx.borderWidth;
-    const inRight = coords.x >= (ctx.PDFWIDTH - ctx.borderWidth) && coords.x <= ctx.PDFWIDTH;
+    const inLeft = coords.x >= 0 && coords.x <= r.w;
+    const inRight = coords.x >= (ctx.PDFWIDTH - r.w) && coords.x <= ctx.PDFWIDTH;
     return inY && (inLeft || inRight);
 
 }

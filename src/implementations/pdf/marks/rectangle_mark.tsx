@@ -5,8 +5,9 @@ export const rectangleMark: MarkType = {
     isDrawable: true,
     
     hasSelectedBorder(point: Point, region: Mark, ctx: SelectionContext) {
-      if(ctx.borderWidth === undefined) return false  
-      return isInRectBorder(point, region, ctx.borderWidth)
+      if(ctx.zoom === undefined) return false  
+      const hitThreshold = (STROKE_HIT_WIDTH / 2) / ctx.zoom;
+      return isInRectBorder(point, region, hitThreshold)
     },
 
     createFinalizedShape(selection) {

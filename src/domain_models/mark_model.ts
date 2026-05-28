@@ -83,15 +83,13 @@ export interface SectionRange {
 export interface SelectionContext {
     minPointDistance?: number
     zoom?: number
-    borderWidth?: number
-    PDFWIDTH?: number // TODO... renmove this....
+    PDFWIDTH?: number 
 }
 
 export interface RenderMarkContext {
     minPointDistance?: number
     zoom?: number
-    borderWidth?: number
-    PDFWIDTH?: number // TODO... renmove this....
+    PDFWIDTH?: number 
     tool?: string
     color?: string 
     idx?: number
@@ -100,3 +98,6 @@ export interface RenderMarkContext {
 }
 
 export const STROKE_HIT_WIDTH = 12;
+export const SECTION_BASE_WIDTH = 16;
+export const SECTION_WIDTH_STEP = 8;
+export const DEFAULT_SECTION_WIDTH = SECTION_BASE_WIDTH + SECTION_WIDTH_STEP;
