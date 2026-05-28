@@ -15,6 +15,7 @@ import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } fro
 import { confirmErrorDialog, jjoin, rdTextFile, readDirAKS } from './platform_adapter/switch.ts';
 import { getMarkType } from './capabilty_registry/pdf/mark_registry.ts';
 import { setupAllRegistries } from './capabilty_registry/setup_all.ts';
+import { dist2, distToSegmentSquared } from './helper.ts';
 
 setupAllRegistries(); //TODO, find proper place
 
@@ -34,55 +35,6 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 const MIN_PANE_PCT     = 15;
 const MAX_PANE_PCT     = 85;
 const STROKE_HIT_WIDTH = 12;
-
-// ─── Geometry helpers ─────────────────────────────────────────────────────────
-const getLocalCoords = (e, ref) => {
-  if (!ref.current) return { x: 0, y: 0 };
-  const rect = ref.current.getBoundingClientRect();
-  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-};
-
-const rectFromDrag = (drag) => ({
-  x: Math.min(drag.startX, drag.currentX),
-  y: Math.min(drag.startY, drag.currentY),
-  w: Math.abs(drag.startX - drag.currentX),
-  h: Math.abs(drag.startY - drag.currentY),
-});
-
-const isNearBorder = (coords, r, threshold = STROKE_HIT_WIDTH / 2) => {
-  const { x, y } = coords;
-  const inX = x >= r.x - threshold && x <= r.x + r.w + threshold;
-  const inY = y >= r.y - threshold && y <= r.y + r.h + threshold;
-  return (
-    (Math.abs(x - r.x)         < threshold && inY) ||
-    (Math.abs(x - (r.x + r.w)) < threshold && inY) ||
-    (Math.abs(y - r.y)         < threshold && inX) ||
-    (Math.abs(y - (r.y + r.h)) < threshold && inX)
-  );
-};
-
-const sqr = (x) => x * x;
-
-const distToSegmentSquared = (p, v, w) => {
-  const l2 = dist2(v, w);
-  if (l2 === 0) return dist2(p, v);
-  let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
-  t = Math.max(0, Math.min(1, t));
-  return dist2(p, { x: v.x + t * (w.x - v.x), y: v.y + t * (w.y - v.y) });
-};
-
-const isNearLassoBorder = (coords, r, threshold) => {
-  if (coords.x < r.x - threshold || coords.x > r.x + r.w + threshold ||
-      coords.y < r.y - threshold || coords.y > r.y + r.h + threshold) return false;
-
-  const thresh2 = threshold * threshold;
-  for(let i=0; i<r.points.length; i++) {
-    const p1 = { x: r.x + r.points[i].x, y: r.y + r.points[i].y };
-    const p2 = { x: r.x + r.points[(i+1)%r.points.length].x, y: r.y + r.points[(i+1)%r.points.length].y };
-    if (distToSegmentSquared(coords, p1, p2) <= thresh2) return true;
-  }
-  return false;
-};
 
 // ─── Region colour palette ────────────────────────────────────────────────────
 const REGION_COLORS = [
@@ -760,9 +712,12 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
           return inY && (inLeft || inRight);
         }
         if (r.type === 'lasso') {
-          return isNearLassoBorder(coords, r, hitThreshold);
+          return getMarkType(r.type).hasSelectedBorder(coords, r, hitThreshold);
+          // return isNearLassoBorder(coords, r, hitThreshold);
         }
-        return isNearBorder(coords, r, hitThreshold);
+        if(r.type === 'rect') {
+          return getMarkType(r.type).hasSelectedBorder(coords, r, hitThreshold);
+        }
       });
 
       if (hit) {
@@ -979,7 +934,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     if (tool === 'remove') {
       const isConfirmed = await confirmErrorDialog(
         'Are you sure you want to delete this region? Its whiteboard data will be permanently lost.',
-        { title: 'Delete Whiteboard', kind: 'warning' }
+        'Delete Whiteboard'
       );
 
       if (isConfirmed) {
@@ -1383,7 +1338,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                       }} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #4b5563', background: 'transparent', color: '#d1d5db', cursor: 'pointer' }}>Close</button>
                       {globalToolCount > 1 && (
                         <button onClick={async () => {
-                          const yes = await confirmErrorDialog('Delete this global whiteboard tool?', { title: 'Delete Tool', kind: 'warning' });
+                          const yes = await confirmErrorDialog('Delete this global whiteboard tool?','Delete Tool');
                           if (!yes) return;
                           setGlobalToolLinks((prev) => prev.filter((_, i) => i !== idx));
                           setGlobalToolCount((c) => Math.max(1, c - 1));
@@ -1407,7 +1362,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                           {globalToolCount > 1 && (
                             <button
                               onClick={async () => {
-                                const yes = await confirmErrorDialog('Delete this global whiteboard tool?', { title: 'Delete Tool', kind: 'warning' });
+                                const yes = await confirmErrorDialog('Delete this global whiteboard tool?', 'Delete Tool');
                                 if (!yes) return;
                                 setGlobalToolLinks((prev) => prev.filter((_, i) => i !== idx));
                                 setGlobalToolCount((c) => Math.max(1, c - 1));
