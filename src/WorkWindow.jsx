@@ -794,15 +794,15 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
     if (tool === 'lasso') {
       e.currentTarget.setPointerCapture?.(e.pointerId);
-      setLassoPoints({type: 'lasso',  points:[{ x: coords.x, y: coords.y }]});
-      // setCurrentSelection(getMarkType(currentSelection.type).initiateShape(coords))
+      // setLassoPoints({type: 'lasso',  points:[{ x: coords.x, y: coords.y }]});
+      setCurrentSelection(getMarkType(tool).initiateShape(coords))
       return;
     }
 
     if (tool === 'rect') {
       e.currentTarget.setPointerCapture?.(e.pointerId);
-      setCurrentDrag({ type:'rect', startX: coords.x, startY: coords.y, currentX: coords.x, currentY: coords.y });
-      // setCurrentSelection(getMarkType(currentSelection.type).initiateShape(coords))
+      // setCurrentDrag({ type:'rect', startX: coords.x, startY: coords.y, currentX: coords.x, currentY: coords.y });
+      setCurrentSelection(getMarkType(tool).initiateShape(coords))
     }
 
   }, [tool, regions, zoom, getUnscaledCoords, sectionTarget, sectionY, sectionWidths, editingShapeId]);
@@ -811,28 +811,28 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     mousePosRef.current = { x: e.clientX, y: e.clientY };
     const coords = getUnscaledCoords(e);
 
-    // if(currentSelection) {
-    //   setCurrentSelection((prev) =>
-    //     prev ? getMarkType(prev.type).updateSelection(prev, coords, {
-    //       minPointDistance: 2 / zoom, // TODO: remove hardcoding 2, create variable
-    //     }) : prev
-    //   );    
-    // }
-    
-    if (currentDrag) setCurrentDrag((p) => ({ ...p, currentX: coords.x, currentY: coords.y }));
-
-    if (lassoPoints) {
-      setLassoPoints((prev) => {
-        if (!prev || prev.points.length === 0) {
-          return prev;
-        }
-        const last = prev.points[prev.points.length - 1];
-        if (Math.abs(last.x - coords.x) > 2 / zoom || Math.abs(last.y - coords.y) > 2 / zoom) {
-          return {...prev, points: [...prev.points, { x: coords.x, y: coords.y }]};
-        }
-        return prev;
-      });
+    if(currentSelection) {
+      setCurrentSelection((prev) =>
+        prev ? getMarkType(prev.type).updateSelection(prev, coords, {
+          minPointDistance: 2 / zoom, // TODO: remove hardcoding 2, create variable
+        }) : prev
+      );    
     }
+    
+    // if (currentDrag) setCurrentDrag((p) => ({ ...p, currentX: coords.x, currentY: coords.y }));
+
+    // if (lassoPoints) {
+    //   setLassoPoints((prev) => {
+    //     if (!prev || prev.points.length === 0) {
+    //       return prev;
+    //     }
+    //     const last = prev.points[prev.points.length - 1];
+    //     if (Math.abs(last.x - coords.x) > 2 / zoom || Math.abs(last.y - coords.y) > 2 / zoom) {
+    //       return {...prev, points: [...prev.points, { x: coords.x, y: coords.y }]};
+    //     }
+    //     return prev;
+    //   });
+    // }
 
     if (movingRegion) {
       setMarks((prev) =>
@@ -851,51 +851,51 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     if (e?.currentTarget?.hasPointerCapture?.(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
-    // if(currentSelection){
-    //   shape = getMarkType(currentSelection.type).createShape(currentSelection)
-    //   if (shape && shape.w > 10 / zoom && shape.h > 10 / zoom) {
-    //     if(editingShapeId && tool === currentSelection.type) {
-    //       setMarks(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
+    if(currentSelection){
+      const shape = getMarkType(currentSelection.type).createFinalizedShape(currentSelection)
+      if (shape && shape.w > 10 / zoom && shape.h > 10 / zoom) {
+        if(editingShapeId && tool === currentSelection.type) {
+          setMarks(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
+        } else {
+          const newId = `reg_${Date.now()}`; // TODO: create proper ID creation place....
+          setMarks((prev) => [...prev, { id: newId, type: currentSelection.type, ...shape }]);
+          setSelectedMarkId(newId);
+        }
+      }
+      setCurrentSelection(null);
+    }
+    
+    // if (currentDrag) {
+    //   const shape = getMarkType('rect').createFinalizedShape(currentDrag)
+    //   if (!shape) {
+    //     setCurrentDrag(null);
+    //     return;
+    //   }
+    //   if (shape.w > 10 / zoom && shape.h > 10 / zoom) {
+    //     if (editingShapeId && tool === 'rect') {
+    //        setMarks(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
     //     } else {
-    //       const newId = `reg_${Date.now()}`; // TODO: create proper ID creation place....
-    //       setMarks((prev) => [...prev, { id: newId, type: currentSelection.type, ...shape }]);
-    //       setSelectedMarkId(newId);
+    //        const newId = `reg_${Date.now()}`;
+    //        setMarks((prev) => [...prev, { id: newId, type: 'rect', ...shape }]);
+    //        setSelectedMarkId(newId);
     //     }
     //   }
-    //   setCurrentSelection(null);
+    //   setCurrentDrag(null);
     // }
-    
-    if (currentDrag) {
-      const shape = getMarkType('rect').createFinalizedShape(currentDrag)
-      if (!shape) {
-        setCurrentDrag(null);
-        return;
-      }
-      if (shape.w > 10 / zoom && shape.h > 10 / zoom) {
-        if (editingShapeId && tool === 'rect') {
-           setMarks(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
-        } else {
-           const newId = `reg_${Date.now()}`;
-           setMarks((prev) => [...prev, { id: newId, type: 'rect', ...shape }]);
-           setSelectedMarkId(newId);
-        }
-      }
-      setCurrentDrag(null);
-    }
 
-    if (lassoPoints) {
-        const shape = getMarkType('lasso').createFinalizedShape(lassoPoints)
-        if (shape && shape.w > 10 / zoom && shape.h > 10 / zoom) {
-          if (editingShapeId && tool === 'lasso') {
-             setMarks(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
-          } else {
-             const newId = `reg_${Date.now()}`;
-             setMarks(prev => [...prev, { id: newId, type: 'lasso', ...shape }]);
-             setSelectedMarkId(newId);
-          }
-        }
-        setLassoPoints(null);
-      }
+    // if (lassoPoints) {
+    //     const shape = getMarkType('lasso').createFinalizedShape(lassoPoints)
+    //     if (shape && shape.w > 10 / zoom && shape.h > 10 / zoom) {
+    //       if (editingShapeId && tool === 'lasso') {
+    //          setMarks(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
+    //       } else {
+    //          const newId = `reg_${Date.now()}`;
+    //          setMarks(prev => [...prev, { id: newId, type: 'lasso', ...shape }]);
+    //          setSelectedMarkId(newId);
+    //       }
+    //     }
+    //     setLassoPoints(null);
+    //   }
 
     setMovingRegion(null);
   }, [currentSelection, currentDrag, lassoPoints, zoom, editingShapeId, tool]);
@@ -930,28 +930,28 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
           const coords = getUnscaledCoordsFromClient(clientX, clientY);
           const state = dragStateRef.current;
 
-          // if(currentSelection) {
-          //   setCurrentSelection((prev) =>
-          //     prev ? getMarkType(prev.type).updateSelection(prev, coords, {
-          //       minPointDistance: 2 / zoom, // TODO: remove hardcoding 2, create variable
-          //     }) : prev
-          //   );    
-          // }
-
-          if (currentDrag) setCurrentDrag((p) => ({ ...p, currentX: coords.x, currentY: coords.y }));
-
-          if (lassoPoints) {
-            setLassoPoints((prev) => {
-              if (!prev || prev.points.length === 0) {
-                return prev;
-              }
-              const last = prev.points[prev.points.length - 1];
-              if (Math.abs(last.x - coords.x) > 2 / zoom || Math.abs(last.y - coords.y) > 2 / zoom) {
-                return { ...prev, points: [...prev.points, { x: coords.x, y: coords.y }] };
-              }
-              return prev;
-            });
+          if(currentSelection) {
+            setCurrentSelection((prev) =>
+              prev ? getMarkType(prev.type).updateSelection(prev, coords, {
+                minPointDistance: 2 / zoom, // TODO: remove hardcoding 2, create variable
+              }) : prev
+            );    
           }
+
+          // if (currentDrag) setCurrentDrag((p) => ({ ...p, currentX: coords.x, currentY: coords.y }));
+
+          // if (lassoPoints) {
+          //   setLassoPoints((prev) => {
+          //     if (!prev || prev.points.length === 0) {
+          //       return prev;
+          //     }
+          //     const last = prev.points[prev.points.length - 1];
+          //     if (Math.abs(last.x - coords.x) > 2 / zoom || Math.abs(last.y - coords.y) > 2 / zoom) {
+          //       return { ...prev, points: [...prev.points, { x: coords.x, y: coords.y }] };
+          //     }
+          //     return prev;
+          //   });
+          // }
           
           if (state.movingRegion) {
             setMarks((prev) =>
@@ -1243,11 +1243,11 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                 );
               })}
 
-              {/* {currentSelection && (() => {
-                getMarkType(selection.type).renderSelectionPreview(selection, {zoom: zoom}) ?? null
-              })()} */}
+              {currentSelection && 
+                getMarkType(currentSelection.type).renderSelectionPreview(currentSelection, {zoom: zoom})
+              } 
               
-              {currentDrag && (() => {
+              {/* } {currentDrag && (() => {
                 const { x, y, w, h } = rectFromDrag(currentDrag);
                 return (
                   <rect x={x * zoom} y={y * zoom} width={w * zoom} height={h * zoom} fill="rgba(59,130,246,0.1)" stroke="#3B82F6" strokeWidth={1.5} strokeDasharray="5 4" rx={2} style={{ pointerEvents: 'none' }} />
@@ -1257,7 +1257,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
               {lassoPoints && lassoPoints.points.length > 0 && (
                 <polyline points={lassoPoints.points.map(p => `${p.x * zoom},${p.y * zoom}`).join(' ')} fill="rgba(59,130,246,0.1)" stroke="#3B82F6" strokeWidth={1.5} strokeDasharray="5 4" style={{ pointerEvents: 'none' }} />
               )}
-
+              */}
             </svg>
           </div>
         </div>
