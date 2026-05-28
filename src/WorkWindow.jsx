@@ -1121,25 +1121,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
                 if (r.type === 'section') {
                   const sw = sectionWidths[r.id];
-                  const leftW = sw * zoom;
-                  const rightX = PDF_WIDTH * zoom - leftW;
-                  return (
-                    <g key={r.id}>
-                      <g style={{ pointerEvents: 'auto' }} onMouseDown={(e) => { if (e.ctrlKey || e.metaKey) return; if (tool === 'section' || tool === 'rect' || tool === 'lasso') return; e.stopPropagation(); }} onClick={(e) => { if (e.ctrlKey || e.metaKey) return; handleBorderClick(e, r.id); }}>
-                        <rect x={0} y={ry} width={Math.max(leftW, 24 * zoom)} height={rh} fill="transparent" style={{ cursor: tool === 'select' ? 'pointer' : 'crosshair' }} />
-                      </g>
-                      <rect x={0} y={ry} width={leftW} height={rh} fill={color} opacity={isSelected ? 0.66 : 0.33} style={{ transition: 'opacity 0.15s', pointerEvents: 'none' }} />
-                      <rect x={leftW + 2} y={ry + 4} width={28} height={15} fill={color} rx={2} style={{ pointerEvents: 'none' }} />
-                      <text x={leftW + 16} y={ry + 14} textAnchor="middle" fill="white" fontSize={9} fontWeight="700" style={{ pointerEvents: 'none' }}>{`S${idx + 1}`}</text>
-
-                      <g style={{ pointerEvents: 'auto' }} onMouseDown={(e) => { if (e.ctrlKey || e.metaKey) return; if (tool === 'section' || tool === 'rect' || tool === 'lasso') return; e.stopPropagation(); }} onClick={(e) => { if (e.ctrlKey || e.metaKey) return; handleBorderClick(e, r.id); }}>
-                        <rect x={rightX} y={ry} width={Math.max(leftW, 24 * zoom)} height={rh} fill="transparent" style={{ cursor: tool === 'select' ? 'pointer' : 'crosshair' }} />
-                      </g>
-                      <rect x={rightX} y={ry} width={leftW} height={rh} fill={color} opacity={isSelected ? 0.66 : 0.33} style={{ transition: 'opacity 0.15s', pointerEvents: 'none' }} />
-                      <rect x={rightX - 30} y={ry + 4} width={28} height={15} fill={color} rx={2} style={{ pointerEvents: 'none' }} />
-                      <text x={rightX - 16} y={ry + 14} textAnchor="middle" fill="white" fontSize={9} fontWeight="700" style={{ pointerEvents: 'none' }}>{`S${idx + 1}`}</text>
-                    </g>
-                  );
+                  return getMarkType(r.type).render(r, {zoom:zoom, PDFWIDTH: PDF_WIDTH, borderWidth: sw, tool:tool, color: color, idx:idx, onClick: handleBorderClick, isSelected:isSelected, });
                 }
 
                 if (r.type === 'lasso') {

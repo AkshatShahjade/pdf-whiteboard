@@ -1,4 +1,4 @@
-import { Mark, MarkType, Point, Selection, SectionRange, SelectionContext } from "../../../domain_models/mark_model";
+import { Mark, MarkType, Point, Selection, SectionRange, SelectionContext, RenderMarkContext } from "../../../domain_models/mark_model";
 
 export const sectionMark: MarkType = {
     id: 'section',
@@ -42,7 +42,46 @@ export const sectionMark: MarkType = {
         }
     },
 
-    render(){}
+    render(r: Mark, ctx: RenderMarkContext){
+        if (r.type === 'section' 
+            && ctx.PDFWIDTH !== undefined && ctx.borderWidth !== undefined && ctx.zoom !== undefined && ctx.color !== undefined && ctx.tool !== undefined && ctx.idx !== undefined && ctx.isSelected !== undefined && ctx.onClick !== undefined) {
+            const leftW = ctx.borderWidth * ctx.zoom;
+            const rightX = ctx.PDFWIDTH * ctx.zoom - leftW;
+            const ry = r.y * ctx.zoom, rh = r.h * ctx.zoom;
+
+            const handleMouseDown = (e: React.MouseEvent) => {
+                if (e.ctrlKey || e.metaKey) return;
+                if (ctx.tool === 'section' || ctx.tool === 'rect' || ctx.tool === 'lasso') return;
+                e.stopPropagation();
+            };
+            const handleElementClick = (e: React.MouseEvent) => {
+                if (e.ctrlKey || e.metaKey) return;
+                ctx.onClick(e, r.id);
+            };
+            return (
+                <g key={r.id}>
+                    {/* Left Border Interactive & Display */}
+                    <g style={{ pointerEvents: 'auto' }} onMouseDown={handleMouseDown} onClick={handleElementClick}>
+                        <rect x={0} y={ry} width={Math.max(leftW, 24 * ctx.zoom)} height={rh} fill="transparent" style={{ cursor: ctx.tool === 'select' ? 'pointer' : 'crosshair' }} />
+                    </g>
+                    <rect x={0} y={ry} width={leftW} height={rh} fill={ctx.color} opacity={ctx.isSelected ? 0.66 : 0.33} style={{ transition: 'opacity 0.15s', pointerEvents: 'none' }} />
+                    <rect x={leftW + 2} y={ry + 4} width={28} height={15} fill={ctx.color} rx={2} style={{ pointerEvents: 'none' }} />
+                    <text x={leftW + 16} y={ry + 14} textAnchor="middle" fill="white" fontSize={9} fontWeight="700" style={{ pointerEvents: 'none' }}>
+                        {`S${ctx.idx + 1}`}
+                    </text>
+                    {/* Right Border Interactive & Display */}
+                    <g style={{ pointerEvents: 'auto' }} onMouseDown={handleMouseDown} onClick={handleElementClick}>
+                        <rect x={rightX} y={ry} width={Math.max(leftW, 24 * ctx.zoom)} height={rh} fill="transparent" style={{ cursor: ctx.tool === 'select' ? 'pointer' : 'crosshair' }} />
+                    </g>
+                    <rect x={rightX} y={ry} width={leftW} height={rh} fill={ctx.color} opacity={ctx.isSelected ? 0.66 : 0.33} style={{ transition: 'opacity 0.15s', pointerEvents: 'none' }} />
+                    <rect x={rightX - 30} y={ry + 4} width={28} height={15} fill={ctx.color} rx={2} style={{ pointerEvents: 'none' }} />
+                    <text x={rightX - 16} y={ry + 14} textAnchor="middle" fill="white" fontSize={9} fontWeight="700" style={{ pointerEvents: 'none' }}>
+                        {`S${ctx.idx + 1}`}
+                    </text>
+                </g>
+            );
+        }
+    }
 }
 
 

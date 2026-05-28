@@ -51,7 +51,7 @@ export interface MarkType {
 
     // updateMark: (selection:Selection) => Mark
     
-    render: () => void
+    render: (r: Mark, ctx: RenderMarkContext) => any
 }
 
 // export interface Mark {
@@ -85,6 +85,18 @@ export interface SelectionContext {
     zoom?: number
     borderWidth?: number
     PDFWIDTH?: number // TODO... renmove this....
+}
+
+export interface RenderMarkContext {
+    minPointDistance?: number
+    zoom?: number
+    borderWidth?: number
+    PDFWIDTH?: number // TODO... renmove this....
+    tool?: string
+    color?: string 
+    idx?: number
+    isSelected?: boolean
+    onClick: (e: React.MouseEvent, id: string) => void;
 }
 
 export const STROKE_HIT_WIDTH = 12;
