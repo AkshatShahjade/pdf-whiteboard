@@ -814,6 +814,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     if (e?.currentTarget?.hasPointerCapture?.(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
+    // BIBIBO: create 2 new markRegistry functions: updateDrawableMark and createDrawableMark
     if(currentSelection && getMarkType(currentSelection.type).isDrawable){
         const shape = getMarkType(currentSelection.type).createFinalizedShape(currentSelection)
         if (shape && shape.w > 10 / zoom && shape.h > 10 / zoom) {
@@ -821,6 +822,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
             setMarksWithSectionWidths(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
           } else {
             const newId = `reg_${Date.now()}`; // TODO: create proper ID creation place....
+            const new_mark = getMarkType(currentSelection.type).returnNewDrawableMark(currentSelection)
             setMarksWithSectionWidths((prev) => [...prev, { id: newId, type: currentSelection.type, ...shape }]);
             setSelectedMarkId(newId);
           }

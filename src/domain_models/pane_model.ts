@@ -17,23 +17,3 @@ export interface SystemPane {
 
 export type BlobPath = string // TODO
 
-export type SourceContentType = PDF | WhiteBoard //| CodeEditor | BlockText | Image | Video | PPT | Spreadsheet | KeyboardMindMap | ObsidianCanvas
-export type DerivedContentType = WhiteBoard //| CodeEditor | BlockText | Image | Video | Spreadsheet | KeyboardMindMap | ObsidianCanvas
-
-export interface PDF {}
-
-export interface WhiteBoard{}
-
-// export interface CodeEditor{}
-
-// export interface BlockText{}
-
-// export interface Image{}
-
-// export interface Video{}
-
-// export interface PPT{}
-
-// export interface Spreadsheet{}
-
-// export interface KeyboardMindMap{}

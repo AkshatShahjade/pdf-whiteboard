@@ -1,3 +1,25 @@
+export type SourceContent = PDF | WhiteBoard //| CodeEditor | BlockText | Image | Video | PPT | Spreadsheet | KeyboardMindMap | ObsidianCanvas
+export type DerivedContent = WhiteBoard //| CodeEditor | BlockText | Image | Video | Spreadsheet | KeyboardMindMap | ObsidianCanvas
+export type Content = DerivedContent | SourceContent
+
+export interface PDF {}
+
+export interface WhiteBoard{}
+
+// export interface CodeEditor{}
+
+// export interface BlockText{}
+
+// export interface Image{}
+
+// export interface Video{}
+
+// export interface PPT{}
+
+// export interface Spreadsheet{}
+
+// export interface KeyboardMindMap{}
+
 export interface ContentType {
     
     id: string

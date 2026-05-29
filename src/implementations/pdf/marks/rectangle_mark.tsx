@@ -20,6 +20,11 @@ export const rectangleMark: MarkType = {
       return { type:'rect', startX: coords.x, startY: coords.y, currentX: coords.x, currentY: coords.y };
     },
 
+    returnNewDrawableMark(selection) {
+      const shape = getMarkType(currentSelection.type).createFinalizedShape(currentSelection)
+      [...prev, { id: newId, type: currentSelection.type, ...shape }]
+    },
+
     updateSelection(prev: Selection, coords: Point) {
         if(prev.type === 'rect'){
           return { ...prev, currentX: coords.x, currentY: coords.y }

@@ -47,7 +47,7 @@ export interface MarkType {
 
     renderSelectionPreview: (selection: Selection, ctx: SelectionContext) => any
 
-    // createNewMark:(selection: Selection) => Mark
+    returnNewDrawableMark:(selection: Selection) => Mark
 
     // updateMark: (selection:Selection) => Mark
     
