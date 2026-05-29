@@ -27,6 +27,9 @@ export const lassoMark: MarkType = {
 
     updateSelection(prev: Selection, coords: Point, ctx: { minPointDistance?: number }) {
         if (prev.type !== 'lasso'){ console.error("BOOGA OOGA ERR"); return prev}
+        if (!Array.isArray(prev.points) || prev.points.length === 0) {
+            return { ...prev, points: [coords] };
+        }
 
         const last = prev.points[prev.points.length - 1]
         if (!last) {
@@ -45,7 +48,11 @@ export const lassoMark: MarkType = {
     },
 
     returnNewDrawableMark(selection) {
-      if(selection.type === "lasso") {const new_sel = createLassoSel(selection); return { id: createMarkId(), ...new_sel }}
+      if(selection.type === "lasso") {
+        const new_sel = createLassoSel(selection);
+        if (!new_sel) return null;
+        return { id: createMarkId(), ...new_sel }
+      }
       console.error("BAOSIK");
       return null
     },
@@ -69,7 +76,7 @@ export const lassoMark: MarkType = {
     //   },
 
     renderSelectionPreview(selection, ctx) {
-        if(selection.type==='lasso' && selection.points.length > 0 && ctx.zoom !== undefined){
+        if(selection.type==='lasso' && Array.isArray(selection.points) && selection.points.length > 0 && ctx.zoom !== undefined){
             return (
                 <polyline 
                     points={selection.points.map(p => `${p.x * ctx.zoom},${p.y * ctx.zoom}`).join(' ')} 
@@ -85,6 +92,7 @@ export const lassoMark: MarkType = {
     
     render(r:Mark, ctx: RenderMarkContext){
         if (r.type === 'lasso'
+            && Array.isArray(r.points)
             && ctx.zoom !== undefined && ctx.color !== undefined && ctx.tool !== undefined && ctx.idx !== undefined && ctx.isSelected !== undefined && ctx.onClick !== undefined
         ) {
             const borderWidth = STROKE_HIT_WIDTH;
@@ -106,7 +114,7 @@ export const lassoMark: MarkType = {
 
 
 function createLassoSel(lassoPoints: LassoSel): any {
-    if (lassoPoints.points.length <= 5) {
+    if (!Array.isArray(lassoPoints.points) || lassoPoints.points.length <= 5) {
         return null;
     }
 
@@ -127,6 +135,7 @@ export const isInLassoBorder = (coords: Point, r: Mark, threshold:number) => {
   if(r.type !== 'lasso'){
     throw new Error(" must pass Lasso into isInLassoBorder ")
   }
+  if (!Array.isArray(r.points) || r.points.length === 0) return false;
   
   if (coords.x < r.x - threshold || coords.x > r.x + r.w + threshold ||
       coords.y < r.y - threshold || coords.y > r.y + r.h + threshold) return false;

@@ -196,11 +196,22 @@ export function saveSession(pdfPath, data) {
   }
 }
 
+export function normalizeRegionCollection(regions) {
+  if (Array.isArray(regions)) return regions;
+  if (regions && typeof regions === 'object') return [regions];
+  return [];
+}
+
 export function loadSession(pdfPath) {
   try {
     const key  = sessionKey(pdfPath);
     const raw  = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : null;
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== 'object') return parsed;
+    return {
+      ...parsed,
+      regions: normalizeRegionCollection(parsed.regions),
+    };
   } catch (err) {
     console.warn('[LemmaMap] session load failed:', err);
     return null;

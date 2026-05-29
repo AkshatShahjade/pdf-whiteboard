@@ -3,7 +3,7 @@ import { Tldraw, DefaultToolbar, DefaultToolbarContent, TldrawUiMenuItem, useToo
 import 'tldraw/tldraw.css';
 import { Document, Page, pdfjs } from 'react-pdf';
 import {
-  saveSession, loadSession,
+  saveSession, loadSession, normalizeRegionCollection,
   saveWhiteboard, loadWhiteboard, deleteWhiteboard,
   debounce, performRollingBackup,
   createWhiteboard, pruneWhiteboards
@@ -47,8 +47,9 @@ const REGION_COLORS = [
 const regionColor = (id) => REGION_COLORS[parseInt(id.replace('reg_', ''), 10) % REGION_COLORS.length];
 
 function updateSectionWidths(marks) {
-  const sections = marks.filter((mark) => mark.type === 'section');
-  if (sections.length === 0) return marks;
+  const normalizedMarks = normalizeRegionCollection(marks);
+  const sections = normalizedMarks.filter((mark) => mark.type === 'section');
+  if (sections.length === 0) return normalizedMarks;
 
   const sortedSections = [...sections].sort((a, b) => (
     b.h - a.h || a.y - b.y || a.id.localeCompare(b.id)
@@ -80,7 +81,7 @@ function updateSectionWidths(marks) {
   }
 
   let changed = false;
-  const nextMarks = marks.map((mark) => {
+  const nextMarks = normalizedMarks.map((mark) => {
     if (mark.type !== 'section') return mark;
     const nextWidth = resolvedWidths.get(mark.id) ?? DEFAULT_SECTION_WIDTH;
     if (mark.w === nextWidth && !('resolvedWidth' in mark)) return mark;
@@ -89,7 +90,7 @@ function updateSectionWidths(marks) {
     return { ...rest, w: nextWidth };
   });
 
-  return changed ? nextMarks : marks;
+  return changed ? nextMarks : normalizedMarks;
 }
 
 // ─── LazyPage Component ────────────────────────────────────────────────────────
@@ -411,6 +412,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
   const setMarksWithSectionWidths = useCallback((updater) => {
     setMarks((prev) => {
       const nextMarks = typeof updater === 'function' ? updater(prev) : updater;
+      if (nextMarks == null) return prev;
       return updateSectionWidths(nextMarks);
     });
   }, []);
@@ -818,8 +820,10 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
             setMarksWithSectionWidths(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
           } else {
             const new_mark = getMarkType(currentSelection.type).returnNewDrawableMark(currentSelection)
-            setMarksWithSectionWidths(new_mark);
-            setSelectedMarkId(new_mark.id);
+            if (new_mark) {
+              setMarksWithSectionWidths(prev => [...prev, new_mark]);
+              setSelectedMarkId(new_mark.id);
+            }
           }
         }
         setCurrentSelection(null);

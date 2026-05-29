@@ -9,11 +9,16 @@ export function applyToolUiReset(tool, {
 }) {
   const toolType = getToolType(tool);
 
-  if (!toolType.createsSelections) return;
-
-  setCurrentSelection(prev =>
-    prev?.type === tool ? prev : toolType.createNullSelection()
-  );
+  // Only section mode needs a persistent placeholder selection.
+  // Rect / lasso should start from a clean slate so the first click
+  // becomes the actual drag origin instead of a stale "empty" shape.
+  if (tool === 'section' && toolType.createsSelections) {
+    setCurrentSelection(prev =>
+      prev?.type === tool ? prev : toolType.createNullSelection()
+    );
+  } else {
+    setCurrentSelection(null);
+  }
 
   if (tool !== 'section') {
     setSectionTarget('start');

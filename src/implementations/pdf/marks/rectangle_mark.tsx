@@ -23,6 +23,7 @@ export const rectangleMark: MarkType = {
 
     returnNewDrawableMark(selection) {
       const new_sel = createRectSel(selection)
+      if (!new_sel) return null;
       return { id: createMarkId(), ...new_sel }
     },
 
@@ -37,7 +38,7 @@ export const rectangleMark: MarkType = {
     },
 
     renderSelectionPreview(selection, ctx) {
-      if(selection.type==="rect" && ctx.zoom){
+      if(selection.type==="rect" && ctx.zoom && selection.startX !== null && selection.startY !== null && selection.currentX !== null && selection.currentY !== null){
           const { x, y, w, h } = createRectSel(selection);
           return (
             <rect x={x * ctx.zoom} y={y * ctx.zoom} width={w * ctx.zoom} height={h * ctx.zoom} fill="rgba(59,130,246,0.1)" stroke="#3B82F6" strokeWidth={1.5} strokeDasharray="5 4" rx={2} style={{ pointerEvents: 'none' }} />
@@ -67,6 +68,9 @@ export const rectangleMark: MarkType = {
 }
 
 function createRectSel (drag: RectSel) : any {
+  if (drag.startX === null || drag.startY === null || drag.currentX === null || drag.currentY === null) {
+    return null;
+  }
   return {
       type:"rect",
       x: Math.min(drag.startX, drag.currentX),

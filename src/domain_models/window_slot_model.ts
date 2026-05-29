@@ -1,3 +1,5 @@
+import { Content } from "./content_models"
+import { Mark } from "./mark_model"
 import { ContentPane, Pane } from "./pane_model"
 
 export type UUID = string
@@ -28,3 +30,10 @@ export interface Slot{
 
 // }
 
+interface ContentTreeNode {
+  content: Content;
+  marks: Mark[];
+  children: Map<string, ContentTreeNode>; // markId → child node
+  parent: { markId: string; contentId: string } | null;
+  depth: number;
+}
