@@ -107,7 +107,7 @@ export interface ToolBorderClickContext {
         confirmDelete: () => Promise<boolean>
         deleteRegion: (regionId: string) => void
         selectRegion: (regionId: string | null) => void
-        clearGlobalToolUi: () => void
+        clearShortcutUi: () => void
     }
 }
 
@@ -126,10 +126,10 @@ export interface ToolToolbarExtrasContext {
         setCurrentSelection: (next: any) => void
         setMarksWithSectionWidths: (next: any) => void
         setSelectedMarkId: (next: string | null) => void
-        setSelectedGlobalToolIdx: (next: number | null) => void
+        setSelectedShortcutIdx: (next: number | null) => void
         setShapeBackup: (next: any) => void
         setEditingShapeId: (next: string | null) => void
-        setSelectPanelToolIdx: (next: number | null) => void
+        setSelectPanelIdx: (next: number | null) => void
     }
 }
 

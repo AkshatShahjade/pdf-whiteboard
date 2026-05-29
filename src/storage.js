@@ -233,7 +233,7 @@ export function debounce(fn, ms) {
   return debounced;
 }
 
-// ─── Global Whiteboards Registry ──────────────────────────────────────────────
+// ─── Whiteboards Registry ─────────────────────────────────────────────────────
 
 const WHITEBOARDS_KEY = 'lemmamap:whiteboards';
 const WHITEBOARD_FOLDER_MAP_KEY = 'lemmamap:whiteboardFolders';

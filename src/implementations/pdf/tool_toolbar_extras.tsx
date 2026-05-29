@@ -60,7 +60,7 @@ export function renderSectionToolbarExtras(ctx: ToolToolbarExtrasContext) {
                                 r.id === ctx.editingSectionId ? { ...r, y: y1, h: y2 - y1 } : r
                             )));
                             ctx.actions.setSelectedMarkId(ctx.editingSectionId);
-                            ctx.actions.setSelectedGlobalToolIdx(null);
+                            ctx.actions.setSelectedShortcutIdx(null);
                             ctx.actions.setEditingSectionId(null);
                         } else {
                             const newId = `reg_${Date.now()}`;
@@ -69,7 +69,7 @@ export function renderSectionToolbarExtras(ctx: ToolToolbarExtrasContext) {
                                 { id: newId, type: 'section', x: 0, y: y1, w: DEFAULT_SECTION_WIDTH, h: y2 - y1 },
                             ]);
                             ctx.actions.setSelectedMarkId(newId);
-                            ctx.actions.setSelectedGlobalToolIdx(null);
+                            ctx.actions.setSelectedShortcutIdx(null);
                         }
                         ctx.actions.setTool('select');
                     }}

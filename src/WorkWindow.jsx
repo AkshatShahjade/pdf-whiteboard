@@ -6,13 +6,14 @@ import {
   saveSession, loadSession, normalizeRegionCollection,
   saveWhiteboard, loadWhiteboard, deleteWhiteboard,
   debounce, performRollingBackup,
-  createWhiteboard, pruneWhiteboards
+  createWhiteboard
 } from './storage.js';
 import HomeScreen, { loadSettings } from './HomeScreen.jsx';
 
 
 import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './implementations/whiteboard/tools/editing/handwriting_whiteboard_editing_tool.jsx';
-import { confirmErrorDialog, jjoin, rdTextFile, readDirAKS } from './platform_adapter/switch.ts';
+import { confirmErrorDialog } from './platform_adapter/switch.ts';
+import { useShortcutToolState } from './window/useShortcutToolState.ts';
 import { getMarkType } from './capabilty_registry/pdf/mark_registry.ts';
 import { setupAllRegistries } from './capabilty_registry/setup_all.ts';
 import { toRoman } from './helper.ts';
@@ -353,23 +354,11 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
   const [tool, setTool]                   = useState('select');
   const [regions, setMarks]             = useState(restoredSession?.regions ?? []);
   const [selectedRegionId, setSelectedMarkId] = useState(restoredSession?.selectedRegionId ?? null);
-  const [selectedGlobalToolIdx, setSelectedGlobalToolIdx] = useState(restoredSession?.selectedGlobalToolIdx ?? null);
-  const [globalToolCount, setGlobalToolCount] = useState(
-    Math.max(1, Math.min(restoredSession?.globalToolCount ?? 1, settings?.maxGlobalPdfTools ?? 8))
-  );
-  const [globalToolLinks, setGlobalToolLinks] = useState(() => {
-    const max = settings?.maxGlobalPdfTools ?? 8;
-    const count = Math.max(1, Math.min(restoredSession?.globalToolCount ?? 1, max));
-    const restored = Array.isArray(restoredSession?.globalToolLinks) ? restoredSession.globalToolLinks : [];
-    return Array.from({ length: count }, (_, i) => restored[i] ?? null);
+  const { manager: shortcutManager, state: shortcutState, refreshAvailableWhiteboards } = useShortcutToolState({
+    settings,
+    restoredSession,
+    externalActions: { setTool, setSelectedMarkId: setSelectedMarkId },
   });
-  const [selectPanelToolIdx, setSelectPanelToolIdx] = useState(null);
-  const [activeGlobalToolControlsIdx, setActiveGlobalToolControlsIdx] = useState(null);
-  const [globalToolDraftId, setGlobalToolDraftId] = useState(null);
-  const [globalToolDraftName, setGlobalToolDraftName] = useState('');
-  const [newGlobalWhiteboardName, setNewGlobalWhiteboardName] = useState('');
-  const [viewStack, setViewStack] = useState([]);
-  const [availableWhiteboards, setAvailableWhiteboards] = useState([]);
   const pdfDirectoryPath = useMemo(() => {
     if (!pdfLocalPath) return null;
     const slash = Math.max(pdfLocalPath.lastIndexOf('/'), pdfLocalPath.lastIndexOf('\\'));
@@ -408,17 +397,10 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  const clearGlobalToolUi = useCallback(() => {
-    setSelectedGlobalToolIdx(null);
-    setActiveGlobalToolControlsIdx(null);
-    setSelectPanelToolIdx(null);
-    setViewStack([]);
-  }, []);
-
   const selectRegion = useCallback((regionId) => {
-    clearGlobalToolUi();
+    shortcutManager.clearUi();
     setSelectedMarkId(regionId);
-  }, [clearGlobalToolUi]);
+  }, []);
 
   const setMarksWithSectionWidths = useCallback((updater) => {
     setMarks((prev) => {
@@ -505,7 +487,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
     if (e.key === '\\' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
-      if (!selectedRegionId && selectedGlobalToolIdx === null) return;
+      if (!selectedRegionId && shortcutState.selectedIdx === null) return;
       setLeftPct(55);
       return;
     }
@@ -516,12 +498,12 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
       return;
     }
 
-    // Global tool shortcuts: I->1, II->2, III->3, ...
+    // Shortcut tool shortcuts: I->1, II->2, III->3, ...
     if (!e.ctrlKey && !e.metaKey && !e.altKey) {
       const n = Number.parseInt(e.key, 10);
-      if (!Number.isNaN(n) && n >= 1 && n <= globalToolCount) {
+      if (!Number.isNaN(n) && n >= 1 && n <= shortcutState.slotCount) {
         e.preventDefault();
-        const btn = document.querySelector(`button[title="Global Whiteboard Tool ${n}"]`);
+        const btn = document.querySelector(`button[title="Shortcut Tool ${n}"]`);
         if (btn) btn.click();
         return;
       }
@@ -555,28 +537,8 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     }
 
     if (e.key === 'Escape') {
-      if (selectPanelToolIdx !== null) {
-         setSelectPanelToolIdx(null);
-      } else if (selectedGlobalToolIdx !== null) {
-         const prevView = viewStack[viewStack.length - 1];
-         if (prevView) {
-           setViewStack(prev => prev.slice(0, -1));
-           if (prevView.type === 'global') {
-             setSelectedMarkId(null);
-             setSelectedGlobalToolIdx(prevView.idx);
-             setActiveGlobalToolControlsIdx(prevView.idx);
-           } else if (prevView.type === 'region') {
-             setSelectedGlobalToolIdx(null);
-             setActiveGlobalToolControlsIdx(null);
-             setSelectedMarkId(prevView.id);
-           }
-         } else {
-           setSelectedGlobalToolIdx(null);
-           setActiveGlobalToolControlsIdx(null);
-         }
-      } else {
-         setSelectedMarkId(null);
-      }
+      if (shortcutManager.handleEscape()) return;
+      setSelectedMarkId(null);
       return;
     }
 
@@ -584,9 +546,8 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
       const hotkeyTool = getToolByHotkey(e.key);
       if (hotkeyTool) {
         e.preventDefault();
-        setSelectedGlobalToolIdx(null);
-        setActiveGlobalToolControlsIdx(null);
-        setSelectPanelToolIdx(null);
+        shortcutManager.setSelectedIdx(null);
+        shortcutManager.setSelectPanelIdx(null);
         setTool((prev) => (
           hotkeyTool.activationMode === 'toggle' && prev === hotkeyTool.id
             ? 'select'
@@ -595,31 +556,14 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
         e.stopPropagation();
       }
     }
-  }, [activePane, selectedRegionId, selectedGlobalToolIdx, editingShapeId, shapeBackup, editingSectionId, currentSelection, tool, selectPanelToolIdx, viewStack, globalToolCount]);
+  }, [activePane, selectedRegionId, editingShapeId, shapeBackup, editingSectionId, currentSelection, tool]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [handleKeyDown]);
 
-  useEffect(() => {
-    const maxTools = Math.max(1, settings?.maxGlobalPdfTools ?? 8);
-    setGlobalToolCount((prev) => Math.min(prev, maxTools));
-  }, [settings?.maxGlobalPdfTools]);
-
-  useEffect(() => {
-    setGlobalToolLinks((prev) => {
-      const next = prev.slice(0, globalToolCount);
-      while (next.length < globalToolCount) next.push(null);
-      return next;
-    });
-  }, [globalToolCount]);
-
-  useEffect(() => {
-    if (selectedGlobalToolIdx === null) {
-      setActiveGlobalToolControlsIdx(null);
-    }
-  }, [selectedGlobalToolIdx]);
+  // Shortcut tool effects (clamp, sync, clear) are now handled by useShortcutToolState hook.
 
   const debouncedSaveSession = useMemo(
     () => debounce((data) => {
@@ -632,26 +576,19 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
   const regionsRef          = useRef(regions);
   const selectedRegionIdRef = useRef(selectedRegionId);
   const leftPctRef          = useRef(leftPct);
-  const selectedGlobalToolIdxRef = useRef(selectedGlobalToolIdx);
-  const globalToolCountRef = useRef(globalToolCount);
-  const globalToolLinksRef = useRef(globalToolLinks);
 
   useEffect(() => { regionsRef.current = regions; }, [regions]);
   useEffect(() => { selectedRegionIdRef.current = selectedRegionId; }, [selectedRegionId]);
   useEffect(() => { leftPctRef.current = leftPct; }, [leftPct]);
-  useEffect(() => { selectedGlobalToolIdxRef.current = selectedGlobalToolIdx; }, [selectedGlobalToolIdx]);
-  useEffect(() => { globalToolCountRef.current = globalToolCount; }, [globalToolCount]);
-  useEffect(() => { globalToolLinksRef.current = globalToolLinks; }, [globalToolLinks]);
 
   const persistSession = useCallback(() => {
+    const shortcutData = shortcutManager.getSessionData();
     debouncedSaveSession({
       regions:          regionsRef.current,
       selectedRegionId: selectedRegionIdRef.current,
-      selectedGlobalToolIdx: selectedGlobalToolIdxRef.current,
+      ...shortcutData,
       scrollTop:        pdfScrollRef.current?.scrollTop ?? 0,
       leftPct:          leftPctRef.current,
-      globalToolCount: globalToolCountRef.current,
-      globalToolLinks: globalToolLinksRef.current,
     });
   }, [debouncedSaveSession]);
 
@@ -659,14 +596,13 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
   useEffect(() => {
     const onUnload = () => {
+      const shortcutData = shortcutManager.getSessionData();
       debouncedSaveSession.flush({
         regions:          regionsRef.current,
         selectedRegionId: selectedRegionIdRef.current,
-        selectedGlobalToolIdx: selectedGlobalToolIdxRef.current,
+        ...shortcutData,
         scrollTop:        pdfScrollRef.current?.scrollTop ?? 0,
         leftPct:          leftPctRef.current,
-        globalToolCount: globalToolCountRef.current,
-        globalToolLinks: globalToolLinksRef.current,
       });
     };
     window.addEventListener('beforeunload', onUnload);
@@ -930,10 +866,10 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
           deleteWhiteboard(id);
         },
         selectRegion,
-        clearGlobalToolUi,
+        clearShortcutUi: () => shortcutManager.clearUi(),
       },
     });
-  }, [tool, selectedRegionId, selectRegion, clearGlobalToolUi]);
+  }, [tool, selectedRegionId, selectRegion]);
 
   const handleBackup = async () => {
     try {
@@ -944,113 +880,20 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     }
   };
 
-  const refreshAvailableWhiteboards = useCallback(async () => {
-    const libraryPath = localStorage.getItem('lemmamap:library');
-    if (!libraryPath) {
-      setAvailableWhiteboards([]);
-      return;
-    }
-
-    const collected = [];
-    const walk = async (dir) => {
-      const items = await readDirAKS(dir);
-      for (const item of items) {
-        const fullPath = await jjoin(dir, item.name);
-        if (item.isDirectory) {
-          await walk(fullPath);
-          continue;
-        }
-        if (!item.isFile || !item.name.toLowerCase().endsWith('.whiteboard.json')) continue;
-        try {
-          const raw = await rdTextFile(fullPath);
-          const meta = JSON.parse(raw);
-          if (meta?.id && meta?.name) collected.push({ id: meta.id, name: meta.name, path: fullPath });
-        } catch {
-          // Ignore malformed whiteboard files.
-        }
-      }
-    };
-
-    try {
-      await walk(libraryPath);
-      const byId = new Map();
-      for (const wb of collected) if (!byId.has(wb.id)) byId.set(wb.id, wb);
-      const deduped = [...byId.values()];
-      pruneWhiteboards(deduped.map((wb) => wb.id));
-      setAvailableWhiteboards(deduped);
-    } catch (err) {
-      console.warn('Failed to scan whiteboard files:', err);
-      setAvailableWhiteboards([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    refreshAvailableWhiteboards();
-  }, [refreshAvailableWhiteboards]);
-
-  const allWhiteboards = availableWhiteboards;
-
-  const pushCurrentViewToStack = useCallback((nextView) => {
-    const currentView = selectedGlobalToolIdx !== null
-      ? { type: 'global', idx: selectedGlobalToolIdx }
-      : (selectedRegionId ? { type: 'region', id: selectedRegionId } : null);
-    if (!currentView) return;
-    const isSame = currentView.type === nextView.type && (currentView.type === 'global' ? currentView.idx === nextView.idx : currentView.id === nextView.id);
-    if (!isSame) {
-      setViewStack((prev) => {
-        const filtered = prev.filter((v) => !(v.type === currentView.type && (v.type === 'global' ? v.idx === currentView.idx : v.id === currentView.id)));
-        return [...filtered, currentView];
-      });
-    }
-  }, [selectedGlobalToolIdx, selectedRegionId]);
-
-  const handleOpenGlobalTool = useCallback((idx) => {
-    setTool('select');
-    const linked = globalToolLinks[idx];
-    if (!linked) {
-      setSelectPanelToolIdx(idx);
-      setActiveGlobalToolControlsIdx(null);
-      setNewGlobalWhiteboardName('');
-      setGlobalToolDraftId(null);
-      setGlobalToolDraftName('');
-      return;
-    }
-
-    pushCurrentViewToStack({ type: 'global', idx });
-    setSelectPanelToolIdx(null);
-    setSelectedMarkId(null);
-    setSelectedGlobalToolIdx(idx);
-    setActiveGlobalToolControlsIdx(idx);
-    const found = allWhiteboards.find((wb) => wb.id === linked);
-    setGlobalToolDraftId(linked);
-    setGlobalToolDraftName(found?.name || 'Whiteboard');
-  }, [globalToolLinks, allWhiteboards, pushCurrentViewToStack]);
-
-  const handleApplyGlobalToolSelection = useCallback((idx, whiteboardId, whiteboardName = null) => {
-    if (!whiteboardId) return;
-    setGlobalToolLinks((prev) => prev.map((id, i) => (i === idx ? whiteboardId : id)));
-    pushCurrentViewToStack({ type: 'global', idx });
-    setSelectedMarkId(null);
-    setSelectedGlobalToolIdx(idx);
-    setActiveGlobalToolControlsIdx(idx);
-    setSelectPanelToolIdx(null);
-    setGlobalToolDraftId(whiteboardId);
-    if (whiteboardName) setGlobalToolDraftName(whiteboardName);
-  }, [pushCurrentViewToStack]);
-
   const handleCreateFromPanel = useCallback(async () => {
-    if (selectPanelToolIdx === null) return;
-    const trimmed = newGlobalWhiteboardName.trim();
+    const { selectPanelIdx, newWhiteboardName } = shortcutManager.state;
+    if (selectPanelIdx === null) return;
+    const trimmed = newWhiteboardName.trim();
     if (!trimmed) return;
     try {
       const wb = await createWhiteboard(trimmed, pdfDirectoryPath);
-      setNewGlobalWhiteboardName('');
+      shortcutManager.setNewWhiteboardName('');
       await refreshAvailableWhiteboards();
-      handleApplyGlobalToolSelection(selectPanelToolIdx, wb.id, wb.name);
+      shortcutManager.applySelection(selectPanelIdx, wb.id, wb.name, selectedRegionIdRef.current);
     } catch (err) {
       showToast(err.message || 'Could not create whiteboard.', 'error');
     }
-  }, [selectPanelToolIdx, newGlobalWhiteboardName, pdfDirectoryPath, handleApplyGlobalToolSelection, refreshAvailableWhiteboards, showToast]);
+  }, [pdfDirectoryPath, refreshAvailableWhiteboards, showToast]);
 
   // --- Dynamic Cursors ---
   const toolType = getToolType(tool);
@@ -1060,7 +903,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
         ? toolType.cursor({ sectionTarget })
         : toolType.cursor) || 'default';
 
-  const activeWhiteboardId = selectedRegionId ?? (selectedGlobalToolIdx !== null ? globalToolLinks[selectedGlobalToolIdx] : null);
+  const activeWhiteboardId = selectedRegionId ?? shortcutManager.getLinkedWhiteboardId();
   const sectionSelection = currentSelection?.type === 'section'
     ? currentSelection
     : { start: null, end: null };
@@ -1165,7 +1008,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
               <div key={id} style={{ position: 'relative' }}>
                 <button
                   onClick={() => {
-                    clearGlobalToolUi();
+                    shortcutManager.clearUi();
                     const buttonToolType = getToolType(id);
                     const nextTool = buttonToolType.activationMode === 'toggle' && tool === id ? 'select' : id;
                     setTool(nextTool);
@@ -1192,10 +1035,10 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                     setCurrentSelection,
                     setMarksWithSectionWidths,
                     setSelectedMarkId,
-                    setSelectedGlobalToolIdx,
+                    setSelectedShortcutIdx: (idx) => shortcutManager.setSelectedIdx(idx),
                     setShapeBackup,
                     setEditingShapeId,
-                    setSelectPanelToolIdx,
+                    setSelectPanelIdx: (idx) => shortcutManager.setSelectPanelIdx(idx),
                   },
                 })}
               </div>
@@ -1203,47 +1046,29 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
           </div>
 
           <div style={{ background: 'rgba(38,42,51,0.65)', backdropFilter: 'blur(10px)', borderRadius: '8px', padding: '6px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
-            {Array.from({ length: globalToolCount }, (_, idx) => {
-              const linkedId = globalToolLinks[idx];
-              const isActive = selectedGlobalToolIdx === idx;
-              const showControls = activeGlobalToolControlsIdx === idx && !!linkedId;
-              const showSelectPanel = selectPanelToolIdx === idx;
+            {Array.from({ length: shortcutState.slotCount }, (_, idx) => {
+              const linkedId = shortcutState.slotLinks[idx];
+              const isActive = shortcutState.selectedIdx === idx;
+              const showControls = shortcutState.activeControlsIdx === idx && !!linkedId;
+              const showSelectPanel = shortcutState.selectPanelIdx === idx;
               return (
                 <div key={`gtool-${idx}`} style={{ position: 'relative' }}>
                   <button
-                    onClick={() => handleOpenGlobalTool(idx)}
-                    title={`Global Whiteboard Tool ${idx + 1}`}
+                    onClick={() => shortcutManager.openSlot(idx, selectedRegionId)}
+                    title={`Shortcut Tool ${idx + 1}`}
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '6px', border: `1px solid ${isActive ? '#3B82F6' : 'transparent'}`, background: isActive ? 'rgba(59,130,246,0.2)' : 'transparent', color: isActive ? '#93C5FD' : '#d1d5db', cursor: 'pointer', fontSize: '16px' }}
                   >
                     {toRoman(idx + 1)}
                   </button>
                   {showControls && (
                     <div style={{ position: 'absolute', right: 'calc(100% + 12px)', top: '50%', transform: 'translateY(-50%)', background: 'rgba(38,42,51,0.9)', backdropFilter: 'blur(10px)', borderRadius: '8px', padding: '6px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', gap: '8px', alignItems: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
-                      <button onClick={() => {
-                        setSelectPanelToolIdx(idx);
-                        setActiveGlobalToolControlsIdx(null);
-                        const found = allWhiteboards.find((wb) => wb.id === linkedId);
-                        setGlobalToolDraftId(linkedId);
-                        setGlobalToolDraftName(found?.name || 'Whiteboard');
-                      }} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #3B82F6', background: 'rgba(59,130,246,0.2)', color: '#93C5FD', cursor: 'pointer' }}>Update</button>
-                      <button onClick={() => {
-                        setSelectedGlobalToolIdx(null);
-                        setSelectedMarkId(null);
-                        setActiveGlobalToolControlsIdx(null);
-                        setSelectPanelToolIdx(null);
-                        setViewStack([]);
-                      }} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #4b5563', background: 'transparent', color: '#d1d5db', cursor: 'pointer' }}>Close</button>
-                      {globalToolCount > 1 && (
+                      <button onClick={() => shortcutManager.showUpdatePanel(idx)} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #3B82F6', background: 'rgba(59,130,246,0.2)', color: '#93C5FD', cursor: 'pointer' }}>Update</button>
+                      <button onClick={() => shortcutManager.closeSlot()} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #4b5563', background: 'transparent', color: '#d1d5db', cursor: 'pointer' }}>Close</button>
+                      {shortcutState.slotCount > 1 && (
                         <button onClick={async () => {
-                          const yes = await confirmErrorDialog('Delete this global whiteboard tool?','Delete Tool');
+                          const yes = await confirmErrorDialog('Delete this shortcut tool?','Delete Tool');
                           if (!yes) return;
-                          setGlobalToolLinks((prev) => prev.filter((_, i) => i !== idx));
-                          setGlobalToolCount((c) => Math.max(1, c - 1));
-                          setActiveGlobalToolControlsIdx(null);
-                          setSelectPanelToolIdx(null);
-                          setViewStack([]);
-                          if (selectedGlobalToolIdx === idx) setSelectedGlobalToolIdx(null);
-                          else if (selectedGlobalToolIdx > idx) setSelectedGlobalToolIdx((prev) => (prev === null ? null : prev - 1));
+                          shortcutManager.deleteSlot(idx);
                         }} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #F87171', background: 'transparent', color: '#F87171', cursor: 'pointer' }}>Delete Tool</button>
                       )}
                     </div>
@@ -1255,18 +1080,13 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                         <div style={{ fontSize: '10px', color: '#9ca3af', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Tool {toRoman(idx + 1)}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <button onClick={handleCreateFromPanel} style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid #3B82F6', background: 'rgba(59,130,246,0.2)', color: '#93C5FD', cursor: 'pointer', fontSize: '11px' }}>Create</button>
-                          <button onClick={() => { setSelectPanelToolIdx(null); setNewGlobalWhiteboardName(''); }} style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid #F87171', background: 'transparent', color: '#F87171', cursor: 'pointer', fontSize: '11px' }}>Cancel</button>
-                          {globalToolCount > 1 && (
+                          <button onClick={() => { shortcutManager.setSelectPanelIdx(null); shortcutManager.setNewWhiteboardName(''); }} style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid #F87171', background: 'transparent', color: '#F87171', cursor: 'pointer', fontSize: '11px' }}>Cancel</button>
+                          {shortcutState.slotCount > 1 && (
                             <button
                               onClick={async () => {
-                                const yes = await confirmErrorDialog('Delete this global whiteboard tool?', 'Delete Tool');
+                                const yes = await confirmErrorDialog('Delete this shortcut tool?', 'Delete Tool');
                                 if (!yes) return;
-                                setGlobalToolLinks((prev) => prev.filter((_, i) => i !== idx));
-                                setGlobalToolCount((c) => Math.max(1, c - 1));
-                                setSelectPanelToolIdx(null);
-                                setViewStack([]);
-                                if (selectedGlobalToolIdx === idx) setSelectedGlobalToolIdx(null);
-                                else if (selectedGlobalToolIdx > idx) setSelectedGlobalToolIdx((prev) => (prev === null ? null : prev - 1));
+                                shortcutManager.deleteSlot(idx);
                               }}
                               style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid #F87171', background: 'transparent', color: '#F87171', cursor: 'pointer', fontSize: '11px' }}
                             >
@@ -1276,25 +1096,25 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                         </div>
                       </div>
                       <div style={{ maxHeight: '182px', overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {allWhiteboards.map((wb) => (
+                        {shortcutState.availableWhiteboards.map((wb) => (
                           <button
                             key={wb.id}
-                            onClick={() => handleApplyGlobalToolSelection(idx, wb.id, wb.name)}
-                            style={{ textAlign: 'left', padding: '8px 10px', borderRadius: '6px', border: `1px solid ${globalToolDraftId === wb.id ? '#3B82F6' : '#374151'}`, background: globalToolDraftId === wb.id ? 'rgba(59,130,246,0.18)' : '#262a33', color: '#e5e7eb', cursor: 'pointer', fontSize: '12px', minHeight: '30px' }}
+                            onClick={() => shortcutManager.applySelection(idx, wb.id, wb.name, selectedRegionId)}
+                            style={{ textAlign: 'left', padding: '8px 10px', borderRadius: '6px', border: `1px solid ${shortcutState.draftId === wb.id ? '#3B82F6' : '#374151'}`, background: shortcutState.draftId === wb.id ? 'rgba(59,130,246,0.18)' : '#262a33', color: '#e5e7eb', cursor: 'pointer', fontSize: '12px', minHeight: '30px' }}
                           >
                             {wb.name}
                           </button>
                         ))}
-                        {allWhiteboards.length === 0 && <span style={{ fontSize: '11px', color: '#9ca3af', textAlign: 'center', padding: '8px' }}>No whiteboards yet.</span>}
+                        {shortcutState.availableWhiteboards.length === 0 && <span style={{ fontSize: '11px', color: '#9ca3af', textAlign: 'center', padding: '8px' }}>No whiteboards yet.</span>}
                       </div>
-                      <input value={newGlobalWhiteboardName} onChange={(e) => setNewGlobalWhiteboardName(e.target.value)} placeholder="New whiteboard name..." style={{ width: '100%', background: '#1c1f26', border: '1px solid #4b5563', color: '#e5e7eb', borderRadius: '6px', padding: '6px 8px', fontSize: '11px', outline: 'none' }} />
+                      <input value={shortcutState.newWhiteboardName} onChange={(e) => shortcutManager.setNewWhiteboardName(e.target.value)} placeholder="New whiteboard name..." style={{ width: '100%', background: '#1c1f26', border: '1px solid #4b5563', color: '#e5e7eb', borderRadius: '6px', padding: '6px 8px', fontSize: '11px', outline: 'none' }} />
                     </div>
                   )}
                 </div>
               );
             })}
-            {globalToolCount < (settings?.maxGlobalPdfTools ?? 8) && (
-              <button onClick={() => setGlobalToolCount((c) => c + 1)} title="Add global whiteboard tool" style={{ width: '36px', height: '32px', borderRadius: '6px', border: '1px dashed #4b5563', background: 'transparent', color: '#d1d5db', cursor: 'pointer', fontSize: '16px' }}>+</button>
+            {shortcutState.slotCount < (settings?.maxGlobalPdfTools ?? 8) && (
+              <button onClick={() => shortcutManager.addSlot()} title="Add shortcut tool" style={{ width: '36px', height: '32px', borderRadius: '6px', border: '1px dashed #4b5563', background: 'transparent', color: '#d1d5db', cursor: 'pointer', fontSize: '16px' }}>+</button>
             )}
           </div>
 

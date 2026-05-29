@@ -18,7 +18,7 @@ export const selectionTool: ToolType = {
     },
 
     onBorderClick({ regionId, actions }) {
-        actions.clearGlobalToolUi()
+        actions.clearShortcutUi()
         actions.selectRegion(regionId)
     },
 
