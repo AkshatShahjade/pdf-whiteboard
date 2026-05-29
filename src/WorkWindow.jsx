@@ -397,6 +397,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
   const mousePosRef = useRef({ x: 0, y: 0 });
   const scrollAnimRef = useRef(null);
   const dragStateRef = useRef({ currentSelection, movingRegion});
+  const pendingToolActivationReasonRef = useRef('normal');
 
   const zoomTimeoutRef = useRef(null);
 
@@ -430,6 +431,10 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
   useEffect(() => { dragStateRef.current = { currentSelection, movingRegion}; }, [currentSelection, movingRegion]);
 
   useEffect(() => {
+    const activationReason = pendingToolActivationReasonRef.current;
+    pendingToolActivationReasonRef.current = 'normal';
+    if (activationReason === 'border-edit') return;
+
     getToolType(tool).onActivate?.({
       state: {
         currentSelection,
@@ -751,6 +756,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
       if (hit) {
         e.preventDefault();
+        pendingToolActivationReasonRef.current = 'border-edit';
         getMarkType(hit.type).onBorderEditStart?.({
           hit,
           coords,
