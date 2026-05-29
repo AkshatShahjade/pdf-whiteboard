@@ -6,5 +6,12 @@ export const selectionTool: ToolType = {
     category: 'system',
     isDrawable: false,
     createsSelections : false,
+    hotkey: 'v',
+    activationMode: 'set',
+
+    onBorderClick({ regionId, actions }) {
+        actions.clearGlobalToolUi()
+        actions.selectRegion(regionId)
+    },
 
 }

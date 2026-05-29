@@ -18,7 +18,7 @@ import { setupAllRegistries } from './capabilty_registry/setup_all.ts';
 import { toRoman } from './helper.ts';
 
 import { DEFAULT_SECTION_WIDTH, SECTION_BASE_WIDTH, SECTION_WIDTH_STEP } from './domain_models/mark_model.ts';
-import { getToolType } from './capabilty_registry/pdf/tool_registry.ts';
+import { getToolByHotkey, getToolType } from './capabilty_registry/pdf/tool_registry.ts';
 import { applyToolUiReset } from './implementations/pdf/ui_helper.ts';
 setupAllRegistries(); //TODO, find proper place
 
@@ -409,6 +409,18 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
+  const clearGlobalToolUi = useCallback(() => {
+    setSelectedGlobalToolIdx(null);
+    setActiveGlobalToolControlsIdx(null);
+    setSelectPanelToolIdx(null);
+    setViewStack([]);
+  }, []);
+
+  const selectRegion = useCallback((regionId) => {
+    clearGlobalToolUi();
+    setSelectedMarkId(regionId);
+  }, [clearGlobalToolUi]);
+
   const setMarksWithSectionWidths = useCallback((updater) => {
     setMarks((prev) => {
       const nextMarks = typeof updater === 'function' ? updater(prev) : updater;
@@ -558,13 +570,19 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     }
 
     if (activePane === 'pdf') {
-      const k = e.key.toLowerCase();
-      if (k === 'v') setTool('select');
-      else if (k === 'r') setTool(t => t === 'rect' ? 'select' : 'rect');
-      else if (k === 'c') setTool(t => t === 'lasso' ? 'select' : 'lasso');
-      else if (k === 's') setTool(t => t === 'section' ? 'select' : 'section');
-      else if (k === 'x') setTool(t => t === 'remove' ? 'select' : 'remove');
-      e.stopPropagation();
+      const hotkeyTool = getToolByHotkey(e.key);
+      if (hotkeyTool) {
+        e.preventDefault();
+        setSelectedGlobalToolIdx(null);
+        setActiveGlobalToolControlsIdx(null);
+        setSelectPanelToolIdx(null);
+        setTool((prev) => (
+          hotkeyTool.activationMode === 'toggle' && prev === hotkeyTool.id
+            ? 'select'
+            : hotkeyTool.id
+        ));
+        e.stopPropagation();
+      }
     }
   }, [activePane, selectedRegionId, selectedGlobalToolIdx, editingShapeId, shapeBackup, editingSectionId, currentSelection, tool, selectPanelToolIdx, viewStack, globalToolCount]);
 
@@ -754,32 +772,30 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
       return;
     }
 
-    // getToolType(tool)
+    const toolType = getToolType(tool);
+    const handled = toolType.onPointerDown?.({
+      e,
+      coords,
+      state: {
+        currentSelection,
+        editingShapeId,
+        sectionTarget,
+        tool,
+        zoom,
+      },
+      actions: {
+        setCurrentSelection,
+        setEditingShapeId,
+        setShapeBackup,
+        setSectionTarget,
+        setMovingRegion,
+        setTool,
+        setMarksWithSectionWidths,
+        setSelectedMarkId,
+      },
+    });
 
-    // BIZAGO
-    if (tool === 'section' && sectionTarget) {
-      e.currentTarget.setPointerCapture?.(e.pointerId);
-
-      const nextSelection = currentSelection?.type === 'section'
-        ? currentSelection
-        : { type: 'section', start: null, end: null };
-      const updatedSelection = { ...nextSelection, [sectionTarget]: coords.y };
-
-      setCurrentSelection(updatedSelection);
-
-      if (sectionTarget === 'start' && updatedSelection.end === null) setSectionTarget('end');
-      else if (sectionTarget === 'end' && updatedSelection.start === null) setSectionTarget('start');
-      return;
-    }
-
-    if (tool === 'remove' || tool === 'select') {
-      return;
-    }
-
-    if (tool !== 'section') {
-      e.currentTarget.setPointerCapture?.(e.pointerId);
-      setCurrentSelection(getMarkType(tool).initiateShape(coords))
-    }
+    if (handled) return;
 
   }, [tool, regions, zoom, getUnscaledCoords, sectionTarget, currentSelection, editingShapeId]);
 
@@ -812,22 +828,19 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     if (e?.currentTarget?.hasPointerCapture?.(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
-    // BIBIBO: is this the best it can be?
     if(currentSelection && getMarkType(currentSelection.type).isDrawable){
-        const shape = getMarkType(currentSelection.type).returnDrawableMarkWithoutId(currentSelection)
-        if (shape && shape.w > 10 / zoom && shape.h > 10 / zoom) {
-          if(editingShapeId && tool === currentSelection.type) {
-            setMarksWithSectionWidths(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
-          } else {
-            const new_mark = getMarkType(currentSelection.type).returnNewDrawableMark(currentSelection)
-            if (new_mark) {
-              setMarksWithSectionWidths(prev => [...prev, new_mark]);
-              setSelectedMarkId(new_mark.id);
-            }
-          }
-        }
-        setCurrentSelection(null);
-      }
+      getToolType(currentSelection.type).onPointerUp?.({
+        currentSelection,
+        editingShapeId,
+        tool,
+        zoom,
+        actions: {
+          setCurrentSelection,
+          setMarksWithSectionWidths,
+          setSelectedMarkId,
+        },
+      });
+    }
 
     setMovingRegion(null);
   }, [currentSelection, zoom, editingShapeId, tool]);
@@ -893,26 +906,24 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
   const handleBorderClick = useCallback(async (e, regionId) => {
     e.stopPropagation();
 
-    
-    if (tool === 'remove') {
-      const isConfirmed = await confirmErrorDialog(
-        'Are you sure you want to delete this region? Its whiteboard data will be permanently lost.',
-        'Delete Whiteboard'
-      );
-
-      if (isConfirmed) {
-        setMarksWithSectionWidths((prev) => prev.filter((r) => r.id !== regionId));
-        deleteWhiteboard(regionId);
-        if (selectedRegionId === regionId) setSelectedMarkId(null);
-      }
-    } else if (tool === 'select') {
-      setSelectedGlobalToolIdx(null);
-      setActiveGlobalToolControlsIdx(null);
-      setSelectPanelToolIdx(null);
-      setViewStack([]);
-      setSelectedMarkId(regionId);
-    }
-  }, [tool, selectedRegionId]);
+    const toolType = getToolType(tool);
+    await toolType.onBorderClick?.({
+      regionId,
+      selectedRegionId,
+      actions: {
+        confirmDelete: () => confirmErrorDialog(
+          'Are you sure you want to delete this region? Its whiteboard data will be permanently lost.',
+          'Delete Whiteboard'
+        ),
+        deleteRegion: (id) => {
+          setMarksWithSectionWidths((prev) => prev.filter((r) => r.id !== id));
+          deleteWhiteboard(id);
+        },
+        selectRegion,
+        clearGlobalToolUi,
+      },
+    });
+  }, [tool, selectedRegionId, selectRegion, clearGlobalToolUi]);
 
   const handleBackup = async () => {
     try {
@@ -1032,19 +1043,12 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
   }, [selectPanelToolIdx, newGlobalWhiteboardName, pdfDirectoryPath, handleApplyGlobalToolSelection, refreshAvailableWhiteboards, showToast]);
 
   // --- Dynamic Cursors ---
-  const deleteCursor = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%23EF4444'><path d='M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z'/></svg>") 12 12, auto`;
-  const lassoCursor = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%233B82F6' stroke-width='2'><path d='M8 8c0-3.3 2.7-6 6-6s6 2.7 6 6-2.7 6-6 6M4 20l5-5'/></svg>") 4 20, auto`;
-
-  // Swapped Start/End logic as requested.
-  const sectionStartCursor = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23EF4444' stroke-width='3'><path d='M6 20v-8h12v8' /></svg>") 12 16, auto`;
-  const sectionEndCursor = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2310B981' stroke-width='3'><path d='M6 4v8h12V4' /></svg>") 12 8, auto`;
-
-  let pdfCursor = 'default';
-  if (movingRegion) pdfCursor = 'grabbing';
-  else if (tool === 'remove') pdfCursor = deleteCursor;
-  else if (tool === 'lasso') pdfCursor = lassoCursor;
-  else if (tool === 'section') pdfCursor = sectionTarget === 'start' ? sectionStartCursor : sectionEndCursor;
-  else if (tool === 'rect') pdfCursor = 'crosshair';
+  const toolType = getToolType(tool);
+  const pdfCursor = movingRegion
+    ? 'grabbing'
+    : (typeof toolType.cursor === 'function'
+        ? toolType.cursor({ sectionTarget })
+        : toolType.cursor) || 'default';
 
   const activeWhiteboardId = selectedRegionId ?? (selectedGlobalToolIdx !== null ? globalToolLinks[selectedGlobalToolIdx] : null);
   const sectionSelection = currentSelection?.type === 'section'
@@ -1149,69 +1153,41 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
               { id: 'remove', label: 'Remove', key: 'X', icon: '✕' },
             ].map(({ id, label, key, icon }) => (
               <div key={id} style={{ position: 'relative' }}>
-                <button onClick={() => { setSelectedGlobalToolIdx(null); setActiveGlobalToolControlsIdx(null); setSelectPanelToolIdx(null); if (tool === 'section' && id === 'section') setTool('select'); else setTool(id); }} title={`${label} [${key}]`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '6px', border: `1px solid ${tool === id ? '#3B82F6' : 'transparent'}`, background: tool === id ? 'rgba(59,130,246,0.2)' : 'transparent', color: tool === id ? '#93C5FD' : '#d1d5db', cursor: 'pointer', fontSize: '18px', transition: 'all 0.15s' }} onMouseEnter={e => { if (tool !== id) { e.currentTarget.style.color='#fff'; e.currentTarget.style.background='rgba(255,255,255,0.1)'; } }} onMouseLeave={e => { if (tool !== id) { e.currentTarget.style.color='#d1d5db'; e.currentTarget.style.background='transparent'; } }}>
+                <button
+                  onClick={() => {
+                    clearGlobalToolUi();
+                    const buttonToolType = getToolType(id);
+                    const nextTool = buttonToolType.activationMode === 'toggle' && tool === id ? 'select' : id;
+                    setTool(nextTool);
+                  }}
+                  title={`${label} [${key}]`}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '6px', border: `1px solid ${tool === id ? '#3B82F6' : 'transparent'}`, background: tool === id ? 'rgba(59,130,246,0.2)' : 'transparent', color: tool === id ? '#93C5FD' : '#d1d5db', cursor: 'pointer', fontSize: '18px', transition: 'all 0.15s' }}
+                  onMouseEnter={e => { if (tool !== id) { e.currentTarget.style.color='#fff'; e.currentTarget.style.background='rgba(255,255,255,0.1)'; } }}
+                  onMouseLeave={e => { if (tool !== id) { e.currentTarget.style.color='#d1d5db'; e.currentTarget.style.background='transparent'; } }}
+                >
                   {icon}
                 </button>
-{/* ABO: Instead check tool === section area.... */}
-                {/* ── SECTION MINI MENU ── */}
-                {tool === 'section' && id === 'section' && (
-                  <div style={{ position: 'absolute', right: 'calc(100% + 12px)', top: '50%', transform: 'translateY(-50%)', background: 'rgba(38,42,51,0.85)', backdropFilter: 'blur(10px)', borderRadius: '8px', padding: '6px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', gap: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', alignItems: 'center' }}>
-                    {(() => {
-
-                      const color = sectionSelection.start !== null ? '#10B981' : '#F87171';
-                      const isActive = sectionTarget === 'start';
-                      return (<button onClick={() => setSectionTarget('start')} style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: `1px solid ${color}`, background: isActive ? `${color}40` : 'transparent', color: color, transition: 'all 0.15s' }}>Start</button>);
-                    })()}
-                    {(() => {
-
-                      const color = sectionSelection.end !== null ? '#10B981' : '#F87171';
-                      const isActive = sectionTarget === 'end';
-                      return (<button onClick={() => setSectionTarget('end')} style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: `1px solid ${color}`, background: isActive ? `${color}40` : 'transparent', color: color, transition: 'all 0.15s' }}>End</button>);
-                    })()}
-                    {(() => {
-
-                      const canConfirm = sectionSelection.start !== null && sectionSelection.end !== null;
-                      return (
-                        <>
-                          <button disabled={!canConfirm} onClick={() => {
-                              const y1 = Math.min(sectionSelection.start, sectionSelection.end);
-                              const y2 = Math.max(sectionSelection.start, sectionSelection.end);
-                              if (editingSectionId) {
-                                setMarksWithSectionWidths(prev => prev.map(r => r.id === editingSectionId ? { ...r, y: y1, h: y2 - y1 } : r));
-                                setSelectedMarkId(editingSectionId);
-                                setSelectedGlobalToolIdx(null);
-                                setEditingSectionId(null);
-                              } else {
-                                const newId = `reg_${Date.now()}`;
-                                setMarksWithSectionWidths(prev => [...prev, { id: newId, type: 'section', x: 0, y: y1, w: DEFAULT_SECTION_WIDTH, h: y2 - y1 }]);
-                                setSelectedMarkId(newId);
-                                setSelectedGlobalToolIdx(null);
-                              }
-                              setTool('select');
-                            }}
-                            style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: canConfirm ? 'pointer' : 'not-allowed', border: `1px solid ${canConfirm ? '#3B82F6' : '#4b5563'}`, background: canConfirm ? 'rgba(59,130,246,0.2)' : 'transparent', color: canConfirm ? '#93C5FD' : '#6b7280', transition: 'all 0.15s' }}
-                          >
-                            {editingSectionId ? 'Update' : 'Confirm'}
-                          </button>
-
-                          <button onClick={() => { setEditingSectionId(null); setCurrentSelection(null); setSectionTarget('start'); setTool('select'); }}
-                            style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: `1px solid #F87171`, background: 'transparent', color: '#F87171', transition: 'all 0.15s' }}
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                {/* ── SHAPE EDIT MINI MENU (Rect/Lasso) ── */}
-                {editingShapeId && tool === id && (id === 'rect' || id === 'lasso') && (
-                  <div style={{ position: 'absolute', right: 'calc(100% + 12px)', top: '50%', transform: 'translateY(-50%)', background: 'rgba(38,42,51,0.85)', backdropFilter: 'blur(10px)', borderRadius: '8px', padding: '6px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', gap: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', alignItems: 'center' }}>
-                    <button onClick={() => { setMarksWithSectionWidths(prev => prev.map(r => r.id === shapeBackup?.id ? shapeBackup : r)); setEditingShapeId(null); setShapeBackup(null); setTool('select'); }} style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: `1px solid #F87171`, background: 'transparent', color: '#F87171', transition: 'all 0.15s' }}>Cancel</button>
-                    <button onClick={() => { setEditingShapeId(null); setShapeBackup(null); setTool('select'); }} style={{ padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', border: `1px solid #3B82F6`, background: 'rgba(59,130,246,0.2)', color: '#93C5FD', transition: 'all 0.15s' }}>Update</button>
-                  </div>
-                )}
+                {getToolType(id).renderToolbarExtras?.({
+                  toolId: id,
+                  tool,
+                  sectionTarget,
+                  sectionSelection,
+                  editingShapeId,
+                  editingSectionId,
+                  shapeBackup,
+                  actions: {
+                    setTool,
+                    setSectionTarget,
+                    setEditingSectionId,
+                    setCurrentSelection,
+                    setMarksWithSectionWidths,
+                    setSelectedMarkId,
+                    setSelectedGlobalToolIdx,
+                    setShapeBackup,
+                    setEditingShapeId,
+                    setSelectPanelToolIdx,
+                  },
+                })}
               </div>
             ))}
           </div>
