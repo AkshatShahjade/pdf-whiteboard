@@ -2,16 +2,19 @@
 //     id: string
 // }
 
-import { Content } from "./content_models"
+import { Content, content_id } from "./content_models"
+import { Selection } from "./mark_model"
 
-export type ToolCategory = "mark-bspatial" | "edit" | "link" | "layer"
+export type ToolCategory = "mark-spatial" | "edit" | "link" | "layer" | "system"
 
 export interface ToolType {
     id: string
-    content: Content
+    content: content_id
     category: ToolCategory
+    isDrawable: boolean
+    createsSelections: boolean
 
-    createNullMark: ()=> any
+    createNullSelection?: ()=> Selection
 }
 
 export interface Tool {

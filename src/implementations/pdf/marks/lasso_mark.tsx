@@ -1,5 +1,6 @@
-import { LassoPoints, Mark, MarkType, Point, RenderMarkContext, Selection, SelectionContext, STROKE_HIT_WIDTH } from "../../../domain_models/mark_model";
+import { LassoSel, Mark, MarkType, Point, RenderMarkContext, Selection, SelectionContext, STROKE_HIT_WIDTH } from "../../../domain_models/mark_model";
 import { distToSegmentSquared } from "../../../helper";
+import { createMarkId as createMarkId } from "../../../object_factories/mark_factory";
 
 export const lassoMark: MarkType = {
     id : 'lasso',
@@ -11,9 +12,9 @@ export const lassoMark: MarkType = {
         return isInLassoBorder(point, region, hitThreshold)
     },
 
-    createFinalizedShape(selection: Selection) {
+    returnDrawableMarkWithoutId(selection: Selection) {
         if(selection.type === 'lasso'){
-            return createLassoMarkShape(selection)
+            return createLassoSel(selection)
         } else{
             console.error("ISSUE OOGABOOGA");
         }
@@ -41,6 +42,12 @@ export const lassoMark: MarkType = {
         }
 
         return prev
+    },
+
+    returnNewDrawableMark(selection) {
+      if(selection.type === "lasso") {const new_sel = createLassoSel(selection); return { id: createMarkId(), ...new_sel }}
+      console.error("BAOSIK");
+      return null
     },
 
     
@@ -98,7 +105,7 @@ export const lassoMark: MarkType = {
 }
 
 
-function createLassoMarkShape(lassoPoints: LassoPoints): any {
+function createLassoSel(lassoPoints: LassoSel): any {
     if (lassoPoints.points.length <= 5) {
         return null;
     }
@@ -113,7 +120,7 @@ function createLassoMarkShape(lassoPoints: LassoPoints): any {
     const h = maxY - minY;
 
     const relativePoints = lassoPoints.points.map(p => ({ x: p.x - minX, y: p.y - minY }));
-    return { x: minX, y: minY, w, h, points: relativePoints };
+    return { type:"lasso" ,x: minX, y: minY, w, h, points: relativePoints };
 }
 
 export const isInLassoBorder = (coords: Point, r: Mark, threshold:number) => {

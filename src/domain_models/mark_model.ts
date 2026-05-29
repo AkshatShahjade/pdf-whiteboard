@@ -39,15 +39,15 @@ export interface MarkType {
 
     hasSelectedBorder: (pt: Point, r: Mark, ctx: SelectionContext) => boolean   
 
-    createFinalizedShape?: (selection: Selection) => any
-
     initiateShape?: (coords: Point) => Selection
-
+    
     updateSelection?: (prev: Selection, coords: Point, ctx: SelectionContext) => Selection
-
+    
     renderSelectionPreview: (selection: Selection, ctx: SelectionContext) => any
+    
+    returnDrawableMarkWithoutId?: (selection: Selection) => any
 
-    returnNewDrawableMark:(selection: Selection) => Mark
+    returnNewDrawableMark?:(selection: Selection) => Mark
 
     // updateMark: (selection:Selection) => Mark
     
@@ -59,25 +59,25 @@ export interface MarkType {
 //     { id: newId, type: 'lasso', ...shape }
 // }
 
-export type Selection = RectDrag | LassoPoints | SectionRange
+export type Selection = RectSel | LassoSel | SectionSel
 
-export interface RectDrag {
+export interface RectSel {
     type: 'rect'
-    startX: number
-    startY: number
-    currentX: number
-    currentY: number
+    startX: number | null
+    startY: number | null
+    currentX: number | null
+    currentY: number | null
 }
 
-export interface LassoPoints {
+export interface LassoSel {
     type: 'lasso'
-    points: Point[]
+    points: Point[] | null
 }
 
-export interface SectionRange {
+export interface SectionSel {
     type: 'section'
-    start: number
-    end: number
+    start: number | null
+    end: number | null
 }
 
 export interface SelectionContext {

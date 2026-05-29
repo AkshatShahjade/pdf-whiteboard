@@ -1,4 +1,4 @@
-import { Mark, MarkType, Point, Selection, SectionRange, SelectionContext, RenderMarkContext } from "../../../domain_models/mark_model";
+import { Mark, MarkType, Point, Selection, SectionSel, SelectionContext, RenderMarkContext } from "../../../domain_models/mark_model";
 
 export const sectionMark: MarkType = {
     id: 'section',

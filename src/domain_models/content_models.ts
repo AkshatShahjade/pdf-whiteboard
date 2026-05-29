@@ -1,3 +1,6 @@
+export type content_id = derived_content_id | source_content_id
+export type derived_content_id = 'whiteboard'
+export type source_content_id = 'whiteboard' | 'pdf'
 export type SourceContent = PDF | WhiteBoard //| CodeEditor | BlockText | Image | Video | PPT | Spreadsheet | KeyboardMindMap | ObsidianCanvas
 export type DerivedContent = WhiteBoard //| CodeEditor | BlockText | Image | Video | Spreadsheet | KeyboardMindMap | ObsidianCanvas
 export type Content = DerivedContent | SourceContent

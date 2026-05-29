@@ -2,7 +2,7 @@ import { ToolType } from "../../domain_models/tool_models"
 
 export const toolRegistry = new Map<string, ToolType>
 
-export function registerTool(tool: ToolType): void {
+export function registerToolType(tool: ToolType): void {
     if (toolRegistry.has(tool.id)) {
         throw new Error(`Duplicate tool implementation: ${tool.id}`)
     }

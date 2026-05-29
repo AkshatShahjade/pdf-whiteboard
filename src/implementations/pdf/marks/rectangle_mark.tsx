@@ -1,4 +1,5 @@
-import { Selection, MarkType, Point, Mark, STROKE_HIT_WIDTH, RectDrag, RectMark, SelectionContext, RenderMarkContext } from "../../../domain_models/mark_model";
+import { Selection, MarkType, Point, Mark, STROKE_HIT_WIDTH, RectSel, RectMark, SelectionContext, RenderMarkContext } from "../../../domain_models/mark_model";
+import { createMarkId } from "../../../object_factories/mark_factory";
 
 export const rectangleMark: MarkType = {
     id : 'rect',
@@ -10,9 +11,9 @@ export const rectangleMark: MarkType = {
       return isInRectBorder(point, region, hitThreshold)
     },
 
-    createFinalizedShape(selection) {
+    returnDrawableMarkWithoutId(selection) {
       if(selection.type === 'rect'){
-        return createRectMarkShape(selection)
+        return createRectSel(selection)
       }
     },
 
@@ -21,8 +22,8 @@ export const rectangleMark: MarkType = {
     },
 
     returnNewDrawableMark(selection) {
-      const shape = getMarkType(currentSelection.type).createFinalizedShape(currentSelection)
-      [...prev, { id: newId, type: currentSelection.type, ...shape }]
+      const new_sel = createRectSel(selection)
+      return { id: createMarkId(), ...new_sel }
     },
 
     updateSelection(prev: Selection, coords: Point) {
@@ -37,7 +38,7 @@ export const rectangleMark: MarkType = {
 
     renderSelectionPreview(selection, ctx) {
       if(selection.type==="rect" && ctx.zoom){
-          const { x, y, w, h } = createRectMarkShape(selection);
+          const { x, y, w, h } = createRectSel(selection);
           return (
             <rect x={x * ctx.zoom} y={y * ctx.zoom} width={w * ctx.zoom} height={h * ctx.zoom} fill="rgba(59,130,246,0.1)" stroke="#3B82F6" strokeWidth={1.5} strokeDasharray="5 4" rx={2} style={{ pointerEvents: 'none' }} />
           );
@@ -65,8 +66,9 @@ export const rectangleMark: MarkType = {
 
 }
 
-function createRectMarkShape (drag: RectDrag) : any {
+function createRectSel (drag: RectSel) : any {
   return {
+      type:"rect",
       x: Math.min(drag.startX, drag.currentX),
       y: Math.min(drag.startY, drag.currentY),
       w: Math.abs(drag.startX - drag.currentX),

@@ -18,6 +18,8 @@ import { setupAllRegistries } from './capabilty_registry/setup_all.ts';
 import { toRoman } from './helper.ts';
 
 import { DEFAULT_SECTION_WIDTH, SECTION_BASE_WIDTH, SECTION_WIDTH_STEP } from './domain_models/mark_model.ts';
+import { getToolType } from './capabilty_registry/pdf/tool_registry.ts';
+import { applyToolUiReset } from './implementations/pdf/ui_helper.ts';
 setupAllRegistries(); //TODO, find proper place
 
 
@@ -570,21 +572,13 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
   }, [handleKeyDown]);
 
   useEffect(() => {
-    if (tool === 'section') {
-      setCurrentSelection((prev) => (
-        prev?.type === 'section'
-          ? prev
-          : { type: 'section', start: null, end: null }
-      ));
-    } else {
-      setCurrentSelection(null);
-      setSectionTarget('start');
-      setEditingSectionId(null);
-    }
-    if (!getMarkType(tool).isDrawable) {
-      setEditingShapeId(null);
-      setShapeBackup(null);
-    }
+    applyToolUiReset(tool, {
+      setCurrentSelection,
+      setSectionTarget,
+      setEditingSectionId,
+      setEditingShapeId,
+      setShapeBackup,
+    });
   }, [tool]);
 
   useEffect(() => {
@@ -758,6 +752,8 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
       return;
     }
 
+    // getToolType(tool)
+
     // BIZAGO
     if (tool === 'section' && sectionTarget) {
       e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -774,7 +770,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
       return;
     }
 
-    if (tool === 'remove') {
+    if (tool === 'remove' || tool === 'select') {
       return;
     }
 
@@ -814,17 +810,16 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     if (e?.currentTarget?.hasPointerCapture?.(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
-    // BIBIBO: create 2 new markRegistry functions: updateDrawableMark and createDrawableMark
+    // BIBIBO: is this the best it can be?
     if(currentSelection && getMarkType(currentSelection.type).isDrawable){
-        const shape = getMarkType(currentSelection.type).createFinalizedShape(currentSelection)
+        const shape = getMarkType(currentSelection.type).returnDrawableMarkWithoutId(currentSelection)
         if (shape && shape.w > 10 / zoom && shape.h > 10 / zoom) {
           if(editingShapeId && tool === currentSelection.type) {
             setMarksWithSectionWidths(prev => prev.map(r => r.id === editingShapeId ? { ...r, ...shape } : r));
           } else {
-            const newId = `reg_${Date.now()}`; // TODO: create proper ID creation place....
             const new_mark = getMarkType(currentSelection.type).returnNewDrawableMark(currentSelection)
-            setMarksWithSectionWidths((prev) => [...prev, { id: newId, type: currentSelection.type, ...shape }]);
-            setSelectedMarkId(newId);
+            setMarksWithSectionWidths(new_mark);
+            setSelectedMarkId(new_mark.id);
           }
         }
         setCurrentSelection(null);
@@ -894,6 +889,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
   const handleBorderClick = useCallback(async (e, regionId) => {
     e.stopPropagation();
 
+    
     if (tool === 'remove') {
       const isConfirmed = await confirmErrorDialog(
         'Are you sure you want to delete this region? Its whiteboard data will be permanently lost.',
