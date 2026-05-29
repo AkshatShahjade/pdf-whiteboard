@@ -9,6 +9,14 @@ export const selectionTool: ToolType = {
     hotkey: 'v',
     activationMode: 'set',
 
+    onActivate({ actions }) {
+        actions.setCurrentSelection(null)
+        actions.setSectionTarget('start')
+        actions.setEditingSectionId(null)
+        actions.setEditingShapeId(null)
+        actions.setShapeBackup(null)
+    },
+
     onBorderClick({ regionId, actions }) {
         actions.clearGlobalToolUi()
         actions.selectRegion(regionId)

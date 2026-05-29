@@ -8,6 +8,15 @@ export const sectionMark: MarkType = {
         return isInSectionBorder(point, region, ctx)
     },
 
+    onBorderEditStart({ hit, actions }) {
+      if (hit.type !== 'section') return false
+      actions.setTool('section')
+      actions.setCurrentSelection({ type: 'section', start: hit.y, end: hit.y + hit.h })
+      actions.setEditingSectionId(hit.id)
+      actions.setSectionTarget('start')
+      return true
+    },
+
     renderSelectionPreview(selection, ctx) {
         if(selection.type==="section" && ctx.zoom && ctx.PDFWIDTH){
             return (

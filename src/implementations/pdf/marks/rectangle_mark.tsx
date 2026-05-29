@@ -11,6 +11,15 @@ export const rectangleMark: MarkType = {
       return isInRectBorder(point, region, hitThreshold)
     },
 
+    onBorderEditStart({ hit, coords, actions }) {
+      if (hit.type !== 'rect') return false
+      actions.setEditingShapeId(hit.id)
+      actions.setShapeBackup({ ...hit })
+      actions.setTool('rect')
+      actions.setMovingRegion({ id: hit.id, offsetX: coords.x - hit.x, offsetY: coords.y - hit.y })
+      return true
+    },
+
     returnDrawableMarkWithoutId(selection) {
       if(selection.type === 'rect'){
         return createRectSel(selection)

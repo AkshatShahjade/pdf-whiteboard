@@ -12,6 +12,15 @@ export const lassoMark: MarkType = {
         return isInLassoBorder(point, region, hitThreshold)
     },
 
+    onBorderEditStart({ hit, coords, actions }) {
+      if (hit.type !== 'lasso') return false
+      actions.setEditingShapeId(hit.id)
+      actions.setShapeBackup({ ...hit })
+      actions.setTool('lasso')
+      actions.setMovingRegion({ id: hit.id, offsetX: coords.x - hit.x, offsetY: coords.y - hit.y })
+      return true
+    },
+
     returnDrawableMarkWithoutId(selection: Selection) {
         if(selection.type === 'lasso'){
             return createLassoSel(selection)

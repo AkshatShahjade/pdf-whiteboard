@@ -19,7 +19,6 @@ import { toRoman } from './helper.ts';
 
 import { DEFAULT_SECTION_WIDTH, SECTION_BASE_WIDTH, SECTION_WIDTH_STEP } from './domain_models/mark_model.ts';
 import { getToolByHotkey, getToolType } from './capabilty_registry/pdf/tool_registry.ts';
-import { applyToolUiReset } from './implementations/pdf/ui_helper.ts';
 setupAllRegistries(); //TODO, find proper place
 
 
@@ -37,7 +36,6 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MIN_PANE_PCT     = 15;
 const MAX_PANE_PCT     = 85;
-const STROKE_HIT_WIDTH = 12;
 
 // ─── Region colour palette ────────────────────────────────────────────────────
 const REGION_COLORS = [
@@ -431,6 +429,25 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
   useEffect(() => { dragStateRef.current = { currentSelection, movingRegion}; }, [currentSelection, movingRegion]);
 
+  useEffect(() => {
+    getToolType(tool).onActivate?.({
+      state: {
+        currentSelection,
+        editingShapeId,
+        editingSectionId,
+        sectionTarget,
+        tool,
+      },
+      actions: {
+        setCurrentSelection,
+        setSectionTarget,
+        setEditingSectionId,
+        setEditingShapeId,
+        setShapeBackup,
+      },
+    });
+  }, [tool]);
+
   // Native Ctrl+Scroll for zooming / Shift+Scroll for horizontal pan
   useEffect(() => {
     const pdfWrapper = pdfScrollRef.current;
@@ -504,47 +521,36 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
         return;
       }
     }
-// OBA: currentSelection?.type === 'section'
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (editingShapeId) {
-         setEditingShapeId(null);
-         setShapeBackup(null);
-         setTool('select');
-      } else if (tool === 'section' && currentSelection?.type === 'section' && currentSelection.start !== null && currentSelection.end !== null) {
-         const y1 = Math.min(currentSelection.start, currentSelection.end);
-         const y2 = Math.max(currentSelection.start, currentSelection.end);
-        //  const shape = {type: 'section', y: y1, h: y2-y1};
-         if (editingSectionId) { 
-             setMarksWithSectionWidths(prev => prev.map(r => r.id === editingSectionId ? { ...r, y: y1, h: y2 - y1 } : r));
-             setSelectedMarkId(editingSectionId);
-             setEditingSectionId(null);
-         } else {
-             const newId = `reg_${Date.now()}`;
-             setMarksWithSectionWidths(prev => [...prev, { id: newId, type: 'section', y: y1, h: y2 - y1, w: DEFAULT_SECTION_WIDTH }]);
-             setSelectedMarkId(newId);
-         }
-         setTool('select');
-      }
+    const toolType = getToolType(tool);
+    const toolHandledKey = toolType.onKeyDown?.({
+      e,
+      state: {
+        currentSelection,
+        editingShapeId,
+        editingSectionId,
+        sectionTarget,
+        tool,
+        zoom,
+        shapeBackup,
+      },
+      actions: {
+        setTool,
+        setCurrentSelection,
+        setSectionTarget,
+        setEditingSectionId,
+        setEditingShapeId,
+        setShapeBackup,
+        setMarksWithSectionWidths,
+        setSelectedMarkId,
+      },
+    });
+    if (toolHandledKey) {
+      e.stopPropagation();
       return;
     }
 
     if (e.key === 'Escape') {
-      if (editingShapeId) {
-         setMarksWithSectionWidths(prev => prev.map(r => r.id === shapeBackup?.id ? shapeBackup : r));
-         setEditingShapeId(null);
-         setShapeBackup(null);
-         setTool('select');
-      } else if (tool === 'section' && currentSelection?.type === 'section' && (editingSectionId || currentSelection.start !== null || currentSelection.end !== null)) {
-         setEditingSectionId(null);
-        //  setSectionY({ type: 'section', start: null, end: null });
-         setCurrentSelection(null);
-         setSectionTarget('start');
-         setTool('select');
-      } else if (editingSectionId) {
-         setEditingSectionId(null);
-         setTool('select');
-      } else if (selectPanelToolIdx !== null) {
+      if (selectPanelToolIdx !== null) {
          setSelectPanelToolIdx(null);
       } else if (selectedGlobalToolIdx !== null) {
          const prevView = viewStack[viewStack.length - 1];
@@ -590,16 +596,6 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [handleKeyDown]);
-
-  useEffect(() => {
-    applyToolUiReset(tool, {
-      setCurrentSelection,
-      setSectionTarget,
-      setEditingSectionId,
-      setEditingShapeId,
-      setShapeBackup,
-    });
-  }, [tool]);
 
   useEffect(() => {
     const maxTools = Math.max(1, settings?.maxGlobalPdfTools ?? 8);
@@ -755,19 +751,19 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
       if (hit) {
         e.preventDefault();
-        if (hit.type === 'section') {
-          setTool('section');
-          setCurrentSelection({ type:'section', start: hit.y, end: hit.y + hit.h });
-          setEditingSectionId(hit.id);
-          setSectionTarget('start');
-        } else {
-          if (editingShapeId !== hit.id) {
-            setEditingShapeId(hit.id);
-            setShapeBackup({...hit});
-            setTool(hit.type);
-          }
-          setMovingRegion({ id: hit.id, offsetX: coords.x - hit.x, offsetY: coords.y - hit.y });
-        }
+        getMarkType(hit.type).onBorderEditStart?.({
+          hit,
+          coords,
+          actions: {
+            setTool,
+            setCurrentSelection,
+            setEditingSectionId,
+            setEditingShapeId,
+            setShapeBackup,
+            setMovingRegion,
+            setSectionTarget,
+          },
+        });
       }
       return;
     }
@@ -802,14 +798,18 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
   const handleDivPointerMove = useCallback((e) => {
     mousePosRef.current = { x: e.clientX, y: e.clientY };
     const coords = getUnscaledCoords(e);
-
-    if(currentSelection && getMarkType(currentSelection.type).isDrawable) {
-      setCurrentSelection((prev) =>
-        prev ? getMarkType(prev.type).updateSelection(prev, coords, {
-          minPointDistance: 2 / zoom, // TODO: remove hardcoding 2, create variable
-        }) : prev
-      );    
-    }
+    getToolType(tool).onPointerMove?.({
+      coords,
+      state: {
+        currentSelection,
+        editingShapeId,
+        tool,
+        zoom,
+      },
+      actions: {
+        setCurrentSelection,
+      },
+    });
 
     if (movingRegion) {
       setMarksWithSectionWidths((prev) =>
@@ -822,7 +822,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
         })
       );
     }
-  }, [currentSelection, movingRegion, zoom, getUnscaledCoords]);
+  }, [currentSelection, movingRegion, zoom, getUnscaledCoords, tool, editingShapeId]);
 
   const handleDivPointerUp = useCallback((e) => {
     if (e?.currentTarget?.hasPointerCapture?.(e.pointerId)) {
@@ -874,14 +874,18 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
         if (scrolled) {
           const coords = getUnscaledCoordsFromClient(clientX, clientY);
           const state = dragStateRef.current;
-
-          if(currentSelection && getMarkType(currentSelection.type).isDrawable) {
-            setCurrentSelection((prev) =>
-              prev ? getMarkType(prev.type).updateSelection(prev, coords, {
-                minPointDistance: 2 / zoom, // TODO: remove hardcoding 2, create variable
-              }) : prev
-            );    
-          }
+          getToolType(tool).onPointerMove?.({
+            coords,
+            state: {
+              currentSelection: state.currentSelection,
+              editingShapeId,
+              tool,
+              zoom,
+            },
+            actions: {
+              setCurrentSelection,
+            },
+          });
           
           if (state.movingRegion) {
             setMarksWithSectionWidths((prev) =>
@@ -901,7 +905,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
     scrollAnimRef.current = requestAnimationFrame(scrollStep);
     return () => cancelAnimationFrame(scrollAnimRef.current);
-  }, [currentSelection, movingRegion, zoom, getUnscaledCoordsFromClient]);
+  }, [currentSelection, movingRegion, zoom, getUnscaledCoordsFromClient, tool, editingShapeId]);
 
   const handleBorderClick = useCallback(async (e, regionId) => {
     e.stopPropagation();

@@ -38,6 +38,19 @@ export interface MarkType {
     isDrawable: boolean
 
     hasSelectedBorder: (pt: Point, r: Mark, ctx: SelectionContext) => boolean   
+    onBorderEditStart?: (ctx: {
+        hit: Mark
+        coords: Point
+        actions: {
+            setTool: (next: string) => void
+            setCurrentSelection: (next: any) => void
+            setEditingSectionId: (next: string | null) => void
+            setEditingShapeId: (next: string | null) => void
+            setShapeBackup: (next: any) => void
+            setMovingRegion: (next: any) => void
+            setSectionTarget: (next: "start" | "end") => void
+        }
+    }) => boolean | void
 
     initiateShape?: (coords: Point) => Selection
     

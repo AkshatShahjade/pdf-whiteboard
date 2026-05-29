@@ -11,6 +11,14 @@ export const removeTool: ToolType = {
     activationMode: 'toggle',
     cursor: deleteCursor,
 
+    onActivate({ actions }) {
+        actions.setCurrentSelection(null)
+        actions.setSectionTarget('start')
+        actions.setEditingSectionId(null)
+        actions.setEditingShapeId(null)
+        actions.setShapeBackup(null)
+    },
+
     async onBorderClick({ regionId, selectedRegionId, actions }) {
         const isConfirmed = await actions.confirmDelete()
         if (!isConfirmed) return

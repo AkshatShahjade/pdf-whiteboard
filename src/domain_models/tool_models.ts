@@ -35,6 +35,19 @@ export interface ToolPointerDownContext {
     }
 }
 
+export interface ToolPointerMoveContext {
+    coords: { x: number; y: number }
+    state: {
+        currentSelection: Selection | null
+        editingShapeId: string | null
+        tool: string
+        zoom: number
+    }
+    actions: {
+        setCurrentSelection: (next: any) => void
+    }
+}
+
 export interface ToolPointerUpContext {
     currentSelection: Selection | null
     editingShapeId: string | null
@@ -44,6 +57,46 @@ export interface ToolPointerUpContext {
         setCurrentSelection: (next: Selection | null) => void
         setMarksWithSectionWidths: (next: any) => void
         setSelectedMarkId: (next: string | null) => void
+    }
+}
+
+export interface ToolKeyDownContext {
+    e: any
+    state: {
+        currentSelection: Selection | null
+        editingShapeId: string | null
+        editingSectionId: string | null
+        sectionTarget: "start" | "end"
+        tool: string
+        zoom: number
+        shapeBackup: any
+    }
+    actions: {
+        setTool: (next: string) => void
+        setCurrentSelection: (next: any) => void
+        setSectionTarget: (next: "start" | "end") => void
+        setEditingSectionId: (next: string | null) => void
+        setEditingShapeId: (next: string | null) => void
+        setShapeBackup: (next: any) => void
+        setMarksWithSectionWidths: (next: any) => void
+        setSelectedMarkId: (next: string | null) => void
+    }
+}
+
+export interface ToolActivateContext {
+    state: {
+        currentSelection: Selection | null
+        editingShapeId: string | null
+        editingSectionId: string | null
+        sectionTarget: "start" | "end"
+        tool: string
+    }
+    actions: {
+        setCurrentSelection: (next: any) => void
+        setSectionTarget: (next: "start" | "end") => void
+        setEditingSectionId: (next: string | null) => void
+        setEditingShapeId: (next: string | null) => void
+        setShapeBackup: (next: any) => void
     }
 }
 
@@ -92,8 +145,11 @@ export interface ToolType {
     cursor?: ToolCursor
 
     createNullSelection?: ()=> Selection
+    onActivate?: (ctx: ToolActivateContext) => void
     onPointerDown?: (ctx: ToolPointerDownContext) => boolean | void
+    onPointerMove?: (ctx: ToolPointerMoveContext) => boolean | void
     onPointerUp?: (ctx: ToolPointerUpContext) => boolean | void
+    onKeyDown?: (ctx: ToolKeyDownContext) => boolean | void
     onBorderClick?: (ctx: ToolBorderClickContext) => void | Promise<void>
     renderToolbarExtras?: (ctx: ToolToolbarExtrasContext) => any
 }
