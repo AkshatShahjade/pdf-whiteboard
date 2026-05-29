@@ -154,6 +154,7 @@ export interface ToolType {
     renderToolbarExtras?: (ctx: ToolToolbarExtrasContext) => any
 }
 
+//custom tools: ROOPA level thing... TODO
 export interface Tool {
     id: string
     name: string

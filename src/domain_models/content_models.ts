@@ -1,6 +1,8 @@
 export type content_id = derived_content_id | source_content_id
 export type derived_content_id = 'whiteboard'
 export type source_content_id = 'whiteboard' | 'pdf'
+
+// Data types that store actual contents like .pdf files... instances...
 export type SourceContent = PDF | WhiteBoard //| CodeEditor | BlockText | Image | Video | PPT | Spreadsheet | KeyboardMindMap | ObsidianCanvas
 export type DerivedContent = WhiteBoard //| CodeEditor | BlockText | Image | Video | Spreadsheet | KeyboardMindMap | ObsidianCanvas
 export type Content = DerivedContent | SourceContent
@@ -50,8 +52,10 @@ export interface RAGCapability {
 }
 
 export interface ImportCapability {
-
+    supported_extensions: string[]
 }
 
-export interface ExportCapability{}
+export interface ExportCapability{
+    supported_extensions: string[]
+}
 
