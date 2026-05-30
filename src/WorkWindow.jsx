@@ -352,8 +352,8 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
   // Tools & Regions
   const [tool, setTool]                   = useState('select');
-  const [regions, setMarks]             = useState(restoredSession?.regions ?? []);
-  const [selectedRegionId, setSelectedMarkId] = useState(restoredSession?.selectedRegionId ?? null);
+  const [marks, setMarks]             = useState(restoredSession?.marks ?? []);
+  const [selectedMarkId, setSelectedMarkId] = useState(restoredSession?.selectedMarkId ?? null);
   const { manager: shortcutManager, state: shortcutState, refreshAvailableWhiteboards } = useShortcutToolState({
     settings,
     restoredSession,
@@ -487,7 +487,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
     if (e.key === '\\' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
-      if (!selectedRegionId && shortcutState.selectedIdx === null) return;
+      if (!selectedMarkId && shortcutState.selectedIdx === null) return;
       setLeftPct(55);
       return;
     }
@@ -556,7 +556,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
         e.stopPropagation();
       }
     }
-  }, [activePane, selectedRegionId, editingShapeId, shapeBackup, editingSectionId, currentSelection, tool]);
+  }, [activePane, selectedMarkId, editingShapeId, shapeBackup, editingSectionId, currentSelection, tool]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown, true);
@@ -573,12 +573,12 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     [pdfPath]
   );
 
-  const regionsRef          = useRef(regions);
-  const selectedRegionIdRef = useRef(selectedRegionId);
+  const regionsRef          = useRef(marks);
+  const selectedRegionIdRef = useRef(selectedMarkId);
   const leftPctRef          = useRef(leftPct);
 
-  useEffect(() => { regionsRef.current = regions; }, [regions]);
-  useEffect(() => { selectedRegionIdRef.current = selectedRegionId; }, [selectedRegionId]);
+  useEffect(() => { regionsRef.current = marks; }, [marks]);
+  useEffect(() => { selectedRegionIdRef.current = selectedMarkId; }, [selectedMarkId]);
   useEffect(() => { leftPctRef.current = leftPct; }, [leftPct]);
 
   const persistSession = useCallback(() => {
@@ -592,7 +592,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     });
   }, [debouncedSaveSession]);
 
-  useEffect(() => { persistSession(); }, [regions, selectedRegionId, leftPct, persistSession]);
+  useEffect(() => { persistSession(); }, [marks, selectedMarkId, leftPct, persistSession]);
 
   useEffect(() => {
     const onUnload = () => {
@@ -684,7 +684,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     const coords = getUnscaledCoords(e);
 
     if (e.ctrlKey || e.metaKey) {
-      const hit = [...regions].reverse().find((r) => {
+      const hit = [...marks].reverse().find((r) => {
         const selectionContext = {PDFWIDTH: PDF_WIDTH, zoom: zoom};
         
         return getMarkType(r.type).hasSelectedBorder(coords, r, selectionContext);
@@ -735,7 +735,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
     if (handled) return;
 
-  }, [tool, regions, zoom, getUnscaledCoords, sectionTarget, currentSelection, editingShapeId]);
+  }, [tool, marks, zoom, getUnscaledCoords, sectionTarget, currentSelection, editingShapeId]);
 
   const handleDivPointerMove = useCallback((e) => {
     mousePosRef.current = { x: e.clientX, y: e.clientY };
@@ -855,7 +855,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     const toolType = getToolType(tool);
     await toolType.onBorderClick?.({
       regionId,
-      selectedRegionId,
+      selectedRegionId: selectedMarkId,
       actions: {
         confirmDelete: () => confirmErrorDialog(
           'Are you sure you want to delete this region? Its whiteboard data will be permanently lost.',
@@ -869,7 +869,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
         clearShortcutUi: () => shortcutManager.clearUi(),
       },
     });
-  }, [tool, selectedRegionId, selectRegion]);
+  }, [tool, selectedMarkId, selectRegion]);
 
   const handleBackup = async () => {
     try {
@@ -903,7 +903,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
         ? toolType.cursor({ sectionTarget })
         : toolType.cursor) || 'default';
 
-  const activeWhiteboardId = selectedRegionId ?? shortcutManager.getLinkedWhiteboardId();
+  const activeWhiteboardId = selectedMarkId ?? shortcutManager.getLinkedWhiteboardId();
   const sectionSelection = currentSelection?.type === 'section'
     ? currentSelection
     : { start: null, end: null };
@@ -964,9 +964,9 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
             {/* Scaled SVG overlay */}
             <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible', zIndex: 10, pointerEvents: 'none' }}>
               {/* BOZOZO */}
-              {regions.map((r, idx) => {
+              {marks.map((r, idx) => {
                 const color      = regionColor(r.id);
-                const isSelected = selectedRegionId === r.id;
+                const isSelected = selectedMarkId === r.id;
                 let renderCtx = {zoom:zoom, PDFWIDTH: PDF_WIDTH, tool:tool, color: color, idx:idx, onClick: handleBorderClick, isSelected:isSelected, };
                 
                 return getMarkType(r.type).render(r, renderCtx);
@@ -1054,7 +1054,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
               return (
                 <div key={`gtool-${idx}`} style={{ position: 'relative' }}>
                   <button
-                    onClick={() => shortcutManager.openSlot(idx, selectedRegionId)}
+                    onClick={() => shortcutManager.openSlot(idx, selectedMarkId)}
                     title={`Shortcut Tool ${idx + 1}`}
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '6px', border: `1px solid ${isActive ? '#3B82F6' : 'transparent'}`, background: isActive ? 'rgba(59,130,246,0.2)' : 'transparent', color: isActive ? '#93C5FD' : '#d1d5db', cursor: 'pointer', fontSize: '16px' }}
                   >
@@ -1099,7 +1099,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                         {shortcutState.availableWhiteboards.map((wb) => (
                           <button
                             key={wb.id}
-                            onClick={() => shortcutManager.applySelection(idx, wb.id, wb.name, selectedRegionId)}
+                            onClick={() => shortcutManager.applySelection(idx, wb.id, wb.name, selectedMarkId)}
                             style={{ textAlign: 'left', padding: '8px 10px', borderRadius: '6px', border: `1px solid ${shortcutState.draftId === wb.id ? '#3B82F6' : '#374151'}`, background: shortcutState.draftId === wb.id ? 'rgba(59,130,246,0.18)' : '#262a33', color: '#e5e7eb', cursor: 'pointer', fontSize: '12px', minHeight: '30px' }}
                           >
                             {wb.name}

@@ -6,7 +6,7 @@ export const shortcutTool: ToolType = {
     category: 'system',
     isDrawable: false,
     createsSelections : false,
-    hotkey: ,
+    hotkey: "",
     activationMode: 'set',
 
     onActivate({ actions }) {

@@ -70,16 +70,17 @@ export class ShortcutToolManager {
         const restoredLinks = Array.isArray(config.initialSlotLinks) ? config.initialSlotLinks : []
 
         this._state = {
+            slotLinks: Array.from({ length: slotCount }, (_, i) => restoredLinks[i] ?? null),
             selectedIdx: config.initialSelectedIdx ?? null,
             slotCount,
-            slotLinks: Array.from({ length: slotCount }, (_, i) => restoredLinks[i] ?? null),
+            availableWhiteboards: [],
+            
             selectPanelIdx: null,
             activeControlsIdx: null,
             draftId: null,
             draftName: '',
-            newWhiteboardName: '',
             viewStack: [],
-            availableWhiteboards: [],
+            newWhiteboardName: '',
         }
     }
 
