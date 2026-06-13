@@ -427,9 +427,9 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
       actions: {
         setCurrentSelection,
         setSectionTarget: uiController.setSectionTarget,
-        setEditingSectionId: (id) => uiController.setEditingSection(id, uiState.sectionTarget),
-        setEditingShapeId: (id) => uiController.setEditingShape(id, null),
-        setShapeBackup: (backup) => uiController.setEditingShape(uiState.editingShapeId, backup),
+        setEditingSectionId: uiController.setEditingSectionId,
+        setEditingShapeId: uiController.setEditingShapeId,
+        setShapeBackup: uiController.setShapeBackup,
       },
     });
   }, [uiState.tool]);
@@ -698,9 +698,9 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
           actions: {
             setTool: uiController.setTool,
             setCurrentSelection,
-            setEditingSectionId: (id) => uiController.setEditingSection(id, uiState.sectionTarget),
-            setEditingShapeId: (id) => uiController.setEditingShape(id, null),
-            setShapeBackup: (backup) => uiController.setEditingShape(uiState.editingShapeId, backup),
+            setEditingSectionId: uiController.setEditingSectionId,
+            setEditingShapeId: uiController.setEditingShapeId,
+            setShapeBackup: uiController.setShapeBackup,
             setMovingRegion: setMovingMark,
             setSectionTarget: uiController.setSectionTarget,
           },
@@ -722,8 +722,8 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
       },
       actions: {
         setCurrentSelection,
-        setEditingShapeId: (id) => uiController.setEditingShape(id, null),
-        setShapeBackup: (backup) => uiController.setEditingShape(uiState.editingShapeId, backup),
+        setEditingShapeId: uiController.setEditingShapeId,
+        setShapeBackup: uiController.setShapeBackup,
         setSectionTarget: uiController.setSectionTarget,
         setMovingRegion: setMovingMark,
         setTool: uiController.setTool,
@@ -1028,13 +1028,13 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                   actions: {
                     setTool: uiController.setTool,
                     setSectionTarget: uiController.setSectionTarget,
-                    setEditingSectionId: (id) => uiController.setEditingSection(id, uiState.sectionTarget),
+                    setEditingSectionId: uiController.setEditingSectionId,
                     setCurrentSelection,
                     setMarksWithSectionWidths,
                     setSelectedMarkId: uiController.setSelectedMarkId,
                     setSelectedShortcutIdx: (idx) => shortcutManager.setSelectedIdx(idx),
-                    setShapeBackup: (backup) => uiController.setEditingShape(uiState.editingShapeId, backup),
-                    setEditingShapeId: (id) => uiController.setEditingShape(id, null),
+                    setShapeBackup: uiController.setShapeBackup,
+                    setEditingShapeId: uiController.setEditingShapeId,
                     setSelectPanelIdx: (idx) => shortcutManager.setSelectPanelIdx(idx),
                   },
                 })}

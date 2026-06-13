@@ -11,8 +11,9 @@ export interface UIController {
     setTool: (tool: string) => void;
     setSelectedMarkId: (selectedMarkId: string | null) => void;
     setActivePane: (activePane: 'pdf' | 'whiteboard') => void;
-    setEditingShape: (editingShapeId: string | null, shapeBackup?: any) => void;
-    setEditingSection: (editingSectionId: string | null, sectionTarget?: 'start' | 'end') => void;
+    setEditingShapeId: (editingShapeId: string | null) => void;
+    setShapeBackup: (shapeBackup: any) => void;
+    setEditingSectionId: (editingSectionId: string | null) => void;
     setSectionTarget: (sectionTarget: 'start' | 'end') => void;
     showToast: (msg: string, type?: ToastState['type']) => void;
     clearToast: () => void;
@@ -47,17 +48,14 @@ export function createUIController(store: UIStateStore): UIController {
         setActivePane: (activePane) => {
             store.setState({ activePane });
         },
-        setEditingShape: (editingShapeId, shapeBackup = null) => {
-            store.setState({
-                editingShapeId,
-                shapeBackup,
-            });
+        setEditingShapeId: (editingShapeId) => {
+            store.setState({ editingShapeId });
         },
-        setEditingSection: (editingSectionId, sectionTarget = 'start') => {
-            store.setState({
-                editingSectionId,
-                sectionTarget,
-            });
+        setShapeBackup: (shapeBackup) => {
+            store.setState({ shapeBackup });
+        },
+        setEditingSectionId: (editingSectionId) => {
+            store.setState({ editingSectionId });
         },
         setSectionTarget: (sectionTarget) => {
             store.setState({ sectionTarget });
