@@ -63,10 +63,10 @@ function timeAgo(ts) {
   return `${Math.floor(d / 86400)}d ago`;
 }
 
-function regionCount(path) {
+function markCount(path) {
   if (!path || path.startsWith('whiteboard:')) return 0;
   const s = loadSession(path);
-  return s?.regions?.length ?? 0;
+  return s?.marks?.length ?? 0;
 }
 
 const SETTINGS_KEY = 'lemmamap:settings';
@@ -147,7 +147,7 @@ function DropZone({ onBrowseClick, onFileDrop, disabled, showToast }) {
 
 function RecentCard({ entry, onOpen, onRemove }) {
   const [hovered, setHovered] = useState(false);
-  const regions = regionCount(entry.path);
+  const marksCount = markCount(entry.path);
   const name = entry.name || entry.path.split('/').pop();
   const session = loadSession(entry.path);
 
@@ -170,7 +170,7 @@ function RecentCard({ entry, onOpen, onRemove }) {
       </div>
       <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
         <span style={{ fontSize: '10px', color: '#9ca3af' }}>{timeAgo(entry.openedAt)}</span>
-        {regions > 0 && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '10px', background: 'rgba(59,130,246,0.15)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.3)' }}>{regions} region{regions !== 1 ? 's' : ''}</span>}
+        {marksCount > 0 && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '10px', background: 'rgba(59,130,246,0.15)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.3)' }}>{marksCount} mark{marksCount !== 1 ? 's' : ''}</span>}
         {session?.scrollTop > 0 && <span style={{ fontSize: '9px', color: '#6b7280' }}>p.{Math.ceil(session.scrollTop / 1100) + 1}</span>}
       </div>
     </div>

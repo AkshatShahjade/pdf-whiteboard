@@ -196,9 +196,9 @@ export function saveSession(pdfPath, data) {
   }
 }
 
-export function normalizeRegionCollection(regions) {
-  if (Array.isArray(regions)) return regions;
-  if (regions && typeof regions === 'object') return [regions];
+export function normalizeMarkCollection(marks) {
+  if (Array.isArray(marks)) return marks;
+  if (marks && typeof marks === 'object') return [marks];
   return [];
 }
 
@@ -210,7 +210,7 @@ export function loadSession(pdfPath) {
     if (!parsed || typeof parsed !== 'object') return parsed;
     return {
       ...parsed,
-      regions: normalizeRegionCollection(parsed.regions),
+      marks: normalizeMarkCollection(parsed.marks),
     };
   } catch (err) {
     console.warn('[LemmaMap] session load failed:', err);
