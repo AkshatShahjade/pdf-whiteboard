@@ -322,7 +322,7 @@ function SettingsDrawer({ open: isOpen, onClose, settings, onChange, backupPath,
           <Field label="Autosave delay" hint={`${settings.autosaveMs}ms`}>
             <input type="range" min="200" max="2000" step="100" value={settings.autosaveMs} onChange={(e) => onChange({ ...settings, autosaveMs: +e.target.value })} style={{ width: '100%', accentColor: '#3B82F6' }} />
           </Field>
-          <Field label="Max global PDF tools" hint={`${settings.maxGlobalPdfTools}`}>
+          <Field label="Max shortcut tools" hint={`${settings.maxGlobalPdfTools}`}>
             <input type="range" min="1" max="12" step="1" value={settings.maxGlobalPdfTools} onChange={(e) => onChange({ ...settings, maxGlobalPdfTools: +e.target.value })} style={{ width: '100%', accentColor: '#3B82F6' }} />
           </Field>
           <Field label="Default Tool">
@@ -462,6 +462,11 @@ export default function HomeScreen({ onOpen }) {
 
   const handleSettingsChange = useCallback((s) => { setSettings(s); saveSettings(s); }, []);
 
+  const clearRecents = useCallback(() => {
+    localStorage.removeItem('lemmamap:recents');
+    setRecents([]);
+  }, []);
+
   const refreshDir = useCallback(async (dir) => {
     if (!dir) return;
     try {
@@ -484,8 +489,12 @@ export default function HomeScreen({ onOpen }) {
       const selected = await openFile2(true)
       
       if (selected) {
-        setLibraryPath(selected); setCurrentDir(selected);
-        localStorage.setItem('lemmamap:library', selected);
+        const nextLibraryPath = selected;
+        if (nextLibraryPath !== libraryPath) {
+          clearRecents();
+        }
+        setLibraryPath(nextLibraryPath); setCurrentDir(nextLibraryPath);
+        localStorage.setItem('lemmamap:library', nextLibraryPath);
       }
     } catch (err) { console.error(err); }
   };
@@ -673,7 +682,7 @@ export default function HomeScreen({ onOpen }) {
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                   <span style={{ fontSize: '10px', color: '#9ca3af', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Recent</span>
-                  <button onClick={() => { localStorage.removeItem('lemmamap:recents'); setRecents([]); }} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: '10px', fontFamily: 'inherit' }}>clear all</button>
+                  <button onClick={clearRecents} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: '10px', fontFamily: 'inherit' }}>clear all</button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {recents.map(entry => <RecentCard key={entry.path} entry={entry} onOpen={handleRecentOpen} onRemove={handleRemoveRecent} />)}

@@ -888,7 +888,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
       const wb = await createWhiteboard(trimmed, pdfDirectoryPath);
       shortcutManager.setNewWhiteboardName('');
       await refreshAvailableWhiteboards();
-      shortcutManager.applySelection(selectPanelIdx, wb.id, wb.name, selectedRegionIdRef.current);
+      shortcutManager.applySelection(selectPanelIdx, wb.id, wb.name, selectedMarkIdRef.current);
     } catch (err) {
       showToast(err.message || 'Could not create whiteboard.', 'error');
     }
