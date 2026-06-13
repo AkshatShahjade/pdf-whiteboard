@@ -65,6 +65,8 @@ export interface MarkType {
     // updateMark: (selection:Selection) => Mark
     
     render: (r: Mark, ctx: RenderMarkContext) => any
+
+    validate?: (mark: any) => { isValid: boolean; error?: string };
 }
 
 // export interface Mark {

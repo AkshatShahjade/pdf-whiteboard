@@ -90,6 +90,17 @@ export const sectionMark: MarkType = {
                 </g>
             );
         }
+    },
+
+    validate(mark: any) {
+        const { y, h, w } = mark;
+        if (typeof y !== 'number' || typeof h !== 'number' || typeof w !== 'number') {
+            return { isValid: false, error: 'Section dimensions must be numeric.' };
+        }
+        if (y < 0 || h <= 0 || w <= 0) {
+            return { isValid: false, error: 'Section y-position must be non-negative, and height/width must be positive.' };
+        }
+        return { isValid: true };
     }
 }
 

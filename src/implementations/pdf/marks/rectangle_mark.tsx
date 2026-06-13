@@ -71,9 +71,22 @@ export const rectangleMark: MarkType = {
             <text x={rx + 15} y={ry + 11} textAnchor="middle" fill="white" fontSize={9} fontFamily="'IBM Plex Mono', monospace" fontWeight="700" style={{ pointerEvents: 'none' }}>{`R${ctx.idx + 1}`}</text>
           </g>
         );
-    }    
-  }
+      }
+    },
 
+    validate(mark: any) {
+      const { x, y, w, h } = mark;
+      if (typeof x !== 'number' || typeof y !== 'number' || typeof w !== 'number' || typeof h !== 'number') {
+        return { isValid: false, error: 'Rect coordinates (x, y, w, h) must be numeric.' };
+      }
+      if (x < 0 || y < 0 || w <= 0 || h <= 0) {
+        return { isValid: false, error: 'Rect dimensions must be positive and non-negative.' };
+      }
+      if (x + w > 800) {
+        return { isValid: false, error: `Rect bounds exceed the page width: ${x + w} > 800` };
+      }
+      return { isValid: true };
+    }
 }
 
 function createRectSel (drag: RectSel) : any {

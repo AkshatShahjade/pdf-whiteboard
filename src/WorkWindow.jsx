@@ -3,8 +3,7 @@ import { Tldraw, DefaultToolbar, DefaultToolbarContent, TldrawUiMenuItem, useToo
 import 'tldraw/tldraw.css';
 import { Document, Page, pdfjs } from 'react-pdf';
 import {
-  saveSession, loadSession, normalizeMarkCollection,
-  saveWhiteboard, loadWhiteboard, deleteWhiteboard,
+  loadSession, normalizeMarkCollection,
   debounce, performRollingBackup,
   createWhiteboard
 } from './storage.js';
@@ -12,6 +11,7 @@ import HomeScreen, { loadSettings } from './HomeScreen.jsx';
 import { createUIStateStore } from './ui/ui_state_store';
 import { createUIController } from './ui/ui_controller';
 import { useUIState } from './ui/useUIState';
+import { inputAPI, outputAPI, queryAPI } from './atma/singletons';
 
 
 import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './implementations/whiteboard/tools/editing/handwriting_whiteboard_editing_tool.jsx';
@@ -147,7 +147,7 @@ function WhiteboardPane({ markId, settings }) {
 
   useEffect(() => {
     let cancelled = false;
-    loadWhiteboard(markId).then((snap) => {
+    queryAPI.getWhiteboardSnapshot(markId).then((snap) => {
       if (!cancelled) {
         setSnapshot(snap ?? undefined);
         setLoaded(true);
@@ -168,7 +168,7 @@ function WhiteboardPane({ markId, settings }) {
 }
 
 function TldrawWithPersistence({ markId, initialSnapshot, settings }) {
-  const debouncedSave = useMemo(() => debounce((snap) => saveWhiteboard(markId, snap), 800), [markId]);
+  const debouncedSave = useMemo(() => debounce((snap) => inputAPI.saveWhiteboardSnapshot(markId, snap), 800), [markId]);
 
   const handleMount = useCallback((editor) => {
     if (initialSnapshot) {
@@ -327,28 +327,34 @@ function WhiteboardOnlyApp({ whiteboardId, whiteboardName, settings, onHome }) {
 function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
   const PDF_WIDTH = 800;
 
-  // PDF
+  // PDF - not UI or app state
   const [numPages, setNumPages]   = useState(null);
   const [pdfReady, setPdfReady]   = useState(false);
   const [pdfData, setPdfData]     = useState(null);
   const pdfScrollRef = useRef(null);
   const documentFile = useMemo(() => pdfData ? { data: pdfData } : null, [pdfData]);
-  const restoredSession = useMemo(() => {
-    const session = loadSession(pdfPath);
-    if (session?.marks) {
-      return { ...session, marks: updateSectionWidths(session.marks) };
+  const syncSession = useMemo(() => {
+    try {
+      return loadSession(pdfPath);
+    } catch {
+      return null;
     }
-    return session;
   }, [pdfPath]);
 
   // UI Decoupled Store & Controller
   const uiStore = useMemo(() => createUIStateStore({
-    leftPct: restoredSession?.leftPct ?? settings?.defaultSplit ?? 50,
-    selectedMarkId: restoredSession?.selectedMarkId ?? null,
+    leftPct: syncSession?.leftPct ?? settings?.defaultSplit ?? 50,
+    selectedMarkId: syncSession?.selectedMarkId ?? null,
     tool: 'select',
-  }), [restoredSession, settings]);
+    marks: syncSession?.marks ?? [],
+    pdfPath: pdfPath,
+    scrollTop: syncSession?.scrollTop ?? 0,
+  }), [syncSession, pdfPath, settings]);
 
   const uiController = useMemo(() => createUIController(uiStore), [uiStore]);
+  useEffect(() => {
+    return uiController.connect();
+  }, [uiController]);
   const uiState = useUIState(uiStore);
 
   // Layout & UI State (High Frequency / Visual only)
@@ -356,13 +362,13 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
   const [headerVisible, setHeaderVisible] = useState(false);
   const containerRef = useRef(null);
 
-  // AppState (Persisted)
-  const [marks, setMarks] = useState(restoredSession?.marks ?? []);
+  // AppState (Derived synchronously from UI State Cache)
+  const marks = useMemo(() => updateSectionWidths(uiState.marks), [uiState.marks]);
 
   // Shortcut Tool state adapter
   const { manager: shortcutManager, state: shortcutState, refreshAvailableWhiteboards } = useShortcutToolState({
     settings,
-    restoredSession,
+    restoredSession: syncSession,
     externalActions: { 
       setTool: uiController.setTool, 
       setSelectedMarkId: uiController.setSelectedMarkId 
@@ -402,12 +408,30 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
   }, [uiController, shortcutManager]);
 
   const setMarksWithSectionWidths = useCallback((updater) => {
-    setMarks((prev) => {
-      const nextMarks = typeof updater === 'function' ? updater(prev) : updater;
-      if (nextMarks == null) return prev;
-      return updateSectionWidths(nextMarks);
-    });
-  }, []);
+    const prevMarks = uiState.marks;
+    const nextMarks = typeof updater === 'function' ? updater(prevMarks) : updater;
+    if (nextMarks == null || nextMarks === prevMarks) return;
+
+    const prevMap = new Map(prevMarks.map(m => [m.id, m]));
+    const nextMap = new Map(nextMarks.map(m => [m.id, m]));
+
+    // 1. Detect deletions
+    for (const m of prevMarks) {
+      if (!nextMap.has(m.id)) {
+        inputAPI.deleteMark(m.id);
+      }
+    }
+
+    // 2. Detect additions & updates
+    for (const m of nextMarks) {
+      const prev = prevMap.get(m.id);
+      if (!prev) {
+        inputAPI.addMark(m);
+      } else if (JSON.stringify(prev) !== JSON.stringify(m)) {
+        inputAPI.updateMark(m);
+      }
+    }
+  }, [uiState.marks]);
 
   useEffect(() => { dragStateRef.current = { currentSelection, movingMark }; }, [currentSelection, movingMark]);
 
@@ -523,9 +547,9 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
         setTool: uiController.setTool,
         setCurrentSelection,
         setSectionTarget: uiController.setSectionTarget,
-        setEditingSectionId: (id) => uiController.setEditingSection(id, uiState.sectionTarget),
-        setEditingShapeId: (id) => uiController.setEditingShape(id, null),
-        setShapeBackup: (backup) => uiController.setEditingShape(uiState.editingShapeId, backup),
+        setEditingSectionId: uiController.setEditingSectionId,
+        setEditingShapeId: uiController.setEditingShapeId,
+        setShapeBackup: uiController.setShapeBackup,
         setMarksWithSectionWidths,
         setSelectedMarkId: uiController.setSelectedMarkId,
       },
@@ -564,62 +588,33 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
 
   // Shortcut tool effects (clamp, sync, clear) are now handled by useShortcutToolState hook.
 
-  const debouncedSaveSession = useMemo(
-    () => debounce((data) => {
-      saveSession(pdfPath, data);
-      setLastSavedAt(Date.now());
-    }, 600),
-    [pdfPath]
-  );
+  // Core Session Loading Effect
+  useEffect(() => {
+    if (pdfPath) {
+      inputAPI.loadSession(pdfPath);
+    }
+  }, [pdfPath]);
 
-  const marksRef            = useRef(marks);
-  const selectedMarkIdRef   = useRef(uiState.selectedMarkId);
-  const leftPctRef          = useRef(uiState.leftPct);
-
-  useEffect(() => { marksRef.current = marks; }, [marks]);
-  useEffect(() => { selectedMarkIdRef.current = uiState.selectedMarkId; }, [uiState.selectedMarkId]);
-  useEffect(() => { leftPctRef.current = uiState.leftPct; }, [uiState.leftPct]);
-
-  const persistSession = useCallback(() => {
-    const shortcutData = shortcutManager.getSessionData();
-    debouncedSaveSession({
-      marks:            marksRef.current,
-      selectedMarkId:   selectedMarkIdRef.current,
-      ...shortcutData,
-      scrollTop:        pdfScrollRef.current?.scrollTop ?? 0,
-      leftPct:          leftPctRef.current,
-    });
-  }, [debouncedSaveSession, shortcutManager]);
-
-  useEffect(() => { persistSession(); }, [marks, uiState.selectedMarkId, uiState.leftPct, persistSession]);
-
+  // Unload handler: Flush any pending saves to local storage
   useEffect(() => {
     const onUnload = () => {
-      const shortcutData = shortcutManager.getSessionData();
-      debouncedSaveSession.flush({
-        marks:            marksRef.current,
-        selectedMarkId:   selectedMarkIdRef.current,
-        ...shortcutData,
-        scrollTop:        pdfScrollRef.current?.scrollTop ?? 0,
-        leftPct:          leftPctRef.current,
-      });
+      inputAPI.flushSession();
     };
     window.addEventListener('beforeunload', onUnload);
     return () => window.removeEventListener('beforeunload', onUnload);
-  }, [debouncedSaveSession, shortcutManager]);
+  }, []);
 
   const scrollRestored = useRef(false);
   useEffect(() => {
-    if (pdfReady && !scrollRestored.current && pdfScrollRef.current && restoredSession?.scrollTop) {
-      pdfScrollRef.current.scrollTop = restoredSession.scrollTop;
+    if (pdfReady && !scrollRestored.current && pdfScrollRef.current && syncSession?.scrollTop) {
+      pdfScrollRef.current.scrollTop = syncSession.scrollTop;
       scrollRestored.current = true;
     }
-  }, [pdfReady, restoredSession]);
+  }, [pdfReady, syncSession]);
 
-  const debouncedScrollSave = useMemo(() => debounce(persistSession, 400), [persistSession]);
   const handleScroll = useCallback(() => {
-    debouncedScrollSave();
     if (pdfScrollRef.current) {
+      inputAPI.updateScrollTop(pdfPath, pdfScrollRef.current.scrollTop);
       // TODO add support for custom sized pages not only A4
       const pageHeight = PDF_WIDTH * uiState.zoom * 1.414;
       const newPage = Math.floor(pdfScrollRef.current.scrollTop / pageHeight) + 1;
@@ -628,7 +623,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
         uiController.setPageInput(String(newPage));
       }
     }
-  }, [debouncedScrollSave, uiState.zoom, uiController]);
+  }, [pdfPath, uiState.zoom, uiController]);
 
   const handlePageSubmit = (e) => {
     if (e.key === 'Enter') {
@@ -815,13 +810,13 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
         if (scrolled) {
           const coords = getUnscaledCoordsFromClient(clientX, clientY);
           const state = dragStateRef.current;
-          getToolType(tool).onPointerMove?.({
+          getToolType(uiState.tool).onPointerMove?.({
             coords,
             state: {
               currentSelection: state.currentSelection,
-              editingShapeId,
-              tool,
-              zoom,
+              editingShapeId: uiState.editingShapeId,
+              tool: uiState.tool,
+              zoom: uiState.zoom,
             },
             actions: {
               setCurrentSelection,
@@ -862,7 +857,6 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
         ),
         deleteRegion: (id) => {
           setMarksWithSectionWidths((prev) => prev.filter((r) => r.id !== id));
-          deleteWhiteboard(id);
         },
         selectRegion: selectMark,
         clearShortcutUi: () => shortcutManager.clearUi(),
@@ -888,11 +882,11 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
       const wb = await createWhiteboard(trimmed, pdfDirectoryPath);
       shortcutManager.setNewWhiteboardName('');
       await refreshAvailableWhiteboards();
-      shortcutManager.applySelection(selectPanelIdx, wb.id, wb.name, selectedMarkIdRef.current);
+      shortcutManager.applySelection(selectPanelIdx, wb.id, wb.name, uiStore.getState().selectedMarkId);
     } catch (err) {
       showToast(err.message || 'Could not create whiteboard.', 'error');
     }
-  }, [pdfDirectoryPath, refreshAvailableWhiteboards, showToast]);
+  }, [pdfDirectoryPath, refreshAvailableWhiteboards, showToast, shortcutManager, uiStore]);
 
   // --- Dynamic Cursors ---
   const toolType = getToolType(uiState.tool);

@@ -96,6 +96,24 @@ export const sessionService = {
   },
 
   /**
+   * Sets the active selection mark ID, updates the store, triggers storage persistence, and publishes MARK_SELECTED.
+   */
+  selectMark(
+    store: AppStateStore,
+    output: OutputAPIInterface,
+    markId: string | null
+  ): void {
+    store.setState(draft => {
+      draft.selectedMarkId = markId;
+    });
+
+    output.publish('MARK_SELECTED', { markId });
+
+    // Queue debounced save to persistence
+    this.persist(store, false);
+  },
+
+  /**
    * Persists scroll position changes to the store and schedules a debounced storage save.
    */
   updateScrollTop(

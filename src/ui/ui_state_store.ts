@@ -3,6 +3,8 @@
  * Uses closure-based state encapsulation rather than ES6 classes.
  */
 
+import { MarkDTO } from '../atma/api/dtos';
+
 export interface ToastState {
     msg: string;
     type: 'info' | 'success' | 'error';
@@ -10,17 +12,21 @@ export interface ToastState {
 
 export interface UIState {
     zoom: number;
-    leftPct: number;
     currentPage: number;
     pageInput: string;
     tool: string;
-    selectedMarkId: string | null;
     activePane: 'pdf' | 'whiteboard';
     editingShapeId: string | null;
     shapeBackup: any | null;
     editingSectionId: string | null;
     sectionTarget: 'start' | 'end';
     toast: ToastState | null;
+    // Core Domain Variables cached for UI presentation
+    leftPct: number;
+    selectedMarkId: string | null;
+    marks: MarkDTO[];
+    pdfPath: string | null;
+    scrollTop: number;
 }
 
 export type UIStateListener = (state: UIState) => void;
@@ -48,6 +54,9 @@ export function createUIStateStore(initialState: Partial<UIState> = {}): UIState
         editingSectionId: null,
         sectionTarget: 'start',
         toast: null,
+        marks: [],
+        pdfPath: null,
+        scrollTop: 0,
         ...initialState,
     };
 

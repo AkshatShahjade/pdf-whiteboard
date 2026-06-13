@@ -38,7 +38,7 @@ function commitSectionSelection(ctx: {
         ctx.actions.setSelectedMarkId(ctx.editingSectionId)
         ctx.actions.setEditingSectionId(null)
     } else {
-        const newId = `reg_${Date.now()}`
+        const newId = `reg_${Date.now()}_${Math.floor(Math.random() * 100000)}`
         ctx.actions.setMarksWithSectionWidths((prev: any[]) => [
             ...prev,
             { id: newId, type: 'section', x: 0, y: y1, w: DEFAULT_SECTION_WIDTH, h: y2 - y1 },

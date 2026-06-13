@@ -16,18 +16,18 @@ export const markService = {
   async addMark(
     store: AppStateStore,
     output: OutputAPIInterface,
-    markData: Omit<MarkDTO, 'id'>
+    markData: Omit<MarkDTO, 'id'> & { id?: string }
   ): Promise<string> {
-    const validation = validateMark(markData);
-    if (!validation.isValid) {
-      throw new Error(`[MarkService] Invalid mark data: ${validation.error}`);
-    }
-
-    const id = generateMarkId();
+    const id = markData.id || generateMarkId();
     const newMark: MarkDTO = {
       ...markData,
       id
     } as MarkDTO;
+
+    const validation = validateMark(newMark);
+    if (!validation.isValid) {
+      throw new Error(`[MarkService] Invalid mark data: ${validation.error}`);
+    }
 
     store.setState(draft => {
       draft.marks.set(id, newMark);
@@ -62,8 +62,8 @@ export const markService = {
 
     output.publish('MARK_UPDATED', mark);
 
-    // Force immediate persist to storage
-    sessionService.persist(store, true);
+    // Use debounced persist to prevent disk thrashing during dragging updates
+    sessionService.persist(store, false);
   },
 
   /**

@@ -7,10 +7,13 @@ import { markService } from '../services/mark_service';
 export interface InputAPIInterface {
   loadSession(pdfPath: string): Promise<void>;
   updateSplitter(leftPct: number): void;
-  addMark(mark: Omit<MarkDTO, 'id'>): Promise<string>;
+  selectMark(markId: string | null): void;
+  updateScrollTop(pdfPath: string, scrollTop: number): void;
+  addMark(mark: Omit<MarkDTO, 'id'> & { id?: string }): Promise<string>;
   updateMark(mark: MarkDTO): Promise<void>;
   deleteMark(markId: string): Promise<void>;
   saveWhiteboardSnapshot(markId: string, snapshot: any): Promise<void>;
+  flushSession(): void;
 }
 
 /**
@@ -29,7 +32,15 @@ export function createInputAPI(
       sessionService.updateSplitter(store, output, leftPct);
     },
 
-    addMark(mark: Omit<MarkDTO, 'id'>): Promise<string> {
+    selectMark(markId: string | null): void {
+      sessionService.selectMark(store, output, markId);
+    },
+
+    updateScrollTop(pdfPath: string, scrollTop: number): void {
+      sessionService.updateScrollTop(store, pdfPath, scrollTop);
+    },
+
+    addMark(mark: Omit<MarkDTO, 'id'> & { id?: string }): Promise<string> {
       return markService.addMark(store, output, mark);
     },
 
@@ -43,6 +54,10 @@ export function createInputAPI(
 
     saveWhiteboardSnapshot(markId: string, snapshot: any): Promise<void> {
       return markService.saveWhiteboardSnapshot(output, markId, snapshot);
+    },
+
+    flushSession(): void {
+      sessionService.flushPendingSave(store);
     }
   };
 }

@@ -7,6 +7,7 @@ export type EventPayloads = {
   MARK_DELETED: { markId: string };
   WHITEBOARD_UPDATED: { markId: string };
   SPLITTER_CHANGED: { leftPct: number };
+  MARK_SELECTED: { markId: string | null };
 };
 
 export type EventType = keyof EventPayloads;

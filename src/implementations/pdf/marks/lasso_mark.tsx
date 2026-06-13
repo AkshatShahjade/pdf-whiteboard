@@ -118,6 +118,30 @@ export const lassoMark: MarkType = {
             </g>
             );
         }
+    },
+
+    validate(mark: any) {
+        const { x, y, w, h, points } = mark;
+        if (typeof x !== 'number' || typeof y !== 'number' || typeof w !== 'number' || typeof h !== 'number') {
+            return { isValid: false, error: 'Lasso coordinates (x, y, w, h) must be numeric.' };
+        }
+        if (x < 0 || y < 0 || w <= 0 || h <= 0) {
+            return { isValid: false, error: 'Lasso dimensions must be positive and non-negative.' };
+        }
+        if (!Array.isArray(points) || points.length === 0) {
+            return { isValid: false, error: 'Lasso must contain points.' };
+        }
+        for (const pt of points) {
+            if (typeof pt.x !== 'number' || typeof pt.y !== 'number') {
+                return { isValid: false, error: 'Lasso points must have numeric coordinates.' };
+            }
+            const absX = x + pt.x;
+            const absY = y + pt.y;
+            if (absX < 0 || absX > 800 || absY < 0) {
+                return { isValid: false, error: `Lasso point (${absX}, ${absY}) is outside page boundary.` };
+            }
+        }
+        return { isValid: true };
     }
 }
 
