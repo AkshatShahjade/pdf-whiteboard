@@ -1,0 +1,44 @@
+import { MarkDTO, SessionDTO } from './dtos';
+import { AppStateStore } from '../app_state_store';
+import { loadWhiteboard as dbLoadWhiteboard } from '../../storage';
+
+export interface QueryAPIInterface {
+  getCurrentSession(): SessionDTO | null;
+  getMark(markId: string): MarkDTO | null;
+  getAllMarks(): MarkDTO[];
+  getWhiteboardSnapshot(markId: string): Promise<any | null>;
+}
+
+/**
+ * Functional factory generating the QueryAPI implementation.
+ */
+export function createQueryAPI(store: AppStateStore): QueryAPIInterface {
+  return {
+    getCurrentSession(): SessionDTO | null {
+      const state = store.getState();
+      if (!state.pdfPath) return null;
+      
+      return {
+        pdfPath: state.pdfPath,
+        leftPct: state.leftPct,
+        selectedMarkId: state.selectedMarkId,
+        scrollTop: state.scrollTop,
+        marks: Array.from(state.marks.values())
+      };
+    },
+
+    getMark(markId: string): MarkDTO | null {
+      const state = store.getState();
+      return state.marks.get(markId) ?? null;
+    },
+
+    getAllMarks(): MarkDTO[] {
+      const state = store.getState();
+      return Array.from(state.marks.values());
+    },
+
+    getWhiteboardSnapshot(markId: string): Promise<any | null> {
+      return dbLoadWhiteboard(markId);
+    }
+  };
+}
