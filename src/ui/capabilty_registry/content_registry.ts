@@ -1,15 +1,21 @@
-import { ContentType } from "../../shared_doman_models_and_dtos/content_models"
+import { content_id } from "../../shared_doman_models_and_dtos/content_domain_models"
 
-export const contentRegistry = new Map<string, ContentType>
+export const contentRegistry = new Map<string, ContentRendererType>
 
-export function registerContentType(impl: ContentType): void {
+export interface ContentRendererType {
+    id: content_id
+    render: any
+}
+
+
+export function registerContentRendererType(impl: ContentRendererType): void {
     if (contentRegistry.has(impl.id)) {
         throw new Error(`Duplicate content implementation: ${impl.id}`)
     }
     contentRegistry.set(impl.id, impl)
 }
 
-export function getContentType (id: string): ContentType {
+export function getContentRendererType (id: string): ContentRendererType {
     const imp = contentRegistry.get(id)
 
     if(!imp){

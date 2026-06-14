@@ -30,44 +30,7 @@ export interface SectionMark {
     w: number
 }
 
-
 export type Mark = RectMark | LassoMark | SectionMark
-
-export interface MarkType {
-    id: string
-    isDrawable: boolean
-
-    hasSelectedBorder: (pt: Point, r: Mark, ctx: SelectionContext) => boolean   
-    onBorderEditStart?: (ctx: {
-        hit: Mark
-        coords: Point
-        actions: {
-            setTool: (next: string) => void
-            setCurrentSelection: (next: any) => void
-            setEditingSectionId: (next: string | null) => void
-            setEditingShapeId: (next: string | null) => void
-            setShapeBackup: (next: any) => void
-            setMovingRegion: (next: any) => void
-            setSectionTarget: (next: "start" | "end") => void
-        }
-    }) => boolean | void
-
-    initiateShape?: (coords: Point) => Selection
-    
-    updateSelection?: (prev: Selection, coords: Point, ctx: SelectionContext) => Selection
-    
-    renderSelectionPreview: (selection: Selection, ctx: SelectionContext) => any
-    
-    returnDrawableMarkWithoutId?: (selection: Selection) => any
-
-    returnNewDrawableMark?:(selection: Selection) => Mark
-
-    // updateMark: (selection:Selection) => Mark
-    
-    render: (r: Mark, ctx: RenderMarkContext) => any
-
-    validate?: (mark: any) => { isValid: boolean; error?: string };
-}
 
 // export interface Mark {
 //     const newId = `reg_${Date.now()}`;

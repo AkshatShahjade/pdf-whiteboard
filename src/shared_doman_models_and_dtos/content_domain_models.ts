@@ -1,6 +1,6 @@
 export type content_id = derived_content_id | source_content_id
-export type derived_content_id = 'whiteboard'
-export type source_content_id = 'whiteboard' | 'pdf'
+export type derived_content_id = 'whiteboard' // CodeEditor | BlockText | Image | Video | Spreadsheet | KeyboardMindMap | ObsidianCanvas
+export type source_content_id = 'whiteboard' | 'pdf' // CodeEditor | BlockText | Image | Video | PPT | Spreadsheet | KeyboardMindMap | ObsidianCanvas
 
 // Data types that store actual contents like .pdf files... instances...
 export type SourceContent = PDF | WhiteBoard //| CodeEditor | BlockText | Image | Video | PPT | Spreadsheet | KeyboardMindMap | ObsidianCanvas
@@ -25,10 +25,9 @@ export interface WhiteBoard{}
 
 // export interface KeyboardMindMap{}
 
-export interface ContentType {
+export interface ContentDomainType {
     
-    id: string
-    name: string
+    id: content_id
     
     can_be_source: boolean
     can_be_derived: boolean

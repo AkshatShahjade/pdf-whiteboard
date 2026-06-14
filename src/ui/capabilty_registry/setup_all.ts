@@ -1,6 +1,6 @@
 import { setupMarkRegistry, setupToolRegistry } from "./pdf/setup";
 
-export function setupAllRegistries(){
+export function setupAllRendererRegistries(){
     setupMarkRegistry()
     setupToolRegistry()
 }

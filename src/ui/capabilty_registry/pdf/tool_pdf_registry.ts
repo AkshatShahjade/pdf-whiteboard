@@ -1,13 +1,7 @@
-// export interface ToolType{
-//     id: string
-// }
+import { ToolDomainType } from "../../../shared_doman_models_and_dtos/tool_domain_models"
 
-import { Content, content_id } from "./content_models"
-import { Selection } from "./mark_model"
-
-export type ToolCategory = "mark-spatial" | "edit" | "link" | "layer" | "system"
-export type ToolActivationMode = "set" | "toggle"
 export type ToolCursor = string | ((ctx: ToolCursorContext) => string)
+export type ToolActivationMode = "set" | "toggle"
 
 export interface ToolCursorContext {
     sectionTarget?: "start" | "end"
@@ -111,6 +105,7 @@ export interface ToolBorderClickContext {
     }
 }
 
+
 export interface ToolToolbarExtrasContext {
     toolId: string
     tool: string
@@ -133,10 +128,8 @@ export interface ToolToolbarExtrasContext {
     }
 }
 
-export interface ToolType {
-    id: string
-    content: content_id
-    category: ToolCategory
+export interface ToolRendererType {
+    id: ToolDomainType
     isDrawable: boolean
     createsSelections: boolean
 
@@ -154,11 +147,31 @@ export interface ToolType {
     renderToolbarExtras?: (ctx: ToolToolbarExtrasContext) => any
 }
 
-//custom tools: ROOPA level thing... TODO
-export interface Tool {
-    id: string
-    name: string
-    config: RoopaTool
+
+export const toolRendererRegistry = new Map<string, ToolRendererType>
+
+export function registerToolRendererType(tool: ToolRendererType): void {
+    if (toolRendererRegistry.has(tool.id.id)) {
+        throw new Error(`Duplicate tool implementation: ${tool.id}`)
+    }
+    toolRendererRegistry.set(tool.id.id, tool)
+    if (tool.hotkey) {
+        toolHotkeyRegistry.set(tool.hotkey.toLowerCase(), tool)
+    }
 }
 
-export interface RoopaTool{} // TODO: maybe this isn't the way? or it is?
+export function getToolRendererType (name: string): ToolRendererType {
+    const imp = toolRendererRegistry.get(name)   
+    
+    if(!imp){
+        throw new Error(`No tool implementation of name: ${name}`)  
+    }
+    return imp 
+}
+
+
+const toolHotkeyRegistry = new Map<string, ToolRendererType>()
+
+export function getToolRendererByHotkey(key: string): ToolRendererType | undefined {
+    return toolHotkeyRegistry.get(key.toLowerCase())
+}
