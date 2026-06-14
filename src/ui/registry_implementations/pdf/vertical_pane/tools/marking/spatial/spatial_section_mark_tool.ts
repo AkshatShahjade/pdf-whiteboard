@@ -3,7 +3,7 @@ import type {
     ToolKeyDownContext,
     ToolPointerDownContext,
     ToolRendererType,
-} from "../../../../../../renderer_registry/pdf/vertical_pane/tool_registry"
+} from "../../../../../../renderer_registry/pdf/vertical_pane/tool_renderer_registry"
 import { DEFAULT_SECTION_WIDTH } from "../../../../../../../shared_doman_models_and_dtos/mark_domain_model"
 import { getSectionCursor } from "../../../../tool_cursors"
 import { renderSectionToolbarExtras } from "../../../../tool_toolbar_extras"

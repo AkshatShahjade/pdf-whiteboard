@@ -1,7 +1,7 @@
 import type {
     ToolActivateContext,
     ToolRendererType,
-} from "../../../../../renderer_registry/pdf/vertical_pane/tool_registry"
+} from "../../../../../renderer_registry/pdf/vertical_pane/tool_renderer_registry"
 
 export const shortcutTool: ToolRendererType = {
     id: {

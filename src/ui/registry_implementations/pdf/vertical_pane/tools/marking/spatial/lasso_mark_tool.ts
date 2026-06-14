@@ -5,7 +5,7 @@ import type {
     ToolPointerMoveContext,
     ToolPointerUpContext,
     ToolRendererType,
-} from "../../../../../../renderer_registry/pdf/vertical_pane/tool_registry"
+} from "../../../../../../renderer_registry/pdf/vertical_pane/tool_renderer_registry"
 import { lassoMark } from "../../../marks/lasso_mark"
 import { lassoCursor } from "../../../../tool_cursors"
 import { renderDrawableToolbarExtras } from "../../../../tool_toolbar_extras"

@@ -3,7 +3,7 @@ import type {
     ToolBorderClickContext,
     ToolRendererType,
     ToolPointerDownContext,
-} from "../../../../../renderer_registry/pdf/vertical_pane/tool_registry"
+} from "../../../../../renderer_registry/pdf/vertical_pane/tool_renderer_registry"
 
 export const selectionTool: ToolRendererType = {
     id: {

@@ -1,5 +1,5 @@
 import { MarkDTO } from './dtos';
-import { getMarkType } from '../ui/renderer_registry/pdf/vertical_pane/mark_registry';
+import { getMarkDomainType } from '../atma/capabilities_registry/pdf/mark_domain_registry';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -15,9 +15,9 @@ export function validateMark(mark: Omit<MarkDTO, 'id'> | MarkDTO): ValidationRes
   }
 
   try {
-    const markType = getMarkType(mark.type);
-    if (markType.validate) {
-      return markType.validate(mark);
+    const markDomainType = getMarkDomainType(mark.type);
+    if (markDomainType.validate) {
+      return markDomainType.validate(mark);
     }
     return { isValid: true };
   } catch (err: any) {

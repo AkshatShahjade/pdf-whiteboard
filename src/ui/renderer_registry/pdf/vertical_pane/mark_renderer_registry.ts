@@ -4,7 +4,6 @@ export interface MarkRendererType {
     id: string
     isDrawable: boolean
 
-    hasSelectedBorder: (pt: Point, r: Mark, ctx: SelectionContext) => boolean   
     onBorderEditStart?: (ctx: {
         hit: Mark
         coords: Point
@@ -33,21 +32,20 @@ export interface MarkRendererType {
     
     render: (r: Mark, ctx: RenderMarkContext) => any
 
-    validate?: (mark: any) => { isValid: boolean; error?: string };
 }
 
 
-export const markRegistry = new Map<string, MarkRendererType>();
+export const markRendererRegistry = new Map<string, MarkRendererType>();
 
 export function registerMarkRendererType(impl: MarkRendererType): void {
-    if (markRegistry.has(impl.id)) {
+    if (markRendererRegistry.has(impl.id)) {
         throw new Error(`Duplicate mark implementation: ${impl.id}`)
     }
-    markRegistry.set(impl.id, impl)
+    markRendererRegistry.set(impl.id, impl)
 }
 
-export function getMarkType (id: string): MarkRendererType {
-    const imp = markRegistry.get(id)
+export function getMarkRendererType (id: string): MarkRendererType {
+    const imp = markRendererRegistry.get(id)
 
     if(!imp){
         throw new Error(`No mark implementation of id: ${id}`)

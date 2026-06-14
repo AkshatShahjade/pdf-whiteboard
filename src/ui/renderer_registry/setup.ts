@@ -6,18 +6,19 @@ import { rectTool } from "../registry_implementations/pdf/vertical_pane/tools/ma
 import { sectionTool } from "../registry_implementations/pdf/vertical_pane/tools/marking/spatial/spatial_section_mark_tool";
 import { removeTool } from "../registry_implementations/pdf/vertical_pane/tools/system/remove_mark_tool";
 import { selectionTool } from "../registry_implementations/pdf/vertical_pane/tools/system/selection_tool";
-import { markRegistry, registerMarkRendererType } from "./pdf/vertical_pane/mark_registry";
-import { registerToolRendererType, toolRendererRegistry } from "./pdf/vertical_pane/tool_registry";
-import { registerSlotRendererType } from "./pdf/slot_registry";
+import { markRendererRegistry, registerMarkRendererType } from "./pdf/vertical_pane/mark_renderer_registry";
+import { registerToolRendererType, toolRendererRegistry } from "./pdf/vertical_pane/tool_renderer_registry";
+import { registerSlotRendererType } from "./pdf/slot_renderer_registry";
+import { setupAllRegistries as setupAtmaRegistries } from "../../atma/capabilities_registry/setup";
 
 export function setupMarkRegistry() {
-    if (!markRegistry.has(lassoMark.id)) {
+    if (!markRendererRegistry.has(lassoMark.id)) {
         registerMarkRendererType(lassoMark);
     }
-    if (!markRegistry.has(rectangleMark.id)) {
+    if (!markRendererRegistry.has(rectangleMark.id)) {
         registerMarkRendererType(rectangleMark);
     }
-    if (!markRegistry.has(sectionMark.id)) {
+    if (!markRendererRegistry.has(sectionMark.id)) {
         registerMarkRendererType(sectionMark);
     }
 }
@@ -41,11 +42,12 @@ export function setupToolRegistry() {
 }
 
 export function setupAllRegistries() {
+    setupAtmaRegistries();
     setupMarkRegistry();
     setupToolRegistry();
     registerSlotRendererType({
         id: "verticalPane",
-        markRegistry: markRegistry,
-        toolRegistry: toolRendererRegistry
-    });
+        markRendererRegistry: markRendererRegistry,
+        toolRendererRegistry: toolRendererRegistry
+    } as any);
 }

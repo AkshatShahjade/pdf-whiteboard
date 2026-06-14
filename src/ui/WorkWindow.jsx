@@ -17,12 +17,13 @@ import { inputAPI, outputAPI, queryAPI } from '../atma/singletons';
 import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './registry_implementations/whiteboard/tools/editing/handwriting_whiteboard_editing_tool.jsx';
 import { confirmErrorDialog } from '../atma/platform_adapter/switch.ts';
 import { useShortcutToolState } from './window/useShortcutToolState.ts';
-import { getMarkType } from './renderer_registry/pdf/vertical_pane/mark_registry';
+import { getMarkDomainType } from '../atma/capabilities_registry/pdf/mark_domain_registry';
+import { getMarkRendererType } from './renderer_registry/pdf/vertical_pane/mark_renderer_registry';
 import { setupAllRegistries } from './renderer_registry/setup';
 import { toRoman } from './helper.ts';
 
 import { DEFAULT_SECTION_WIDTH, SECTION_BASE_WIDTH, SECTION_WIDTH_STEP } from '../shared_doman_models_and_dtos/mark_domain_model.ts';
-import { getToolRendererByHotkey as getToolByHotkey, getToolRendererType as getToolType } from './renderer_registry/pdf/vertical_pane/tool_registry';
+import { getToolRendererByHotkey as getToolByHotkey, getToolRendererType as getToolType } from './renderer_registry/pdf/vertical_pane/tool_renderer_registry';
 setupAllRegistries(); //TODO, find proper place
 
 
@@ -681,13 +682,13 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
       const hit = [...marks].reverse().find((r) => {
         const selectionContext = {PDFWIDTH: PDF_WIDTH, zoom: uiState.zoom};
         
-        return getMarkType(r.type).hasSelectedBorder(coords, r, selectionContext);
+        return getMarkDomainType(r.type).hasSelectedBorder(coords, r, selectionContext);
       });
 
       if (hit) {
         e.preventDefault();
         pendingToolActivationReasonRef.current = 'border-edit';
-        getMarkType(hit.type).onBorderEditStart?.({
+        getMarkRendererType(hit.type).onBorderEditStart?.({
           hit,
           coords,
           actions: {
@@ -764,7 +765,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     if (e?.currentTarget?.hasPointerCapture?.(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
-    if(currentSelection && getMarkType(currentSelection.type).isDrawable){
+    if(currentSelection && getMarkRendererType(currentSelection.type).isDrawable){
       getToolType(currentSelection.type).onPointerUp?.({
         currentSelection,
         editingShapeId: uiState.editingShapeId,
@@ -962,11 +963,11 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                 const isSelected = uiState.selectedMarkId === r.id;
                 let renderCtx = {zoom:uiState.zoom, PDFWIDTH: PDF_WIDTH, tool:uiState.tool, color: color, idx:idx, onClick: handleBorderClick, isSelected:isSelected, };
                 
-                return getMarkType(r.type).render(r, renderCtx);
+                return getMarkRendererType(r.type).render(r, renderCtx);
               })}
 
               {currentSelection && 
-                getMarkType(currentSelection.type).renderSelectionPreview(currentSelection, {zoom: uiState.zoom, PDFWIDTH: PDF_WIDTH})
+                getMarkRendererType(currentSelection.type).renderSelectionPreview(currentSelection, {zoom: uiState.zoom, PDFWIDTH: PDF_WIDTH})
               } 
              
             </svg>
