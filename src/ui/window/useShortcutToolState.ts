@@ -10,7 +10,7 @@ import {
     ShortcutToolManager,
     ShortcutToolExternalActions,
     WhiteboardInfo,
-} from '../registry_implementations/pdf/tools/system/shortcut_tool_state.ts'
+} from '../registry_implementations/pdf/vertical_pane/tools/system/shortcut_tool_state.ts'
 import { pruneWhiteboards } from '../../atma/storage/storage.js'
 import { jjoin, rdTextFile, readDirAKS } from '../../atma/platform_adapter/switch.ts'
 

@@ -5,10 +5,9 @@ import type {
     ToolPointerMoveContext,
     ToolPointerUpContext,
     ToolRendererType,
-} from "../../../../../capabilty_registry/pdf/tool_pdf_registry"
-import { lassoMark } from "../../../marks/lasso_mark"
-import { lassoCursor } from "../../../tool_cursors"
-import { renderDrawableToolbarExtras } from "../../../tool_toolbar_extras"
+} from "../../../../../../renderer_registry/pdf/vertical_pane/tool_registry"
+import { rectangleMark } from "../../../marks/rectangle_mark"
+import { renderDrawableToolbarExtras } from "../../../../tool_toolbar_extras"
 
 function resetDrawableToolState(actions: {
     setCurrentSelection: (next: any) => void
@@ -24,20 +23,20 @@ function resetDrawableToolState(actions: {
     actions.setShapeBackup(null)
 }
 
-export const lassoTool: ToolRendererType = {
+export const rectTool: ToolRendererType = {
     id: {
-        id: "lasso",
+        id: "rect",
         scope: "pdf",
         category: "mark-spatial"
     },
     isDrawable: true,
     createsSelections : true,
-    hotkey: 'c',
+    hotkey: 'r',
     activationMode: 'toggle',
-    cursor: lassoCursor,
+    cursor: 'crosshair',
 
     createNullSelection() {
-        return {type:"lasso", points: null}
+        return {type:"rect", startX: null, startY: null, currentX: null, currentY: null}
     },
 
     onActivate(ctx: ToolActivateContext) {
@@ -47,37 +46,35 @@ export const lassoTool: ToolRendererType = {
     onPointerDown(ctx: ToolPointerDownContext) {
         ctx.e.currentTarget.setPointerCapture?.(ctx.e.pointerId)
         ctx.actions.setSelectedMarkId(null)
-        ctx.actions.setCurrentSelection(lassoMark.initiateShape(ctx.coords))
+        ctx.actions.setCurrentSelection(rectangleMark.initiateShape(ctx.coords))
         return true
     },
 
     onPointerMove(ctx: ToolPointerMoveContext) {
-        if (!ctx.state.currentSelection || ctx.state.currentSelection.type !== 'lasso') return false
+        if (!ctx.state.currentSelection || ctx.state.currentSelection.type !== 'rect') return false
         ctx.actions.setCurrentSelection(
-            lassoMark.updateSelection?.(ctx.state.currentSelection, ctx.coords, {
-                minPointDistance: 2 / ctx.state.zoom,
-            }) ?? ctx.state.currentSelection
+            rectangleMark.updateSelection?.(ctx.state.currentSelection, ctx.coords) ?? ctx.state.currentSelection
         )
         return true
     },
 
     onPointerUp(ctx: ToolPointerUpContext) {
-        if (!ctx.currentSelection || ctx.currentSelection.type !== 'lasso') return false
+        if (!ctx.currentSelection || ctx.currentSelection.type !== 'rect') return false
 
-        const shape = lassoMark.returnDrawableMarkWithoutId(ctx.currentSelection)
+        const shape = rectangleMark.returnDrawableMarkWithoutId(ctx.currentSelection)
         if (shape && shape.w > 10 / ctx.zoom && shape.h > 10 / ctx.zoom) {
             if (ctx.editingShapeId && ctx.tool === ctx.currentSelection.type) {
                 const updatedMark = { id: ctx.editingShapeId, ...shape }
-                const validation = lassoMark.validate?.(updatedMark) ?? { isValid: true }
+                const validation = rectangleMark.validate?.(updatedMark) ?? { isValid: true }
                 if (validation.isValid) {
                     ctx.actions.setMarksWithSectionWidths((prev: any[]) => prev.map((r) => (
                         r.id === ctx.editingShapeId ? updatedMark : r
                     )))
                 }
             } else {
-                const newMark = lassoMark.returnNewDrawableMark(ctx.currentSelection)
+                const newMark = rectangleMark.returnNewDrawableMark(ctx.currentSelection)
                 if (newMark) {
-                    const validation = lassoMark.validate?.(newMark) ?? { isValid: true }
+                    const validation = rectangleMark.validate?.(newMark) ?? { isValid: true }
                     if (validation.isValid) {
                         ctx.actions.setMarksWithSectionWidths((prev: any[]) => [...prev, newMark])
                         ctx.actions.setSelectedMarkId(newMark.id)

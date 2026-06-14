@@ -17,12 +17,12 @@ import { inputAPI, outputAPI, queryAPI } from '../atma/singletons';
 import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './registry_implementations/whiteboard/tools/editing/handwriting_whiteboard_editing_tool.jsx';
 import { confirmErrorDialog } from '../atma/platform_adapter/switch.ts';
 import { useShortcutToolState } from './window/useShortcutToolState.ts';
-import { getMarkType } from './capabilty_registry/pdf/mark_pdf_registry.ts';
-import { setupAllRegistries } from './capabilty_registry/setup_all.ts';
+import { getMarkType } from './renderer_registry/pdf/vertical_pane/mark_registry';
+import { setupAllRegistries } from './renderer_registry/setup';
 import { toRoman } from './helper.ts';
 
 import { DEFAULT_SECTION_WIDTH, SECTION_BASE_WIDTH, SECTION_WIDTH_STEP } from '../shared_doman_models_and_dtos/mark_domain_model.ts';
-import { getToolRendererByHotkey as getToolByHotkey, getToolRendererType as getToolType } from './capabilty_registry/pdf/tool_pdf_registry.ts';
+import { getToolRendererByHotkey as getToolByHotkey, getToolRendererType as getToolType } from './renderer_registry/pdf/vertical_pane/tool_registry';
 setupAllRegistries(); //TODO, find proper place
 
 

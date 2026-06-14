@@ -3,7 +3,6 @@ export interface Point {
     y: number;
 }
 
-
 export interface RectMark {
     id: string;
     type: 'rect'

@@ -2,7 +2,6 @@ import { ContentDomainType } from "../../../shared_doman_models_and_dtos/content
 
 export const pdfContentType: ContentDomainType = {
     id: 'pdf',
-    name: 'PDF',
     can_be_source: true,
     can_be_derived: false,
     capabilities: {

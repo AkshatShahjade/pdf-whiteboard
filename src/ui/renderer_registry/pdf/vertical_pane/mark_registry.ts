@@ -1,4 +1,4 @@
-import { Selection, Point, Mark, SelectionContext, RenderMarkContext } from "../../../shared_doman_models_and_dtos/mark_domain_model";
+import { Selection, Point, Mark, SelectionContext, RenderMarkContext } from "../../../../shared_doman_models_and_dtos/mark_domain_model";
 
 export interface MarkRendererType {
     id: string

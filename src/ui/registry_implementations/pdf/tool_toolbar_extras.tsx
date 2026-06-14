@@ -1,5 +1,5 @@
 import { DEFAULT_SECTION_WIDTH } from "../../../shared_doman_models_and_dtos/mark_domain_model"
-import type { ToolToolbarExtrasContext } from "../../capabilty_registry/pdf/tool_pdf_registry"
+import type { ToolToolbarExtrasContext } from "../../renderer_registry/pdf/vertical_pane/tool_registry"
 
 function buttonStyle(color: string, active: boolean) {
     return {

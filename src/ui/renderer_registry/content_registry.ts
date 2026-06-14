@@ -1,10 +1,11 @@
 import { content_id } from "../../shared_doman_models_and_dtos/content_domain_models"
+import { SlotRendererType } from "./pdf/slot_registry"
 
 export const contentRegistry = new Map<string, ContentRendererType>
 
 export interface ContentRendererType {
     id: content_id
-    render: any
+    slotRegistry: Map<string, SlotRendererType>
 }
 
 

@@ -1,4 +1,4 @@
-import { ToolDomainType } from "../../../shared_doman_models_and_dtos/tool_domain_models"
+import { ToolDomainType } from "../../../../shared_doman_models_and_dtos/tool_domain_models"
 
 export type ToolCursor = string | ((ctx: ToolCursorContext) => string)
 export type ToolActivationMode = "set" | "toggle"

@@ -1,17 +1,19 @@
 import type {
     ToolActivateContext,
+    ToolBorderClickContext,
     ToolRendererType,
-} from "../../../../capabilty_registry/pdf/tool_pdf_registry"
+    ToolPointerDownContext,
+} from "../../../../../renderer_registry/pdf/vertical_pane/tool_registry"
 
-export const shortcutTool: ToolRendererType = {
+export const selectionTool: ToolRendererType = {
     id: {
-        id: "shortcut",
+        id: "select",
         scope: "pdf",
         category: "system"
     },
     isDrawable: false,
     createsSelections : false,
-    hotkey: "",
+    hotkey: 'v',
     activationMode: 'set',
 
     onActivate(ctx: ToolActivateContext) {
@@ -22,6 +24,13 @@ export const shortcutTool: ToolRendererType = {
         ctx.actions.setShapeBackup(null)
     },
 
+    onPointerDown(ctx: ToolPointerDownContext) {
+        ctx.actions.setSelectedMarkId(null)
+    },
 
+    onBorderClick(ctx: ToolBorderClickContext) {
+        ctx.actions.clearShortcutUi()
+        ctx.actions.selectRegion(ctx.regionId)
+    },
 
 }
