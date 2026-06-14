@@ -10,7 +10,7 @@ import {
     ShortcutToolManager,
     ShortcutToolExternalActions,
     WhiteboardInfo,
-} from '../implementations/pdf/tools/system/shortcut_tool_state'
+} from '../implementations/pdf/tools/system/shortcut_tool_state.ts'
 import { pruneWhiteboards } from '../storage.js'
 import { jjoin, rdTextFile, readDirAKS } from '../platform_adapter/switch.ts'
 

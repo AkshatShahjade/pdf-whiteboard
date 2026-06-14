@@ -1,4 +1,8 @@
-import { ToolType } from "../../../../domain_models/tool_models"
+import type {
+    ToolActivateContext,
+    ToolBorderClickContext,
+    ToolType,
+} from "../../../../domain_models/tool_models"
 import { deleteCursor } from "../../tool_cursors"
 
 export const removeTool: ToolType = {
@@ -11,21 +15,21 @@ export const removeTool: ToolType = {
     activationMode: 'toggle',
     cursor: deleteCursor,
 
-    onActivate({ actions }) {
-        actions.setCurrentSelection(null)
-        actions.setSectionTarget('start')
-        actions.setEditingSectionId(null)
-        actions.setEditingShapeId(null)
-        actions.setShapeBackup(null)
+    onActivate(ctx: ToolActivateContext) {
+        ctx.actions.setCurrentSelection(null)
+        ctx.actions.setSectionTarget('start')
+        ctx.actions.setEditingSectionId(null)
+        ctx.actions.setEditingShapeId(null)
+        ctx.actions.setShapeBackup(null)
     },
 
-    async onBorderClick({ regionId, selectedRegionId, actions }) {
-        const isConfirmed = await actions.confirmDelete()
+    async onBorderClick(ctx: ToolBorderClickContext) {
+        const isConfirmed = await ctx.actions.confirmDelete()
         if (!isConfirmed) return
 
-        actions.deleteRegion(regionId)
-        if (selectedRegionId === regionId) {
-            actions.selectRegion(null)
+        ctx.actions.deleteRegion(ctx.regionId)
+        if (ctx.selectedRegionId === ctx.regionId) {
+            ctx.actions.selectRegion(null)
         }
     },
 

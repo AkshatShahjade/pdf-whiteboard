@@ -14,7 +14,7 @@ import { useUIState } from './ui/useUIState';
 import { inputAPI, outputAPI, queryAPI } from './atma/singletons';
 
 
-import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './implementations/whiteboard/tools/editing/handwriting_whiteboard_editing_tool.jsx';
+import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './implementations/whiteboard/tools/editing/handwriting_whiteboard_editing_tool.js';
 import { confirmErrorDialog } from './platform_adapter/switch.ts';
 import { useShortcutToolState } from './window/useShortcutToolState.ts';
 import { getMarkType } from './capabilty_registry/pdf/mark_registry.ts';

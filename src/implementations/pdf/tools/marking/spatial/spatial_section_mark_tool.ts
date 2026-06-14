@@ -1,4 +1,9 @@
-import { ToolType } from "../../../../../domain_models/tool_models"
+import type {
+    ToolActivateContext,
+    ToolKeyDownContext,
+    ToolPointerDownContext,
+    ToolType,
+} from "../../../../../domain_models/tool_models"
 import { DEFAULT_SECTION_WIDTH } from "../../../../../domain_models/mark_model"
 import { getSectionCursor } from "../../../tool_cursors"
 import { renderSectionToolbarExtras } from "../../../tool_toolbar_extras"
@@ -63,62 +68,62 @@ export const sectionTool: ToolType = {
         return {type:"section", start: null, end: null}
     },
 
-    onActivate({ state, actions }) {
-        if (state.currentSelection?.type !== 'section') {
-            actions.setCurrentSelection(sectionTool.createNullSelection?.())
+    onActivate(ctx: ToolActivateContext) {
+        if (ctx.state.currentSelection?.type !== 'section') {
+            ctx.actions.setCurrentSelection(sectionTool.createNullSelection?.())
         }
-        actions.setEditingShapeId(null)
-        actions.setShapeBackup(null)
+        ctx.actions.setEditingShapeId(null)
+        ctx.actions.setShapeBackup(null)
     },
 
-    onPointerDown({ e, coords, state, actions }) {
-        if (!state.sectionTarget) return false
+    onPointerDown(ctx: ToolPointerDownContext) {
+        if (!ctx.state.sectionTarget) return false
 
-        e.currentTarget.setPointerCapture?.(e.pointerId)
+        ctx.e.currentTarget.setPointerCapture?.(ctx.e.pointerId)
 
-        const nextSelection = state.currentSelection?.type === 'section'
-            ? state.currentSelection
+        const nextSelection = ctx.state.currentSelection?.type === 'section'
+            ? ctx.state.currentSelection
             : sectionTool.createNullSelection?.()
 
         const updatedSelection = {
             ...(nextSelection ?? { type: 'section', start: null, end: null }),
-            [state.sectionTarget]: coords.y,
+            [ctx.state.sectionTarget]: ctx.coords.y,
         }
 
-        actions.setCurrentSelection(updatedSelection)
+        ctx.actions.setCurrentSelection(updatedSelection)
 
-        if (state.sectionTarget === 'start' && updatedSelection.end === null) {
-            actions.setSectionTarget('end')
-        } else if (state.sectionTarget === 'end' && updatedSelection.start === null) {
-            actions.setSectionTarget('start')
+        if (ctx.state.sectionTarget === 'start' && updatedSelection.end === null) {
+            ctx.actions.setSectionTarget('end')
+        } else if (ctx.state.sectionTarget === 'end' && updatedSelection.start === null) {
+            ctx.actions.setSectionTarget('start')
         }
 
         return true
     },
 
-    onKeyDown({ e, state, actions }) {
-        if (e.key === 'Enter') {
+    onKeyDown(ctx: ToolKeyDownContext) {
+        if (ctx.e.key === 'Enter') {
             if (commitSectionSelection({
-                currentSelection: state.currentSelection,
-                editingSectionId: state.editingSectionId,
+                currentSelection: ctx.state.currentSelection,
+                editingSectionId: ctx.state.editingSectionId,
                 actions: {
-                    setTool: actions.setTool,
-                    setMarksWithSectionWidths: actions.setMarksWithSectionWidths,
-                    setSelectedMarkId: actions.setSelectedMarkId,
-                    setEditingSectionId: actions.setEditingSectionId,
+                    setTool: ctx.actions.setTool,
+                    setMarksWithSectionWidths: ctx.actions.setMarksWithSectionWidths,
+                    setSelectedMarkId: ctx.actions.setSelectedMarkId,
+                    setEditingSectionId: ctx.actions.setEditingSectionId,
                 },
             })) {
-                e.preventDefault()
+                ctx.e.preventDefault()
                 return true
             }
             return false
         }
 
-        if (e.key === 'Escape' && (state.editingSectionId || state.currentSelection?.type === 'section')) {
-            e.preventDefault()
-            resetSectionToolState(actions)
-            actions.setEditingSectionId(null)
-            actions.setTool('select')
+        if (ctx.e.key === 'Escape' && (ctx.state.editingSectionId || ctx.state.currentSelection?.type === 'section')) {
+            ctx.e.preventDefault()
+            resetSectionToolState(ctx.actions)
+            ctx.actions.setEditingSectionId(null)
+            ctx.actions.setTool('select')
             return true
         }
 

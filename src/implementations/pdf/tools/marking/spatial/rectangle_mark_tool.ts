@@ -1,4 +1,11 @@
-import { ToolType } from "../../../../../domain_models/tool_models"
+import type {
+    ToolActivateContext,
+    ToolKeyDownContext,
+    ToolPointerDownContext,
+    ToolPointerMoveContext,
+    ToolPointerUpContext,
+    ToolType,
+} from "../../../../../domain_models/tool_models"
 import { rectangleMark } from "../../../marks/rectangle_mark"
 import { renderDrawableToolbarExtras } from "../../../tool_toolbar_extras"
 
@@ -30,66 +37,66 @@ export const rectTool: ToolType = {
         return {type:"rect", startX: null, startY: null, currentX: null, currentY: null}
     },
 
-    onActivate({ actions }) {
-        resetDrawableToolState(actions)
+    onActivate(ctx: ToolActivateContext) {
+        resetDrawableToolState(ctx.actions)
     },
 
-    onPointerDown({ e, coords, actions }) {
-        e.currentTarget.setPointerCapture?.(e.pointerId)
-        actions.setCurrentSelection(rectangleMark.initiateShape(coords))
+    onPointerDown(ctx: ToolPointerDownContext) {
+        ctx.e.currentTarget.setPointerCapture?.(ctx.e.pointerId)
+        ctx.actions.setCurrentSelection(rectangleMark.initiateShape(ctx.coords))
         return true
     },
 
-    onPointerMove({ coords, state, actions }) {
-        if (!state.currentSelection || state.currentSelection.type !== 'rect') return false
-        actions.setCurrentSelection(
-            rectangleMark.updateSelection?.(state.currentSelection, coords) ?? state.currentSelection
+    onPointerMove(ctx: ToolPointerMoveContext) {
+        if (!ctx.state.currentSelection || ctx.state.currentSelection.type !== 'rect') return false
+        ctx.actions.setCurrentSelection(
+            rectangleMark.updateSelection?.(ctx.state.currentSelection, ctx.coords) ?? ctx.state.currentSelection
         )
         return true
     },
 
-    onPointerUp({ currentSelection, editingShapeId, tool, zoom, actions }) {
-        if (!currentSelection || currentSelection.type !== 'rect') return false
+    onPointerUp(ctx: ToolPointerUpContext) {
+        if (!ctx.currentSelection || ctx.currentSelection.type !== 'rect') return false
 
-        const shape = rectangleMark.returnDrawableMarkWithoutId(currentSelection)
-        if (shape && shape.w > 10 / zoom && shape.h > 10 / zoom) {
-            if (editingShapeId && tool === currentSelection.type) {
-                actions.setMarksWithSectionWidths((prev: any[]) => prev.map((r) => (
-                    r.id === editingShapeId ? { ...r, ...shape } : r
+        const shape = rectangleMark.returnDrawableMarkWithoutId(ctx.currentSelection)
+        if (shape && shape.w > 10 / ctx.zoom && shape.h > 10 / ctx.zoom) {
+            if (ctx.editingShapeId && ctx.tool === ctx.currentSelection.type) {
+                ctx.actions.setMarksWithSectionWidths((prev: any[]) => prev.map((r) => (
+                    r.id === ctx.editingShapeId ? { ...r, ...shape } : r
                 )))
             } else {
-                const newMark = rectangleMark.returnNewDrawableMark(currentSelection)
+                const newMark = rectangleMark.returnNewDrawableMark(ctx.currentSelection)
                 if (newMark) {
-                    actions.setMarksWithSectionWidths((prev: any[]) => [...prev, newMark])
-                    actions.setSelectedMarkId(newMark.id)
+                    ctx.actions.setMarksWithSectionWidths((prev: any[]) => [...prev, newMark])
+                    ctx.actions.setSelectedMarkId(newMark.id)
                 }
             }
         }
 
-        actions.setCurrentSelection(null)
+        ctx.actions.setCurrentSelection(null)
         return true
     },
 
-    onKeyDown({ e, state, actions }) {
-        if (e.key === 'Enter') {
-            if (state.editingShapeId) {
-                e.preventDefault()
-                actions.setEditingShapeId(null)
-                actions.setShapeBackup(null)
-                actions.setTool('select')
+    onKeyDown(ctx: ToolKeyDownContext) {
+        if (ctx.e.key === 'Enter') {
+            if (ctx.state.editingShapeId) {
+                ctx.e.preventDefault()
+                ctx.actions.setEditingShapeId(null)
+                ctx.actions.setShapeBackup(null)
+                ctx.actions.setTool('select')
                 return true
             }
             return false
         }
 
-        if (e.key === 'Escape' && state.editingShapeId) {
-            e.preventDefault()
-            actions.setMarksWithSectionWidths((prev: any[]) => prev.map((r) => (
-                r.id === state.shapeBackup?.id ? state.shapeBackup : r
+        if (ctx.e.key === 'Escape' && ctx.state.editingShapeId) {
+            ctx.e.preventDefault()
+            ctx.actions.setMarksWithSectionWidths((prev: any[]) => prev.map((r) => (
+                r.id === ctx.state.shapeBackup?.id ? ctx.state.shapeBackup : r
             )))
-            actions.setEditingShapeId(null)
-            actions.setShapeBackup(null)
-            actions.setTool('select')
+            ctx.actions.setEditingShapeId(null)
+            ctx.actions.setShapeBackup(null)
+            ctx.actions.setTool('select')
             return true
         }
 

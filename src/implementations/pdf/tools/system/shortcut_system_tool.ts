@@ -1,4 +1,7 @@
-import { ToolType } from "../../../../domain_models/tool_models"
+import type {
+    ToolActivateContext,
+    ToolType,
+} from "../../../../domain_models/tool_models"
 
 export const shortcutTool: ToolType = {
     id: "shortcut",
@@ -9,12 +12,12 @@ export const shortcutTool: ToolType = {
     hotkey: "",
     activationMode: 'set',
 
-    onActivate({ actions }) {
-        actions.setCurrentSelection(null)
-        actions.setSectionTarget('start')
-        actions.setEditingSectionId(null)
-        actions.setEditingShapeId(null)
-        actions.setShapeBackup(null)
+    onActivate(ctx: ToolActivateContext) {
+        ctx.actions.setCurrentSelection(null)
+        ctx.actions.setSectionTarget('start')
+        ctx.actions.setEditingSectionId(null)
+        ctx.actions.setEditingShapeId(null)
+        ctx.actions.setShapeBackup(null)
     },
 
 

@@ -1,4 +1,8 @@
-import { ToolType } from "../../../../domain_models/tool_models"
+import type {
+    ToolActivateContext,
+    ToolBorderClickContext,
+    ToolType,
+} from "../../../../domain_models/tool_models"
 
 export const selectionTool: ToolType = {
     id: "select",
@@ -9,17 +13,17 @@ export const selectionTool: ToolType = {
     hotkey: 'v',
     activationMode: 'set',
 
-    onActivate({ actions }) {
-        actions.setCurrentSelection(null)
-        actions.setSectionTarget('start')
-        actions.setEditingSectionId(null)
-        actions.setEditingShapeId(null)
-        actions.setShapeBackup(null)
+    onActivate(ctx: ToolActivateContext) {
+        ctx.actions.setCurrentSelection(null)
+        ctx.actions.setSectionTarget('start')
+        ctx.actions.setEditingSectionId(null)
+        ctx.actions.setEditingShapeId(null)
+        ctx.actions.setShapeBackup(null)
     },
 
-    onBorderClick({ regionId, actions }) {
-        actions.clearShortcutUi()
-        actions.selectRegion(regionId)
+    onBorderClick(ctx: ToolBorderClickContext) {
+        ctx.actions.clearShortcutUi()
+        ctx.actions.selectRegion(ctx.regionId)
     },
 
 }
