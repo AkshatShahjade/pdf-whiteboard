@@ -3,7 +3,7 @@
  * Uses closure-based state encapsulation rather than ES6 classes.
  */
 
-import { MarkDTO } from '../atma/api/dtos';
+import { MarkDTO } from '../shared_doman_models_and_dtos/dtos';
 
 export interface ToastState {
     msg: string;

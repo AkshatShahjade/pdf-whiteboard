@@ -21,4 +21,4 @@ files and directories: app_state_store.ts for example. No camel case.
 interfaces: ToolType - capital case
 functions, variables: resetDrawableToolState - camel case
 
-    
+domain model is the language we use right - like an ontology? thinking of the ui as one independent system, the atma as the other, it is possible that we create separate domain models for each, that both agree with a common DTO.

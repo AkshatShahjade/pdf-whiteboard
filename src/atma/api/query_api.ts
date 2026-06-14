@@ -1,6 +1,6 @@
-import { MarkDTO, SessionDTO } from './dtos';
+import { MarkDTO, SessionDTO } from '../../shared_doman_models_and_dtos/dtos';
 import { AppStateStore } from '../app_state_store';
-import { loadWhiteboard as dbLoadWhiteboard } from '../../storage';
+import { loadWhiteboard as dbLoadWhiteboard } from '../storage/storage.js';
 
 export interface QueryAPIInterface {
   getCurrentSession(): SessionDTO | null;

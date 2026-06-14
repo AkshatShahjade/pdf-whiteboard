@@ -1,8 +1,8 @@
 import { AppStateStore } from '../app_state_store';
 import { OutputAPIInterface } from '../api/output_api';
-import { loadSession as dbLoadSession, saveSession as dbSaveSession, debounce } from '../../storage';
-import { parseRawMark } from '../domain/factories';
-import { SessionDTO } from '../api/dtos';
+import { loadSession as dbLoadSession, saveSession as dbSaveSession, debounce } from '../storage/storage.js';
+import { parseRawMark } from '../../shared_doman_models_and_dtos/factories';
+import { SessionDTO } from '../../shared_doman_models_and_dtos/dtos';
 
 // Debounce helper that reads the latest state from store only at execution time
 const debouncedPersist = debounce((store: AppStateStore) => {

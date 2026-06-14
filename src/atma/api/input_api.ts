@@ -1,4 +1,4 @@
-import { MarkDTO } from './dtos';
+import { MarkDTO } from '../../shared_doman_models_and_dtos/dtos';
 import { AppStateStore } from '../app_state_store';
 import { OutputAPIInterface } from './output_api';
 import { sessionService } from '../services/session_service';

@@ -1,12 +1,12 @@
 import { AppStateStore } from '../app_state_store';
 import { OutputAPIInterface } from '../api/output_api';
-import { MarkDTO } from '../api/dtos';
-import { validateMark } from '../domain/validation';
-import { generateMarkId } from '../domain/factories';
+import { MarkDTO } from '../../shared_doman_models_and_dtos/dtos';
+import { validateMark } from '../../shared_doman_models_and_dtos/validation';
+import { generateMarkId } from '../../shared_doman_models_and_dtos/factories';
 import { 
   deleteWhiteboard as dbDeleteWhiteboard,
   saveWhiteboard as dbSaveWhiteboard
-} from '../../storage';
+} from '../storage/storage.js';
 import { sessionService } from './session_service';
 
 export const markService = {

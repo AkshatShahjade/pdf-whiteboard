@@ -1,4 +1,4 @@
-import { MarkDTO } from './api/dtos';
+import { MarkDTO } from '../shared_doman_models_and_dtos/dtos';
 
 export interface AppState {
   pdfPath: string | null;

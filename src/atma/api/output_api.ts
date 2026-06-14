@@ -1,4 +1,4 @@
-import { MarkDTO, SessionDTO } from './dtos';
+import { MarkDTO, SessionDTO } from '../../shared_doman_models_and_dtos/dtos';
 
 export type EventPayloads = {
   SESSION_LOADED: SessionDTO;
