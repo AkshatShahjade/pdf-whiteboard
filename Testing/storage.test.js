@@ -119,7 +119,7 @@ import {
   deleteGlobalWhiteboard,
   pruneWhiteboards,
   getWhiteboardsForFolder,
-} from '../src/storage.js';  // Adjust path to match your project structure
+} from '../src/atma/storage/storage.js';  // Adjust path to match your project structure
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SECTION 1: sessionKey()

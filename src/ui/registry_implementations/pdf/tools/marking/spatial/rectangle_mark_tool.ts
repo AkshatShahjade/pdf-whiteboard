@@ -4,8 +4,8 @@ import type {
     ToolPointerDownContext,
     ToolPointerMoveContext,
     ToolPointerUpContext,
-    ToolType,
-} from "../../../../../../shared_doman_models_and_dtos/tool_models"
+    ToolRendererType,
+} from "../../../../../capabilty_registry/pdf/tool_pdf_registry"
 import { rectangleMark } from "../../../marks/rectangle_mark"
 import { renderDrawableToolbarExtras } from "../../../tool_toolbar_extras"
 
@@ -23,10 +23,12 @@ function resetDrawableToolState(actions: {
     actions.setShapeBackup(null)
 }
 
-export const rectTool: ToolType = {
-    id: "rect",
-    content: 'pdf',
-    category: 'mark-spatial',
+export const rectTool: ToolRendererType = {
+    id: {
+        id: "rect",
+        scope: "pdf",
+        category: "mark-spatial"
+    },
     isDrawable: true,
     createsSelections : true,
     hotkey: 'r',
@@ -43,6 +45,7 @@ export const rectTool: ToolType = {
 
     onPointerDown(ctx: ToolPointerDownContext) {
         ctx.e.currentTarget.setPointerCapture?.(ctx.e.pointerId)
+        ctx.actions.setSelectedMarkId(null)
         ctx.actions.setCurrentSelection(rectangleMark.initiateShape(ctx.coords))
         return true
     },
@@ -61,14 +64,21 @@ export const rectTool: ToolType = {
         const shape = rectangleMark.returnDrawableMarkWithoutId(ctx.currentSelection)
         if (shape && shape.w > 10 / ctx.zoom && shape.h > 10 / ctx.zoom) {
             if (ctx.editingShapeId && ctx.tool === ctx.currentSelection.type) {
-                ctx.actions.setMarksWithSectionWidths((prev: any[]) => prev.map((r) => (
-                    r.id === ctx.editingShapeId ? { ...r, ...shape } : r
-                )))
+                const updatedMark = { id: ctx.editingShapeId, ...shape }
+                const validation = rectangleMark.validate?.(updatedMark) ?? { isValid: true }
+                if (validation.isValid) {
+                    ctx.actions.setMarksWithSectionWidths((prev: any[]) => prev.map((r) => (
+                        r.id === ctx.editingShapeId ? updatedMark : r
+                    )))
+                }
             } else {
                 const newMark = rectangleMark.returnNewDrawableMark(ctx.currentSelection)
                 if (newMark) {
-                    ctx.actions.setMarksWithSectionWidths((prev: any[]) => [...prev, newMark])
-                    ctx.actions.setSelectedMarkId(newMark.id)
+                    const validation = rectangleMark.validate?.(newMark) ?? { isValid: true }
+                    if (validation.isValid) {
+                        ctx.actions.setMarksWithSectionWidths((prev: any[]) => [...prev, newMark])
+                        ctx.actions.setSelectedMarkId(newMark.id)
+                    }
                 }
             }
         }

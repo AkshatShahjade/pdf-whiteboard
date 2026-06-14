@@ -1,13 +1,16 @@
 import type {
     ToolActivateContext,
     ToolBorderClickContext,
-    ToolType,
-} from "../../../../../shared_doman_models_and_dtos/tool_models"
+    ToolRendererType,
+    ToolPointerDownContext,
+} from "../../../../capabilty_registry/pdf/tool_pdf_registry"
 
-export const selectionTool: ToolType = {
-    id: "select",
-    content: 'pdf',
-    category: 'system',
+export const selectionTool: ToolRendererType = {
+    id: {
+        id: "select",
+        scope: "pdf",
+        category: "system"
+    },
     isDrawable: false,
     createsSelections : false,
     hotkey: 'v',
@@ -19,6 +22,10 @@ export const selectionTool: ToolType = {
         ctx.actions.setEditingSectionId(null)
         ctx.actions.setEditingShapeId(null)
         ctx.actions.setShapeBackup(null)
+    },
+
+    onPointerDown(ctx: ToolPointerDownContext) {
+        ctx.actions.setSelectedMarkId(null)
     },
 
     onBorderClick(ctx: ToolBorderClickContext) {

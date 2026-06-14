@@ -1,6 +1,7 @@
-import { Mark, MarkType, Point, Selection, SectionSel, SelectionContext, RenderMarkContext } from "../../../../shared_doman_models_and_dtos/mark_model";
+import { Mark, Point, Selection, SectionSel, SelectionContext, RenderMarkContext } from "../../../../shared_doman_models_and_dtos/mark_domain_model";
+import { MarkRendererType } from "../../../capabilty_registry/pdf/mark_pdf_registry";
 
-export const sectionMark: MarkType = {
+export const sectionMark: MarkRendererType = {
     id: 'section',
     isDrawable: false,
 

@@ -1,4 +1,4 @@
-import { Point } from "../shared_doman_models_and_dtos/mark_model";
+import { Point } from "../shared_doman_models_and_dtos/mark_domain_model";
 
 export function toRoman(n) {
   const numerals = [
@@ -21,7 +21,7 @@ const REGION_COLORS = [
   '#3B82F6', '#10B981', '#F59E0B', '#EF4444',
   '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16',
 ];
-const regionColor = (id: string) => REGION_COLORS[parseInt(id.replace('reg_', ''), 10) % REGION_COLORS.length];
+const regionColor = (id: string) => REGION_COLORS[parseInt(id.replace('reg_', '').replace('mark_', ''), 10) % REGION_COLORS.length];
 
 
 const sqr = (x: number) => x * x;

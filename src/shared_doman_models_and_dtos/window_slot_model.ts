@@ -1,5 +1,5 @@
-import { Content } from "./content_models"
-import { Mark } from "./mark_model"
+import { Content } from "./content_domain_models"
+import { Mark } from "./mark_domain_model"
 import { ContentPane, Pane } from "./pane_model"
 
 export type UUID = string

@@ -1,7 +1,6 @@
 import { AppStateStore } from '../app_state_store';
 import { OutputAPIInterface } from '../api/output_api';
 import { MarkDTO } from '../../shared_doman_models_and_dtos/dtos';
-import { validateMark } from '../../shared_doman_models_and_dtos/validation';
 import { generateMarkId } from '../../shared_doman_models_and_dtos/factories';
 import { 
   deleteWhiteboard as dbDeleteWhiteboard,
@@ -24,10 +23,6 @@ export const markService = {
       id
     } as MarkDTO;
 
-    const validation = validateMark(newMark);
-    if (!validation.isValid) {
-      throw new Error(`[MarkService] Invalid mark data: ${validation.error}`);
-    }
 
     store.setState(draft => {
       draft.marks.set(id, newMark);
@@ -49,10 +44,6 @@ export const markService = {
     output: OutputAPIInterface,
     mark: MarkDTO
   ): Promise<void> {
-    const validation = validateMark(mark);
-    if (!validation.isValid) {
-      throw new Error(`[MarkService] Invalid mark update: ${validation.error}`);
-    }
 
     store.setState(draft => {
       if (draft.marks.has(mark.id)) {

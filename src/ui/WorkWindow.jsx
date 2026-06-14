@@ -17,12 +17,12 @@ import { inputAPI, outputAPI, queryAPI } from '../atma/singletons';
 import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './registry_implementations/whiteboard/tools/editing/handwriting_whiteboard_editing_tool.jsx';
 import { confirmErrorDialog } from '../atma/platform_adapter/switch.ts';
 import { useShortcutToolState } from './window/useShortcutToolState.ts';
-import { getMarkType } from './capabilty_registry/pdf/mark_registry.ts';
+import { getMarkType } from './capabilty_registry/pdf/mark_pdf_registry.ts';
 import { setupAllRegistries } from './capabilty_registry/setup_all.ts';
 import { toRoman } from './helper.ts';
 
-import { DEFAULT_SECTION_WIDTH, SECTION_BASE_WIDTH, SECTION_WIDTH_STEP } from '../shared_doman_models_and_dtos/mark_model.ts';
-import { getToolByHotkey, getToolType } from './capabilty_registry/pdf/tool_registry.ts';
+import { DEFAULT_SECTION_WIDTH, SECTION_BASE_WIDTH, SECTION_WIDTH_STEP } from '../shared_doman_models_and_dtos/mark_domain_model.ts';
+import { getToolRendererByHotkey as getToolByHotkey, getToolRendererType as getToolType } from './capabilty_registry/pdf/tool_pdf_registry.ts';
 setupAllRegistries(); //TODO, find proper place
 
 
@@ -46,7 +46,7 @@ const MARK_COLORS = [
   '#3B82F6', '#10B981', '#F59E0B', '#EF4444',
   '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16',
 ];
-const markColor = (id) => MARK_COLORS[parseInt(id.replace('reg_', ''), 10) % MARK_COLORS.length];
+const markColor = (id) => MARK_COLORS[parseInt(id.replace('reg_', '').replace('mark_', ''), 10) % MARK_COLORS.length];
 
 function updateSectionWidths(marks) {
   const normalizedMarks = normalizeMarkCollection(marks);
@@ -572,9 +572,9 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
         shortcutManager.setSelectedIdx(null);
         shortcutManager.setSelectPanelIdx(null);
         uiController.setTool(
-          hotkeyTool.activationMode === 'toggle' && uiState.tool === hotkeyTool.id
+          hotkeyTool.activationMode === 'toggle' && uiState.tool === hotkeyTool.id.id
             ? 'select'
-            : hotkeyTool.id
+            : hotkeyTool.id.id
         );
         e.stopPropagation();
       }

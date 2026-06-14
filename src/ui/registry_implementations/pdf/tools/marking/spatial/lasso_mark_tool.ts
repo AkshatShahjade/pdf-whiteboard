@@ -4,8 +4,8 @@ import type {
     ToolPointerDownContext,
     ToolPointerMoveContext,
     ToolPointerUpContext,
-    ToolType,
-} from "../../../../../../shared_doman_models_and_dtos/tool_models"
+    ToolRendererType,
+} from "../../../../../capabilty_registry/pdf/tool_pdf_registry"
 import { lassoMark } from "../../../marks/lasso_mark"
 import { lassoCursor } from "../../../tool_cursors"
 import { renderDrawableToolbarExtras } from "../../../tool_toolbar_extras"
@@ -24,10 +24,12 @@ function resetDrawableToolState(actions: {
     actions.setShapeBackup(null)
 }
 
-export const lassoTool: ToolType = {
-    id: "lasso",
-    content: 'pdf',
-    category: 'mark-spatial',
+export const lassoTool: ToolRendererType = {
+    id: {
+        id: "lasso",
+        scope: "pdf",
+        category: "mark-spatial"
+    },
     isDrawable: true,
     createsSelections : true,
     hotkey: 'c',
@@ -44,6 +46,7 @@ export const lassoTool: ToolType = {
 
     onPointerDown(ctx: ToolPointerDownContext) {
         ctx.e.currentTarget.setPointerCapture?.(ctx.e.pointerId)
+        ctx.actions.setSelectedMarkId(null)
         ctx.actions.setCurrentSelection(lassoMark.initiateShape(ctx.coords))
         return true
     },
@@ -64,14 +67,21 @@ export const lassoTool: ToolType = {
         const shape = lassoMark.returnDrawableMarkWithoutId(ctx.currentSelection)
         if (shape && shape.w > 10 / ctx.zoom && shape.h > 10 / ctx.zoom) {
             if (ctx.editingShapeId && ctx.tool === ctx.currentSelection.type) {
-                ctx.actions.setMarksWithSectionWidths((prev: any[]) => prev.map((r) => (
-                    r.id === ctx.editingShapeId ? { ...r, ...shape } : r
-                )))
+                const updatedMark = { id: ctx.editingShapeId, ...shape }
+                const validation = lassoMark.validate?.(updatedMark) ?? { isValid: true }
+                if (validation.isValid) {
+                    ctx.actions.setMarksWithSectionWidths((prev: any[]) => prev.map((r) => (
+                        r.id === ctx.editingShapeId ? updatedMark : r
+                    )))
+                }
             } else {
                 const newMark = lassoMark.returnNewDrawableMark(ctx.currentSelection)
                 if (newMark) {
-                    ctx.actions.setMarksWithSectionWidths((prev: any[]) => [...prev, newMark])
-                    ctx.actions.setSelectedMarkId(newMark.id)
+                    const validation = lassoMark.validate?.(newMark) ?? { isValid: true }
+                    if (validation.isValid) {
+                        ctx.actions.setMarksWithSectionWidths((prev: any[]) => [...prev, newMark])
+                        ctx.actions.setSelectedMarkId(newMark.id)
+                    }
                 }
             }
         }

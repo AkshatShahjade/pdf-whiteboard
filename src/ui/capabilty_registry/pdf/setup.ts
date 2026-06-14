@@ -6,35 +6,35 @@ import { rectTool } from "../../registry_implementations/pdf/tools/marking/spati
 import { sectionTool } from "../../registry_implementations/pdf/tools/marking/spatial/spatial_section_mark_tool";
 import { removeTool } from "../../registry_implementations/pdf/tools/system/remove_mark_tool";
 import { selectionTool } from "../../registry_implementations/pdf/tools/system/selection_tool";
-import { markRegistry, registerMarkType } from "./mark_registry";
-import { registerToolType, toolRegistry } from "./tool_registry";
+import { markRegistry, registerMarkRendererType } from "./mark_pdf_registry";
+import { registerToolRendererType, toolRendererRegistry } from "./tool_pdf_registry";
 
 export function setupMarkRegistry(){
     if (!markRegistry.has(lassoMark.id)) {
-        registerMarkType(lassoMark);
+        registerMarkRendererType(lassoMark);
     }
     if (!markRegistry.has(rectangleMark.id)) {
-        registerMarkType(rectangleMark);
+        registerMarkRendererType(rectangleMark);
     }
     if(!markRegistry.has(sectionMark.id)){
-        registerMarkType(sectionMark);
+        registerMarkRendererType(sectionMark);
     }
 }
 
 export function setupToolRegistry(){
-    if(!toolRegistry.has(rectTool.id)) {
-        registerToolType(rectTool);
+    if(!toolRendererRegistry.has(rectTool.id.id)) {
+        registerToolRendererType(rectTool);
     }
-    if(!toolRegistry.has(lassoTool.id)) {
-        registerToolType(lassoTool);
+    if(!toolRendererRegistry.has(lassoTool.id.id)) {
+        registerToolRendererType(lassoTool);
     }
-    if(!toolRegistry.has(sectionTool.id)) {
-        registerToolType(sectionTool);
+    if(!toolRendererRegistry.has(sectionTool.id.id)) {
+        registerToolRendererType(sectionTool);
     }
-    if(!toolRegistry.has(selectionTool.id)) {
-        registerToolType(selectionTool);
+    if(!toolRendererRegistry.has(selectionTool.id.id)) {
+        registerToolRendererType(selectionTool);
     }
-    if(!toolRegistry.has(removeTool.id)) {
-        registerToolType(removeTool);
+    if(!toolRendererRegistry.has(removeTool.id.id)) {
+        registerToolRendererType(removeTool);
     }
 }

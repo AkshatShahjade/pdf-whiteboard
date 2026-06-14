@@ -1,5 +1,5 @@
 import { MarkDTO } from './dtos';
-import { getMarkType } from '../ui/capabilty_registry/pdf/mark_registry';
+import { getMarkType } from '../ui/capabilty_registry/pdf/mark_pdf_registry';
 
 export interface ValidationResult {
   isValid: boolean;

@@ -1,12 +1,14 @@
 import type {
     ToolActivateContext,
-    ToolType,
-} from "../../../../../shared_doman_models_and_dtos/tool_models"
+    ToolRendererType,
+} from "../../../../capabilty_registry/pdf/tool_pdf_registry"
 
-export const shortcutTool: ToolType = {
-    id: "shortcut",
-    content: 'pdf',
-    category: 'system',
+export const shortcutTool: ToolRendererType = {
+    id: {
+        id: "shortcut",
+        scope: "pdf",
+        category: "system"
+    },
     isDrawable: false,
     createsSelections : false,
     hotkey: "",

@@ -1,5 +1,5 @@
-import { DEFAULT_SECTION_WIDTH } from "../../../shared_doman_models_and_dtos/mark_model"
-import type { ToolToolbarExtrasContext } from "../../../shared_doman_models_and_dtos/tool_models"
+import { DEFAULT_SECTION_WIDTH } from "../../../shared_doman_models_and_dtos/mark_domain_model"
+import type { ToolToolbarExtrasContext } from "../../capabilty_registry/pdf/tool_pdf_registry"
 
 function buttonStyle(color: string, active: boolean) {
     return {
@@ -63,7 +63,7 @@ export function renderSectionToolbarExtras(ctx: ToolToolbarExtrasContext) {
                             ctx.actions.setSelectedShortcutIdx(null);
                             ctx.actions.setEditingSectionId(null);
                         } else {
-                            const newId = `reg_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+                            const newId = `mark_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
                             ctx.actions.setMarksWithSectionWidths((prev: any[]) => [
                                 ...prev,
                                 { id: newId, type: 'section', x: 0, y: y1, w: DEFAULT_SECTION_WIDTH, h: y2 - y1 },

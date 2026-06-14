@@ -1,8 +1,9 @@
-import { LassoSel, Mark, MarkType, Point, RenderMarkContext, Selection, SelectionContext, STROKE_HIT_WIDTH } from "../../../../shared_doman_models_and_dtos/mark_model";
+import { LassoSel, Mark, Point, RenderMarkContext, Selection, SelectionContext, STROKE_HIT_WIDTH } from "../../../../shared_doman_models_and_dtos/mark_domain_model";
 import { distToSegmentSquared } from "../../../helper";
-import { createMarkId as createMarkId } from "../../../../shared_doman_models_and_dtos/mark_factory";
+import { generateMarkId as createMarkId } from "../../../../shared_doman_models_and_dtos/factories";
+import { MarkRendererType } from "../../../capabilty_registry/pdf/mark_pdf_registry";
 
-export const lassoMark: MarkType = {
+export const lassoMark: MarkRendererType = {
     id : 'lasso',
     isDrawable: true,
 

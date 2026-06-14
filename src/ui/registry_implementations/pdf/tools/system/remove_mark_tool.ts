@@ -1,14 +1,16 @@
 import type {
     ToolActivateContext,
     ToolBorderClickContext,
-    ToolType,
-} from "../../../../../shared_doman_models_and_dtos/tool_models"
+    ToolRendererType,
+} from "../../../../capabilty_registry/pdf/tool_pdf_registry"
 import { deleteCursor } from "../../tool_cursors"
 
-export const removeTool: ToolType = {
-    id: "remove",
-    content: 'pdf',
-    category: 'system',
+export const removeTool: ToolRendererType = {
+    id: {
+        id: "remove",
+        scope: "pdf",
+        category: "system"
+    },
     isDrawable: false,
     createsSelections : false,
     hotkey: 'x',

@@ -2,9 +2,9 @@ import type {
     ToolActivateContext,
     ToolKeyDownContext,
     ToolPointerDownContext,
-    ToolType,
-} from "../../../../../../shared_doman_models_and_dtos/tool_models"
-import { DEFAULT_SECTION_WIDTH } from "../../../../../../shared_doman_models_and_dtos/mark_model"
+    ToolRendererType,
+} from "../../../../../capabilty_registry/pdf/tool_pdf_registry"
+import { DEFAULT_SECTION_WIDTH } from "../../../../../../shared_doman_models_and_dtos/mark_domain_model"
 import { getSectionCursor } from "../../../tool_cursors"
 import { renderSectionToolbarExtras } from "../../../tool_toolbar_extras"
 
@@ -43,7 +43,7 @@ function commitSectionSelection(ctx: {
         ctx.actions.setSelectedMarkId(ctx.editingSectionId)
         ctx.actions.setEditingSectionId(null)
     } else {
-        const newId = `reg_${Date.now()}_${Math.floor(Math.random() * 100000)}`
+        const newId = `mark_${Date.now()}_${Math.floor(Math.random() * 100000)}`
         ctx.actions.setMarksWithSectionWidths((prev: any[]) => [
             ...prev,
             { id: newId, type: 'section', x: 0, y: y1, w: DEFAULT_SECTION_WIDTH, h: y2 - y1 },
@@ -54,10 +54,12 @@ function commitSectionSelection(ctx: {
     return true
 }
 
-export const sectionTool: ToolType = {
-    id: "section",
-    content: 'pdf',
-    category: 'mark-spatial',
+export const sectionTool: ToolRendererType = {
+    id: {
+        id: "section",
+        scope: "pdf",
+        category: "mark-spatial"
+    },
     isDrawable: false,
     createsSelections : true,
     hotkey: 's',
