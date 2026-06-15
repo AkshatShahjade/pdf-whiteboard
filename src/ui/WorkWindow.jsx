@@ -15,7 +15,7 @@ import { inputAPI, outputAPI, queryAPI } from '../atma/singletons';
 
 
 import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './registry_implementations/whiteboard/tools/editing/handwriting_whiteboard_editing_tool.jsx';
-import { confirmErrorDialog } from '../atma/platform_adapter/switch.ts';
+import { confirmDialog } from '../atma/platform_adapter/switch.ts';
 import { useShortcutToolState } from './window/useShortcutToolState.ts';
 import { getMarkDomainType } from '../atma/capabilities_registry/pdf/mark_domain_registry';
 import { getMarkRendererType } from './renderer_registry/pdf/vertical_pane/mark_renderer_registry';
@@ -852,7 +852,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
       regionId: markId,
       selectedRegionId: uiState.selectedMarkId,
       actions: {
-        confirmDelete: () => confirmErrorDialog(
+        confirmDelete: () => confirmDialog(
           'Are you sure you want to delete this region? Its whiteboard data will be permanently lost.',
           'Delete Whiteboard'
         ),
@@ -1058,7 +1058,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                       <button onClick={() => shortcutManager.closeSlot()} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #4b5563', background: 'transparent', color: '#d1d5db', cursor: 'pointer' }}>Close</button>
                       {shortcutState.slotCount > 1 && (
                         <button onClick={async () => {
-                          const yes = await confirmErrorDialog('Delete this shortcut tool?','Delete Tool');
+                          const yes = await confirmDialog('Delete this shortcut tool?','Delete Tool');
                           if (!yes) return;
                           shortcutManager.deleteSlot(idx);
                         }} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #F87171', background: 'transparent', color: '#F87171', cursor: 'pointer' }}>Delete Tool</button>
@@ -1076,7 +1076,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
                           {shortcutState.slotCount > 1 && (
                             <button
                               onClick={async () => {
-                                const yes = await confirmErrorDialog('Delete this shortcut tool?', 'Delete Tool');
+                                const yes = await confirmDialog('Delete this shortcut tool?', 'Delete Tool');
                                 if (!yes) return;
                                 shortcutManager.deleteSlot(idx);
                               }}

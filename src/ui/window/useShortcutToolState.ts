@@ -12,7 +12,8 @@ import {
     WhiteboardInfo,
 } from '../registry_implementations/pdf/vertical_pane/tools/system/shortcut_tool_state.ts'
 import { pruneWhiteboards } from '../../atma/storage/storage.js'
-import { jjoin, rdTextFile, readDirAKS } from '../../atma/platform_adapter/switch.ts'
+import { joinPath } from '../../atma/platform_adapter/switch.ts'
+import { readTextFile, readDir } from '../../atma/storage/storage_adapter/switch.ts'
 
 export interface UseShortcutToolStateOptions {
     settings: any
@@ -53,16 +54,16 @@ export function useShortcutToolState(options: UseShortcutToolStateOptions) {
 
         const collected: WhiteboardInfo[] = []
         const walk = async (dir: string) => {
-            const items = await readDirAKS(dir)
+            const items = await readDir(dir)
             for (const item of items) {
-                const fullPath = await jjoin(dir, item.name)
+                const fullPath = await joinPath(dir, item.name)
                 if (item.isDirectory) {
                     await walk(fullPath)
                     continue
                 }
                 if (!item.isFile || !item.name.toLowerCase().endsWith('.whiteboard.json')) continue
                 try {
-                    const raw = await rdTextFile(fullPath)
+                    const raw = await readTextFile(fullPath)
                     const meta = JSON.parse(raw)
                     if (meta?.id && meta?.name) collected.push({ id: meta.id, name: meta.name, path: fullPath })
                 } catch {

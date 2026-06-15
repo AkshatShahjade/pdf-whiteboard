@@ -10,7 +10,26 @@ import {
   performRollingBackup,
   createWhiteboard,
 } from '../atma/storage/storage.js';
-import { basenamee, confirmErrorDialog, convertFileSrcAKS, cpyFile, dirnamee, existsAKS, jjoin, makeDirectory, openFile1, openFile2, rdTextFile, readDirAKS, remmove, saveFile, wrtFile, wrtTextFile } from '../atma/platform_adapter/switch.ts';
+import {
+  basename,
+  confirmDialog,
+  convertFileSrc,
+  dirname,
+  joinPath,
+  pickFiles,
+  pickFolder,
+  saveFilePicker,
+} from '../atma/platform_adapter/switch.ts';
+import {
+  copyFile,
+  exists,
+  makeDirectory,
+  readDir,
+  readTextFile,
+  remove,
+  writeFile,
+  writeTextFile,
+} from '../atma/storage/storage_adapter/switch.ts';
 
 // ─── Tauri Imports ────────────────────────────────────────────────────────────
 // ─── constants ────────────────────────────────────────────────────────────────
@@ -267,10 +286,10 @@ function SettingsDrawer({ open: isOpen, onClose, settings, onChange, backupPath,
     try {
       const data = await getAllData();
       const jsonStr = JSON.stringify(data, null, 2);
-      const filePath = await saveFile('LemmaMap Backup', ['json'], 'lemmamap_backup.json'); 
+      const filePath = await saveFilePicker('LemmaMap Backup', ['json'], 'lemmamap_backup.json'); 
 
       if (filePath) {
-        await wrtTextFile(filePath, jsonStr);
+        await writeTextFile(filePath, jsonStr);
         showToast('Export successful!', 'success');
       }
     } catch (e) { console.error(e); showToast('Export failed: ' + e.message, 'error'); }
@@ -278,10 +297,10 @@ function SettingsDrawer({ open: isOpen, onClose, settings, onChange, backupPath,
 
   const handleImport = async () => {
     try {
-      const filePath = await openFile1('JSON Backup', ['json'], false);
+      const filePath = await pickFiles('JSON Backup', ['json'], false);
 
       if (filePath) {
-        const content = await rdTextFile(filePath);
+        const content = await readTextFile(filePath);
         const data = JSON.parse(content);
         await restoreAllData(data);
         showToast('Import successful! Reloading LemmaMap...', 'success');
@@ -298,7 +317,7 @@ function SettingsDrawer({ open: isOpen, onClose, settings, onChange, backupPath,
   };
 
   const handleClearRecents = async () => {
-    const yes = await confirmErrorDialog('Clear all recent files? Whiteboard and session settings will be preserved.', 'Clear Recents');
+    const yes = await confirmDialog('Clear all recent files? Whiteboard and session settings will be preserved.', 'Clear Recents');
     if (yes) {
       localStorage.removeItem('lemmamap:recents');
       window.location.reload();
@@ -470,7 +489,7 @@ export default function HomeScreen({ onOpen }) {
   const refreshDir = useCallback(async (dir) => {
     if (!dir) return;
     try {
-      const items = await readDirAKS(dir);
+      const items = await readDir(dir);
       const fsEntries = items
         .filter(i => i.isDirectory || (i.isFile && (i.name.toLowerCase().endsWith('.pdf') || i.name.toLowerCase().endsWith('.whiteboard.json'))))
         .sort((a, b) => {
@@ -486,7 +505,7 @@ export default function HomeScreen({ onOpen }) {
 
   const handleSetLibrary = async () => {
     try {
-      const selected = await openFile2(true)
+      const selected = await pickFolder(true)
       
       if (selected) {
         const nextLibraryPath = selected;
@@ -501,7 +520,7 @@ export default function HomeScreen({ onOpen }) {
 
   const handleSetBackupPath = async () => {
     try {
-      const selected = await openFile2(true);
+      const selected = await pickFolder(true);
       if (selected) {
         setBackupPath(selected);
         localStorage.setItem('lemmamap:backupPath', selected);
@@ -524,8 +543,8 @@ export default function HomeScreen({ onOpen }) {
   const confirmNewFolder = async () => {
     if (!newFolderName.trim()) return;
     try {
-      const newPath = await jjoin(currentDir, newFolderName.trim());
-      if (!(await existsAKS(newPath))) {
+      const newPath = await joinPath(currentDir, newFolderName.trim());
+      if (!(await exists(newPath))) {
         await makeDirectory(newPath); refreshDir(currentDir); setIsFolderModalOpen(false);
       } else { showToast("A folder with that name already exists.", "error"); }
     } catch (err) { console.error(err); }
@@ -533,12 +552,12 @@ export default function HomeScreen({ onOpen }) {
 
   const handleImportBrowse = async () => {
     try {
-      const file = await openFile1('PDF', ['pdf'], true);
+      const file = await pickFiles('PDF', ['pdf'], true);
       if (file && currentDir) {
-        const name = await basenamee(file);
-        const dest = await jjoin(currentDir, name);
-        if (await existsAKS(dest)) return showToast("File already exists in this folder.", "error");
-        await cpyFile(file, dest);
+        const name = await basename(file);
+        const dest = await joinPath(currentDir, name);
+        if (await exists(dest)) return showToast("File already exists in this folder.", "error");
+        await copyFile(file, dest);
         refreshDir(currentDir);
       }
     } catch (err) { console.error(err); }
@@ -546,10 +565,10 @@ export default function HomeScreen({ onOpen }) {
 
   const handleImportDrop = async (file) => {
     try {
-      const dest = await jjoin(currentDir, file.name);
-      if (await existsAKS(dest)) return showToast("File already exists in this folder.", "error");
+      const dest = await joinPath(currentDir, file.name);
+      if (await exists(dest)) return showToast("File already exists in this folder.", "error");
       const buffer = await file.arrayBuffer();
-      await wrtFile(dest, new Uint8Array(buffer));
+      await writeFile(dest, new Uint8Array(buffer));
       refreshDir(currentDir);
     } catch (err) { console.error(err); }
   };
@@ -557,12 +576,12 @@ export default function HomeScreen({ onOpen }) {
   const handleEntryClick = async (entry) => {
     try {
       if (entry.isDirectory) {
-        const nextDir = await jjoin(currentDir, entry.name);
+        const nextDir = await joinPath(currentDir, entry.name);
         setCurrentDir(nextDir);
       } else {
-        const fullPath = await jjoin(currentDir, entry.name);
+        const fullPath = await joinPath(currentDir, entry.name);
         if (entry.name.toLowerCase().endsWith('.whiteboard.json')) {
-          const raw = await rdTextFile(fullPath);
+          const raw = await readTextFile(fullPath);
           const meta = JSON.parse(raw);
           if (!meta?.id) throw new Error('Invalid whiteboard file.');
           const wbPath = `whiteboard:${meta.id}`;
@@ -571,7 +590,7 @@ export default function HomeScreen({ onOpen }) {
           onOpen(null, { id: meta.id, name: meta.name || 'Whiteboard' }, settings, null);
           return;
         }
-        const safeUrl = convertFileSrcAKS(fullPath);
+        const safeUrl = convertFileSrc(fullPath);
         const recentEntry = { path: safeUrl, name: entry.name, openedAt: Date.now(), isLocal: true, sourcePath: fullPath };
         pushRecent(recentEntry);
         onOpen(safeUrl, null, settings, fullPath);
@@ -582,7 +601,7 @@ export default function HomeScreen({ onOpen }) {
   const handleUpDir = async () => {
     if (currentDir === libraryPath) return;
     try {
-      const parent = await dirnamee(currentDir);
+      const parent = await dirname(currentDir);
       setCurrentDir(parent);
     } catch (err) { console.error(err); }
   };
@@ -721,10 +740,10 @@ export default function HomeScreen({ onOpen }) {
                           title="Delete"
                           onClick={async (e) => {
                             e.stopPropagation();
-                            const fullPath = await jjoin(currentDir, entry.name);
-                            const yes = await confirmErrorDialog(`Delete ${entry.isDirectory ? 'folder' : 'file'} "${entry.name}"?`, 'Confirm Delete');
+                            const fullPath = await joinPath(currentDir, entry.name);
+                            const yes = await confirmDialog(`Delete ${entry.isDirectory ? 'folder' : 'file'} "${entry.name}"?`, 'Confirm Delete');
                             if (!yes) return;
-                            await remmove(fullPath, entry.isDirectory ? { recursive: true } : undefined);
+                            await remove(fullPath, entry.isDirectory ? { recursive: true } : undefined);
                             refreshDir(currentDir);
                           }}
                           style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid rgba(248,113,113,0.4)', background: 'rgba(248,113,113,0.08)', color: '#F87171', cursor: 'pointer' }}

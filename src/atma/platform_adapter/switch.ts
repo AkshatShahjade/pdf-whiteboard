@@ -1,7 +1,7 @@
 // TODO: Understand this switch. 
 
 import type { PlatformAdapter, PlatformName } from './interface';
-import tauriPlatform from './tauri';
+import tauriPlatform from './tauri_platform';
 
 const DEFAULT_PLATFORM: PlatformName = 'tauri';
 
@@ -23,20 +23,12 @@ const platform = IMPLEMENTATIONS[activePlatform] ?? tauriPlatform;
 export default platform;
 
 export const {
-  openFile1,
-  openFile2,
-  saveFile,
-  confirmErrorDialog,
-  convertFileSrcAKS,
-  readDirAKS,
-  makeDirectory,
-  cpyFile,
-  existsAKS,
-  wrtFile,
-  wrtTextFile,
-  rdTextFile,
-  remmove,
-  jjoin,
-  basenamee,
-  dirnamee,
+  pickFiles,
+  pickFolder,
+  saveFilePicker,
+  confirmDialog,
+  convertFileSrc,
+  joinPath,
+  basename,
+  dirname,
 } = platform;

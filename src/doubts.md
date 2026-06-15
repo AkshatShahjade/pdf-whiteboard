@@ -101,3 +101,24 @@ In JSX, people use an IIFE when they want to put multiple statements inside an e
 
 
 Understand CDN, and how to make my app truly local without any CDN connection requests.
+
+
+Explanation of Platform Adapter vs Storage stuff - both are tauri abstractions:
+Here is the cleanest way to split these responsibilities so that your architecture makes perfect sense:
+
+1. src/atma/platform_adapter/ (The Environment Layer)
+Keep this folder, but limit it strictly to OS-level environment abstractions that aren't related to reading/writing application data.
+
+What stays here: confirmErrorDialog (Native Dialogs), openFile / saveFile (Native File Picker UI), join / basename / dirname (OS Path utilities), convertFileSrcAKS.
+Why: If you move to the Web (Stage 8), the web doesn't have a "File Picker UI" that returns a string path, and it handles paths using URLs instead of \. This folder abstracts the Host Environment.
+2. src/atma/storage/storage_implementations/ (The Persistence Layer)
+This is where your databases and raw data persistence live.
+
+What goes here: tauri_sqlite.ts (wrapping tauri-plugin-sql) and tauri_fs.ts (wrapping writeTextFile, readTextFile, mkdir, copyFile from @tauri-apps/plugin-fs).
+Why: When your PaneRepository or MarkRepository wants to save a file or execute a query, it talks to the Storage Adapters. It shouldn't care about Error Dialogs or Path joining.
+The Solution
+You don't merge them. You split the current tauri.ts file in two.
+
+Leave the dialogs and path utilities in platform_adapter/tauri.ts.
+Move the raw file read/write methods (wrtTextFile, rdTextFile, readDir) into storage/storage_implementations/tauri_fs.ts.
+Create storage/storage_implementations/tauri_sqlite.ts for your database.
