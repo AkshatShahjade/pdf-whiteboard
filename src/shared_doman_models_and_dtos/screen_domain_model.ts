@@ -6,12 +6,11 @@ export type ISOTimestamp = string
 
 export interface Screen {
     id: UUID
-    kind: ScreenTypes
     slots: Slot[]
     roopa_Screen_config: null
 }
 
-export type ScreenTypes = 'standard' | 'CenterToolBar' | 'CenterToolBarAndTray'
+// export type ScreenTypes = 'standard' | 'CenterToolBar' | 'CenterToolBarAndTray'
 
 
 // If it is the core slot, it will handle the back_navigation_stack, else null. 

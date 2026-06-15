@@ -1,6 +1,6 @@
-import { content_id } from "./content_domain_models"
+import { content_type } from "./content_domain_models"
 
-export type Scope = "fileLevel" | content_id
+export type Scope = "fileLevel" | content_type
 export type ToolCategory = "mark-spatial" | "edit" | "link" | "layer" | "system"
 
 export interface ToolDomainType {
@@ -9,7 +9,7 @@ export interface ToolDomainType {
     category: ToolCategory
 }
 
-//custom tools instances that get persisted 
+//JODO : custom tools instances that get persisted 
 export interface Tool {
     id: string
     name: string

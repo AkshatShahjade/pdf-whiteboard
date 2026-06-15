@@ -1,10 +1,12 @@
+import { UUID } from "./content_domain_models";
+
 export interface Point {
     x: number; 
     y: number;
 }
 
 export interface RectMark {
-    id: string;
+    id: UUID;
     type: 'rect'
     x: number; 
     y: number;
@@ -12,7 +14,7 @@ export interface RectMark {
     h: number;
 }
 export interface LassoMark {
-    id: string;
+    id: UUID;
     type: 'lasso'
     x: number;  // the top left point, idk why?? TODO change this....
     y: number;
@@ -22,7 +24,7 @@ export interface LassoMark {
 }
 
 export interface SectionMark {
-    id: string;
+    id: UUID;
     type: 'section'
     y: number
     h: number
