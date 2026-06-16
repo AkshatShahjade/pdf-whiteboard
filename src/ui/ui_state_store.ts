@@ -42,21 +42,26 @@ export interface UIStateStore {
  */
 export function createUIStateStore(initialState: Partial<UIState> = {}): UIStateStore {
     let state: UIState = {
-        zoom: 1.0,
+        // non volatile In App State
+        pdfPath: null,
         leftPct: 50,
+        marks: [],
+        scrollTop: 0,
+        selectedMarkId: null,
+        
+        // non volatile, not in app state        
+        zoom: 1.0,
+        tool: 'select',
+        
+        // volatile
         currentPage: 1,
         pageInput: '1',
-        tool: 'select',
-        selectedMarkId: null,
         activePane: 'pdf',
         editingShapeId: null,
         shapeBackup: null,
         editingSectionId: null,
         sectionTarget: 'start',
         toast: null,
-        marks: [],
-        pdfPath: null,
-        scrollTop: 0,
         ...initialState,
     };
 
