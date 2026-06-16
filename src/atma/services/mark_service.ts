@@ -2,10 +2,7 @@ import { AppStateStore } from '../app_state_store';
 import { OutputAPIInterface } from '../api/output_api';
 import { MarkDTO } from '../../shared_doman_models_and_dtos/dtos';
 import { generateMarkId } from '../../shared_doman_models_and_dtos/factories';
-import { 
-  deleteWhiteboard as dbDeleteWhiteboard,
-  saveWhiteboard as dbSaveWhiteboard
-} from '../storage/storage.js';
+import { WhiteboardRepository } from '../storage/repositories/WhiteboardRepository';
 import { sessionService } from './session_service';
 
 export const markService = {
@@ -65,6 +62,8 @@ export const markService = {
     output: OutputAPIInterface,
     markId: string
   ): Promise<void> {
+    const pdfPath = store.getState().pdfPath;
+
     store.setState(draft => {
       draft.marks.delete(markId);
       if (draft.selectedMarkId === markId) {
@@ -78,21 +77,25 @@ export const markService = {
     sessionService.persist(store, true);
 
     try {
-      await dbDeleteWhiteboard(markId);
+      await WhiteboardRepository.deleteWhiteboard(markId, pdfPath || undefined);
     } catch (err) {
       console.warn(`[MarkService] Failed to clean up whiteboard data for deleted mark ${markId}:`, err);
     }
   },
 
   /**
-   * Saves a whiteboard canvas snapshot to IndexedDB and publishes WHITEBOARD_UPDATED.
+   * Saves a whiteboard canvas snapshot to the file system and publishes WHITEBOARD_UPDATED.
    */
   async saveWhiteboardSnapshot(
+    store: AppStateStore,
     output: OutputAPIInterface,
     markId: string,
     snapshot: any
   ): Promise<void> {
-    await dbSaveWhiteboard(markId, snapshot);
+    const pdfPath = store.getState().pdfPath;
+    // For global whiteboards pdfPath is null. WhiteboardRepository handles falling back to library folder
+    await WhiteboardRepository.saveWhiteboard(markId, snapshot, pdfPath || undefined);
     output.publish('WHITEBOARD_UPDATED', { markId });
   }
 };
+

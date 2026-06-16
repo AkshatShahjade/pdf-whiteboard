@@ -53,7 +53,7 @@ export function createInputAPI(
     },
 
     saveWhiteboardSnapshot(markId: string, snapshot: any): Promise<void> {
-      return markService.saveWhiteboardSnapshot(output, markId, snapshot);
+      return markService.saveWhiteboardSnapshot(store, output, markId, snapshot);
     },
 
     flushSession(): void {

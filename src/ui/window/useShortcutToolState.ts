@@ -11,9 +11,7 @@ import {
     ShortcutToolExternalActions,
     WhiteboardInfo,
 } from '../registry_implementations/pdf/vertical_pane/tools/system/shortcut_tool_state.ts'
-import { pruneWhiteboards } from '../../atma/storage/storage.js'
-import { joinPath } from '../../atma/platform_adapter/switch.ts'
-import { readTextFile, readDir } from '../../atma/storage/storage_adapter/switch.ts'
+import { ContentRepository } from '../../atma/storage/repositories/ContentRepository.ts'
 
 export interface UseShortcutToolStateOptions {
     settings: any
@@ -44,43 +42,19 @@ export function useShortcutToolState(options: UseShortcutToolStateOptions) {
         manager.setMaxSlots(settings?.maxGlobalPdfTools ?? 8)
     }, [settings?.maxGlobalPdfTools])
 
-    // Refresh available whiteboards from filesystem
+    // Refresh available whiteboards from ContentRepository
     const refreshAvailableWhiteboards = useCallback(async () => {
-        const libraryPath = localStorage.getItem('lemmamap:library')
-        if (!libraryPath) {
-            manager.setAvailableWhiteboards([])
-            return
-        }
-
-        const collected: WhiteboardInfo[] = []
-        const walk = async (dir: string) => {
-            const items = await readDir(dir)
-            for (const item of items) {
-                const fullPath = await joinPath(dir, item.name)
-                if (item.isDirectory) {
-                    await walk(fullPath)
-                    continue
-                }
-                if (!item.isFile || !item.name.toLowerCase().endsWith('.whiteboard.json')) continue
-                try {
-                    const raw = await readTextFile(fullPath)
-                    const meta = JSON.parse(raw)
-                    if (meta?.id && meta?.name) collected.push({ id: meta.id, name: meta.name, path: fullPath })
-                } catch {
-                    // Ignore malformed whiteboard files.
-                }
-            }
-        }
-
         try {
-            await walk(libraryPath)
-            const byId = new Map<string, WhiteboardInfo>()
-            for (const wb of collected) if (!byId.has(wb.id)) byId.set(wb.id, wb)
-            const deduped = [...byId.values()]
-            pruneWhiteboards(deduped.map((wb) => wb.id))
+            const results = await ContentRepository.getAllWhiteboards()
+            // Map file_path to name for now, in future we can add a 'name' column or parse it.
+            const deduped: WhiteboardInfo[] = results.map(row => ({
+                id: row.id,
+                name: row.file_path.split(/[\\/]/).pop() || row.id,
+                path: row.file_path
+            }))
             manager.setAvailableWhiteboards(deduped)
         } catch (err) {
-            console.warn('Failed to scan whiteboard files:', err)
+            console.warn('Failed to load whiteboards:', err)
             manager.setAvailableWhiteboards([])
         }
     }, [])

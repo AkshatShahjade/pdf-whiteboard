@@ -1,7 +1,5 @@
 export const SCHEMA_SQL = `
--- ==========================================
--- JODO LAYER (The Modding Engine)
--- ==========================================
+
 CREATE TABLE IF NOT EXISTS JODO_CONTENT_TYPES (
     id TEXT PRIMARY KEY,
     name TEXT,
@@ -57,9 +55,6 @@ CREATE TABLE IF NOT EXISTS JODO_TOOL_TYPES (
     capabilities_json TEXT
 );
 
--- ==========================================
--- DATA LAYER (The User's Workspace)
--- ==========================================
 CREATE TABLE IF NOT EXISTS SCREEN_INSTANCES (
     id TEXT PRIMARY KEY,
     jodo_screen_type TEXT REFERENCES JODO_SCREEN_TYPES(id),
@@ -94,17 +89,7 @@ CREATE TABLE IF NOT EXISTS LINKS (
     label TEXT
 );
 
-CREATE TABLE IF NOT EXISTS TOOL_INSTANCES (
-    id TEXT PRIMARY KEY,
-    jodo_content_type_id TEXT REFERENCES JODO_CONTENT_TYPES(id) ON DELETE CASCADE,
-    content_id TEXT REFERENCES CONTENTS(id) ON DELETE CASCADE,
-    jodo_slot_id TEXT REFERENCES JODO_SLOT_TYPES(id) ON DELETE CASCADE,
-    slot_id TEXT REFERENCES SLOT_INSTANCES(id) ON DELETE CASCADE,
-    jodo_screen_type_id TEXT REFERENCES JODO_SCREEN_TYPES(id) ON DELETE CASCADE,
-    screen_id TEXT REFERENCES SCREEN_INSTANCES(id) ON DELETE CASCADE,
-    jodo_tool_type TEXT REFERENCES JODO_TOOL_TYPES(id) ON DELETE CASCADE,
-    config_json TEXT
-);
+
 
 CREATE TABLE IF NOT EXISTS TAGS (
     id TEXT PRIMARY KEY,
@@ -124,8 +109,39 @@ CREATE TABLE IF NOT EXISTS MARK_TAGS (
     PRIMARY KEY (mark_id, tag_id)
 );
 
+CREATE TABLE IF NOT EXISTS DOCUMENT_UI_STATES (
+    key TEXT PRIMARY KEY,
+    value_json TEXT
+);
+
 CREATE TABLE IF NOT EXISTS SETTINGS (
     key TEXT PRIMARY KEY,
     value_json TEXT
 );
+
+CREATE TABLE IF NOT EXISTS DEFAULT_INITIAL_VALUES (
+    key TEXT,
+    scope TEXT,
+    value_json TEXT,
+    value_hash TEXT,
+    type TEXT,
+    PRIMARY KEY (key, scope)
+);
+
+CREATE TABLE IF NOT EXISTS SPECIFIC_INITIAL_VALUES (
+    key TEXT,
+    scope TEXT,
+    value_json TEXT,
+    based_on_default_hash TEXT,
+    PRIMARY KEY (key, scope)
+);
+
+-- Seed built-in content types
+INSERT OR IGNORE INTO JODO_CONTENT_TYPES (id, name, is_prebuilt, is_enabled) VALUES ('core.pdf', 'PDF Document', 1, 1);
+INSERT OR IGNORE INTO JODO_CONTENT_TYPES (id, name, is_prebuilt, is_enabled) VALUES ('core.whiteboard', 'Whiteboard', 1, 1);
+
+-- Seed built-in mark types
+INSERT OR IGNORE INTO JODO_MARK_TYPES (id, name, is_prebuilt, is_enabled) VALUES ('rect', 'Rectangle', 1, 1);
+INSERT OR IGNORE INTO JODO_MARK_TYPES (id, name, is_prebuilt, is_enabled) VALUES ('lasso', 'Lasso', 1, 1);
+INSERT OR IGNORE INTO JODO_MARK_TYPES (id, name, is_prebuilt, is_enabled) VALUES ('section', 'Section', 1, 1);
 `;

@@ -1,6 +1,6 @@
 import { MarkDTO, SessionDTO } from '../../shared_doman_models_and_dtos/dtos';
 import { AppStateStore } from '../app_state_store';
-import { loadWhiteboard as dbLoadWhiteboard } from '../storage/storage.js';
+import { WhiteboardRepository } from '../storage/repositories/WhiteboardRepository';
 
 export interface QueryAPIInterface {
   getCurrentSession(): SessionDTO | null;
@@ -38,7 +38,8 @@ export function createQueryAPI(store: AppStateStore): QueryAPIInterface {
     },
 
     getWhiteboardSnapshot(markId: string): Promise<any | null> {
-      return dbLoadWhiteboard(markId);
+      const pdfPath = store.getState().pdfPath;
+      return WhiteboardRepository.loadWhiteboard(markId, pdfPath || undefined);
     }
   };
 }

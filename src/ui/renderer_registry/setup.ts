@@ -8,7 +8,7 @@ import { removeTool } from "../registry_implementations/pdf/vertical_pane/tools/
 import { selectionTool } from "../registry_implementations/pdf/vertical_pane/tools/system/selection_tool";
 import { markRendererRegistry, registerMarkRendererType } from "./pdf/vertical_pane/mark_renderer_registry";
 import { registerToolRendererType, toolRendererRegistry } from "./pdf/vertical_pane/tool_renderer_registry";
-import { registerSlotRendererType } from "./pdf/slot_renderer_registry";
+import { registerSlotRendererType, slotRendererRegistry } from "./pdf/slot_renderer_registry";
 import { setupAllRegistries as setupAtmaRegistries } from "../../atma/capabilities_registry/setup";
 
 export function setupMarkRegistry() {
@@ -45,9 +45,11 @@ export function setupAllRegistries() {
     setupAtmaRegistries();
     setupMarkRegistry();
     setupToolRegistry();
-    registerSlotRendererType({
-        id: "verticalPane",
-        markRendererRegistry: markRendererRegistry,
-        toolRendererRegistry: toolRendererRegistry
-    } as any);
+    if (!slotRendererRegistry.has("verticalPane")) {
+        registerSlotRendererType({
+            id: "verticalPane",
+            markRendererRegistry: markRendererRegistry,
+            toolRendererRegistry: toolRendererRegistry
+        } as any);
+    }
 }

@@ -2,11 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Tldraw, DefaultToolbar, DefaultToolbarContent, TldrawUiMenuItem, useTools, useIsToolSelected } from 'tldraw';
 import 'tldraw/tldraw.css';
 import { Document, Page, pdfjs } from 'react-pdf';
-import {
-  loadSession, normalizeMarkCollection,
-  debounce, performRollingBackup,
-  createWhiteboard
-} from '../atma/storage/storage.js';
+import { debounce } from '../atma/services/session_service.ts';
 import HomeScreen, { loadSettings } from './HomeScreen.jsx';
 import { createUIStateStore } from './ui_state_store';
 import { createUIController } from './ui_controller';
@@ -15,7 +11,7 @@ import { inputAPI, outputAPI, queryAPI } from '../atma/singletons';
 
 
 import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './registry_implementations/whiteboard/tools/editing/handwriting_whiteboard_editing_tool.jsx';
-import { confirmDialog } from '../atma/platform_adapter/switch.ts';
+import { confirmDialog, convertFileSrc } from '../atma/platform_adapter/switch.ts';
 import { useShortcutToolState } from './window/useShortcutToolState.ts';
 import { getMarkDomainType } from '../atma/capabilities_registry/pdf/mark_domain_registry';
 import { getMarkRendererType } from './renderer_registry/pdf/vertical_pane/mark_renderer_registry';
@@ -50,7 +46,7 @@ const MARK_COLORS = [
 const markColor = (id) => MARK_COLORS[parseInt(id.replace('reg_', '').replace('mark_', ''), 10) % MARK_COLORS.length];
 
 function updateSectionWidths(marks) {
-  const normalizedMarks = normalizeMarkCollection(marks);
+  const normalizedMarks = Array.isArray(marks) ? marks : [];
   const sections = normalizedMarks.filter((mark) => mark.type === 'section');
   if (sections.length === 0) return normalizedMarks;
 
@@ -230,12 +226,12 @@ export default function Root() {
   if (!session) {
     return (
       <HomeScreen
-        onOpen={(pdfPath, whiteboard, settings, pdfLocalPath) => {
+        onOpen={(pdfPath, whiteboard, settings) => {
           if (whiteboard?.id) {
             setSession({ mode: 'whiteboard', whiteboardId: whiteboard.id, whiteboardName: whiteboard.name, settings });
             return;
           }
-          setSession({ mode: 'pdf', pdfPath, pdfLocalPath, settings });
+          setSession({ mode: 'pdf', pdfPath, settings });
         }}
       />
     );
@@ -250,7 +246,7 @@ export default function Root() {
       />
     );
   }
-  return <WorkspaceApp pdfPath={session.pdfPath} pdfLocalPath={session.pdfLocalPath} settings={session.settings} onHome={() => setSession(null)} />;
+  return <WorkspaceApp pdfPath={session.pdfPath} settings={session.settings} onHome={() => setSession(null)} />;
 }
 
 function WorkspaceHeader({ title, onHome, onBackup, savedAt, headerVisible, setHeaderVisible }) {
@@ -300,13 +296,7 @@ function WhiteboardOnlyApp({ whiteboardId, whiteboardName, settings, onHome }) {
     setTimeout(() => setToast(null), 3000);
   }, []);
   const handleBackup = async () => {
-    try {
-      const idx = await performRollingBackup();
-      setLastSavedAt(Date.now());
-      showToast(`Workspace backed up! (backup_${idx}.json)`, 'success');
-    } catch (e) {
-      showToast(e.message, 'error');
-    }
+    showToast(`Backup migrating to new SQLite architecture!`, 'success');
   };
 
   return (
@@ -325,7 +315,7 @@ function WhiteboardOnlyApp({ whiteboardId, whiteboardName, settings, onHome }) {
 }
 
 // ─── WorkspaceApp ─────────────────────────────────────────────────────────────
-function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
+function WorkspaceApp({ pdfPath, settings, onHome }) {
   const PDF_WIDTH = 800;
 
   // PDF - not UI or app state
@@ -334,13 +324,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
   const [pdfData, setPdfData]     = useState(null);
   const pdfScrollRef = useRef(null);
   const documentFile = useMemo(() => pdfData ? { data: pdfData } : null, [pdfData]);
-  const syncSession = useMemo(() => {
-    try {
-      return loadSession(pdfPath);
-    } catch {
-      return null;
-    }
-  }, [pdfPath]);
+  const syncSession = null;
 
   // UI Decoupled Store & Controller
   const uiStore = useMemo(() => createUIStateStore({
@@ -377,11 +361,11 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
   });
 
   const pdfDirectoryPath = useMemo(() => {
-    if (!pdfLocalPath) return null;
-    const slash = Math.max(pdfLocalPath.lastIndexOf('/'), pdfLocalPath.lastIndexOf('\\'));
+    if (!pdfPath) return null;
+    const slash = Math.max(pdfPath.lastIndexOf('/'), pdfPath.lastIndexOf('\\'));
     if (slash < 0) return null;
-    return pdfLocalPath.slice(0, slash);
-  }, [pdfLocalPath]);
+    return pdfPath.slice(0, slash);
+  }, [pdfPath]);
 
   // Rect, Lasso and Section Selections Common (High Frequency State)
   const [currentSelection, setCurrentSelection]  = useState(null);
@@ -424,7 +408,11 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
     }
 
     // 2. Detect additions & updates
-    for (const m of nextMarks) {
+    const uniqueNextMarks = Array.from(
+      new Map(nextMarks.map(u => [u.id, u])).values()
+    );
+
+    for (const m of  uniqueNextMarks) {
       const prev = prevMap.get(m.id);
       if (!prev) {
         inputAPI.addMark(m);
@@ -644,7 +632,7 @@ function WorkspaceApp({ pdfPath, pdfLocalPath, settings, onHome }) {
   useEffect(() => {
     let active = true;
     setPdfData(null);
-    fetch(pdfPath)
+    fetch(convertFileSrc(pdfPath))
       .then(res => res.arrayBuffer())
       .then(buffer => { if (active) setPdfData(new Uint8Array(buffer)); })
       .catch(err => console.error("Failed to load PDF to memory:", err));

@@ -1,20 +1,42 @@
 import { AppStateStore } from '../app_state_store';
 import { OutputAPIInterface } from '../api/output_api';
-import { loadSession as dbLoadSession, saveSession as dbSaveSession, debounce } from '../storage/storage.js';
 import { parseRawMark } from '../../shared_doman_models_and_dtos/factories';
 import { SessionDTO } from '../../shared_doman_models_and_dtos/dtos';
+import { LastUIStateRepository } from '../storage/repositories/LastUIStateRepository';
+import { MarkRepository } from '../storage/repositories/MarkRepository';
+import { ContentRepository } from '../storage/repositories/ContentRepository';
+
+export function debounce(fn: Function, ms: number) {
+  let timer: any = null;
+  const debounced = (...args: any[]) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+  debounced.flush = (...args: any[]) => {
+    clearTimeout(timer);
+    fn(...args);
+  };
+  return debounced;
+}
 
 // Debounce helper that reads the latest state from store only at execution time
-const debouncedPersist = debounce((store: AppStateStore) => {
+const debouncedPersist = debounce(async (store: AppStateStore) => {
   const state = store.getState();
   if (state.pdfPath) {
     try {
-      dbSaveSession(state.pdfPath, {
-        marks: Array.from(state.marks.values()),
+      //TODO: why is this even a logic:
+      // 1. Ensure the PDF content row exists
+      await ContentRepository.ensureContentExists(state.pdfPath, 'core.pdf', state.pdfPath);
+
+      // 2. Save UI State to Settings
+      await LastUIStateRepository.saveSessionState(state.pdfPath, {
         selectedMarkId: state.selectedMarkId,
         scrollTop: state.scrollTop,
         leftPct: state.leftPct
       });
+
+      // 3. Upsert Marks
+      await MarkRepository.upsertMarks(state.pdfPath, Array.from(state.marks.values()));
     } catch (err) {
       console.warn('[SessionService] Debounced session save failed:', err);
     }
@@ -23,7 +45,7 @@ const debouncedPersist = debounce((store: AppStateStore) => {
 
 export const sessionService = {
   /**
-   * Triggers or schedules session serialization to localStorage.
+   * Triggers or schedules session serialization to SQLite.
    */
   persist(store: AppStateStore, forceImmediate = false): void {
     if (forceImmediate) {
@@ -45,14 +67,14 @@ export const sessionService = {
       // Flush any pending save for the previous document before loading the new one
       this.persist(store, true);
 
-      const rawSession = dbLoadSession(pdfPath);
+      const rawSession = await LastUIStateRepository.loadSessionState(pdfPath) || {};
       const leftPct = rawSession?.leftPct ?? 50;
       const selectedMarkId = rawSession?.selectedMarkId ?? null;
       const scrollTop = rawSession?.scrollTop ?? 0;
-      const rawMarks = Array.isArray(rawSession?.marks) ? rawSession.marks : [];
       
+      const rawMarks = await MarkRepository.loadMarksByContentId(pdfPath);
       const parsedMarks = rawMarks.map(parseRawMark);
-      const marksMap = new Map(parsedMarks.map(m => [m.id, m]));
+      const marksMap = new Map(parsedMarks.map((m: any) => [m.id, m]));
 
       store.setState(draft => {
         draft.pdfPath = pdfPath;
@@ -77,62 +99,37 @@ export const sessionService = {
     }
   },
 
-  /**
-   * Updates the layout pane splitter percentage, updates the store, triggers storage persistence, and publishes SPLITTER_CHANGED.
-   */
   updateSplitter(
     store: AppStateStore,
     output: OutputAPIInterface,
     leftPct: number
   ): void {
-    store.setState(draft => {
-      draft.leftPct = leftPct;
-    });
-
+    store.setState(draft => { draft.leftPct = leftPct; });
     output.publish('SPLITTER_CHANGED', { leftPct });
-
-    // Queue debounced save to persistence
     this.persist(store, false);
   },
 
-  /**
-   * Sets the active selection mark ID, updates the store, triggers storage persistence, and publishes MARK_SELECTED.
-   */
   selectMark(
     store: AppStateStore,
     output: OutputAPIInterface,
     markId: string | null
   ): void {
-    store.setState(draft => {
-      draft.selectedMarkId = markId;
-    });
-
+    store.setState(draft => { draft.selectedMarkId = markId; });
     output.publish('MARK_SELECTED', { markId });
-
-    // Queue debounced save to persistence
     this.persist(store, false);
   },
 
-  /**
-   * Persists scroll position changes to the store and schedules a debounced storage save.
-   */
   updateScrollTop(
     store: AppStateStore,
     pdfPath: string,
     scrollTop: number
   ): void {
     store.setState(draft => {
-      if (draft.pdfPath === pdfPath) {
-        draft.scrollTop = scrollTop;
-      }
+      if (draft.pdfPath === pdfPath) { draft.scrollTop = scrollTop; }
     });
-
     this.persist(store, false);
   },
 
-  /**
-   * Flushes any pending writes immediately (e.g. on window unload/shutdown).
-   */
   flushPendingSave(store: AppStateStore): void {
     this.persist(store, true);
   }

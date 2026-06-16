@@ -3,17 +3,13 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import {
-  loadSession,
-  getAllData,
-  restoreAllData,
-  performRollingBackup,
-  createWhiteboard,
-} from '../atma/storage/storage.js';
+import { LastUIStateRepository } from '../atma/storage/repositories/LastUIStateRepository.ts';
+import { MarkRepository } from '../atma/storage/repositories/MarkRepository';
+import { WhiteboardRepository } from '../atma/storage/repositories/WhiteboardRepository';
+import { ContentRepository } from '../atma/storage/repositories/ContentRepository';
 import {
   basename,
   confirmDialog,
-  convertFileSrc,
   dirname,
   joinPath,
   pickFiles,
@@ -83,9 +79,7 @@ function timeAgo(ts) {
 }
 
 function markCount(path) {
-  if (!path || path.startsWith('whiteboard:')) return 0;
-  const s = loadSession(path);
-  return s?.marks?.length ?? 0;
+  return 0; // Deprecated synchronous markCount
 }
 
 const SETTINGS_KEY = 'lemmamap:settings';
@@ -166,9 +160,15 @@ function DropZone({ onBrowseClick, onFileDrop, disabled, showToast }) {
 
 function RecentCard({ entry, onOpen, onRemove }) {
   const [hovered, setHovered] = useState(false);
-  const marksCount = markCount(entry.path);
+  const [marksCount, setMarksCount] = useState(0);
+  const [session, setSession] = useState(null);
   const name = entry.name || entry.path.split('/').pop();
-  const session = loadSession(entry.path);
+
+  useEffect(() => {
+    if (!entry.path || entry.path.startsWith('whiteboard:')) return;
+    MarkRepository.loadMarksByContentId(entry.path).then(m => setMarksCount(m?.length || 0)).catch(() => {});
+    LastUIStateRepository.loadSessionState(entry.path).then(s => setSession(s)).catch(() => {});
+  }, [entry.path]);
 
   return (
     <div
@@ -282,39 +282,9 @@ function SettingsDrawer({ open: isOpen, onClose, settings, onChange, backupPath,
     flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #374151', background: 'transparent', color: '#d1d5db', fontSize: '11px', cursor: 'pointer', fontFamily: "'IBM Plex Mono', monospace",
   };
 
-  const handleExport = async () => {
-    try {
-      const data = await getAllData();
-      const jsonStr = JSON.stringify(data, null, 2);
-      const filePath = await saveFilePicker('LemmaMap Backup', ['json'], 'lemmamap_backup.json'); 
-
-      if (filePath) {
-        await writeTextFile(filePath, jsonStr);
-        showToast('Export successful!', 'success');
-      }
-    } catch (e) { console.error(e); showToast('Export failed: ' + e.message, 'error'); }
-  };
-
-  const handleImport = async () => {
-    try {
-      const filePath = await pickFiles('JSON Backup', ['json'], false);
-
-      if (filePath) {
-        const content = await readTextFile(filePath);
-        const data = JSON.parse(content);
-        await restoreAllData(data);
-        showToast('Import successful! Reloading LemmaMap...', 'success');
-        setTimeout(() => window.location.reload(), 1500);
-      }
-    } catch (e) { console.error(e); showToast('Import failed: ' + e.message, 'error'); }
-  };
-
-  const handleRollingBackup = async () => {
-    try {
-      const idx = await performRollingBackup();
-      showToast(`Rolling backup successful! (Created backup_${idx}.json)`, 'success');
-    } catch (e) { console.error(e); showToast('Backup failed: ' + e.message, 'error'); }
-  };
+  const handleExport = async () => { showToast('JSON Export is migrating to new DB architecture.', 'info'); };
+  const handleImport = async () => { showToast('JSON Import is migrating to new DB architecture.', 'info'); };
+  const handleRollingBackup = async () => { showToast('Rolling backup is migrating to new DB architecture.', 'info'); };
 
   const handleClearRecents = async () => {
     const yes = await confirmDialog('Clear all recent files? Whiteboard and session settings will be preserved.', 'Clear Recents');
@@ -491,7 +461,7 @@ export default function HomeScreen({ onOpen }) {
     try {
       const items = await readDir(dir);
       const fsEntries = items
-        .filter(i => i.isDirectory || (i.isFile && (i.name.toLowerCase().endsWith('.pdf') || i.name.toLowerCase().endsWith('.whiteboard.json'))))
+        .filter(i => i.isDirectory || (i.isFile && (i.name.toLowerCase().endsWith('.pdf') || i.name.toLowerCase().endsWith('.tldr'))))
         .sort((a, b) => {
           if (a.isDirectory && !b.isDirectory) return -1;
           if (!a.isDirectory && b.isDirectory) return 1;
@@ -580,20 +550,17 @@ export default function HomeScreen({ onOpen }) {
         setCurrentDir(nextDir);
       } else {
         const fullPath = await joinPath(currentDir, entry.name);
-        if (entry.name.toLowerCase().endsWith('.whiteboard.json')) {
-          const raw = await readTextFile(fullPath);
-          const meta = JSON.parse(raw);
-          if (!meta?.id) throw new Error('Invalid whiteboard file.');
-          const wbPath = `whiteboard:${meta.id}`;
-          const recentEntry = { path: wbPath, name: meta.name || entry.name.replace(/\.whiteboard\.json$/i, ''), openedAt: Date.now(), isWhiteboard: true, sourcePath: fullPath };
+        if (entry.name.toLowerCase().endsWith('.tldr')) {
+          const id = entry.name.replace(/\.tldr$/i, '');
+          const wbPath = `whiteboard:${id}`;
+          const recentEntry = { path: wbPath, name: id, openedAt: Date.now(), isWhiteboard: true, sourcePath: fullPath };
           pushRecent(recentEntry);
-          onOpen(null, { id: meta.id, name: meta.name || 'Whiteboard' }, settings, null);
+          onOpen(null, { id, name: id }, settings, null);
           return;
         }
-        const safeUrl = convertFileSrc(fullPath);
-        const recentEntry = { path: safeUrl, name: entry.name, openedAt: Date.now(), isLocal: true, sourcePath: fullPath };
+        const recentEntry = { path: fullPath, name: entry.name, openedAt: Date.now(), isLocal: true };
         pushRecent(recentEntry);
-        onOpen(safeUrl, null, settings, fullPath);
+        onOpen(fullPath, null, settings);
       }
     } catch (err) { console.error(err); }
   };
@@ -613,14 +580,16 @@ export default function HomeScreen({ onOpen }) {
       onOpen(null, { id, name: entry.name || 'Whiteboard' }, settings, null);
       return;
     }
-    onOpen(entry.path, null, settings, entry.sourcePath || null);
+    onOpen(entry.sourcePath || entry.path, null, settings);
   }, [onOpen, settings]);
 
   const confirmNewWhiteboard = async () => {
     const trimmed = newWhiteboardName.trim();
     if (!trimmed) return;
     try {
-      await createWhiteboard(trimmed, currentDir);
+      const id = `wb_${Date.now()}`;
+      await WhiteboardRepository.saveWhiteboard(id, { name: trimmed }, undefined, currentDir);
+      await ContentRepository.ensureContentExists(id, 'core.whiteboard', await joinPath(currentDir, `${id}.tldr`));
       setIsWhiteboardModalOpen(false);
       refreshDir(currentDir);
     } catch (err) {
@@ -632,10 +601,7 @@ export default function HomeScreen({ onOpen }) {
   const handleRemoveRecent = useCallback((path) => { removeRecent(path); setRecents(getRecents()); }, []);
 
   const triggerBackup = async () => {
-    try {
-      await performRollingBackup();
-      showToast('Backup successful!', 'success');
-    } catch (e) { showToast(e.message, 'error'); }
+    showToast('Backup migrating to new SQLite DB', 'info');
   };
 
   const fadeIn = (delay = 0) => ({
@@ -733,8 +699,8 @@ export default function HomeScreen({ onOpen }) {
                     entries.map(entry => (
                       <div key={`${entry.name}-fs`} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <button onClick={() => handleEntryClick(entry)} style={{ flex: 1, textAlign: 'left', padding: '12px', borderRadius: '6px', background: '#262a33', border: '1px solid #374151', color: '#e5e7eb', cursor: 'pointer', fontSize: '13px', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: '8px' }} onMouseEnter={e => { e.currentTarget.style.borderColor = '#3B82F6'; e.currentTarget.style.background = 'rgba(59,130,246,0.1)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = '#374151'; e.currentTarget.style.background = '#262a33'; }}>
-                          <span style={{ fontSize: '16px', opacity: 0.9 }}>{entry.isDirectory ? '📁' : entry.name.toLowerCase().endsWith('.whiteboard.json') ? '🧠' : '📄'}</span>
-                          <span>{entry.name.toLowerCase().endsWith('.whiteboard.json') ? entry.name.replace(/\.whiteboard\.json$/i, '') : entry.name}</span>
+                          <span style={{ fontSize: '16px', opacity: 0.9 }}>{entry.isDirectory ? '📁' : entry.name.toLowerCase().endsWith('.tldr') ? '🧠' : '📄'}</span>
+                          <span>{entry.name.toLowerCase().endsWith('.tldr') ? entry.name.replace(/\.tldr$/i, '') : entry.name}</span>
                         </button>
                         <button
                           title="Delete"
