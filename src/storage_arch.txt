@@ -1,0 +1,153 @@
+flowchart TD
+    %% Styling
+    classDef store fill:#673ab7,stroke:#333,stroke-width:2px,color:#fff
+    classDef api fill:#009688,stroke:#333,stroke-width:2px,color:#fff
+    classDef logic fill:#ff9800,stroke:#333,stroke-width:2px,color:#fff
+    classDef repodb fill:#f44336,stroke:#333,stroke-width:2px,color:#fff
+    classDef repofs fill:#e91e63,stroke:#333,stroke-width:2px,color:#fff
+    classDef query fill:#4caf50,stroke:#333,stroke-width:2px,color:#fff
+
+    %% -----------------------------------------
+    %% 1. In-Memory State
+    %% -----------------------------------------
+    subgraph State [AppStateStore - In-Memory]
+        Store["getState() / setState()
+        ---
+        State Variables (Managed by 4-Layer Architecture):
+        • workspace_layout: object
+        • tool_config: object
+        • zoom: number
+        • libraryPath: string | null
+        • leftPct: number
+        • scrollTop: number
+        • selectedMarkId: string | null
+        • marks: Map<string, MarkDTO>"]:::store
+    end
+
+    %% -----------------------------------------
+    %% 2. Read Pathway (QueryAPI)
+    %% -----------------------------------------
+    subgraph QAPI [QueryAPI - Read Operations]
+        Q1[getCurrentSession]:::query
+        Q2[getMark]:::query
+        Q3[getAllMarks]:::query
+        Q4[getWhiteboardSnapshot]:::query
+    end
+
+    Q1 -->|Reads| Store
+    Q2 -->|Reads| Store
+    Q3 -->|Reads| Store
+
+    %% -----------------------------------------
+    %% 3. Write Pathway (InputAPI)
+    %% -----------------------------------------
+    subgraph IAPI [InputAPI - Write Operations]
+        I1[loadSession]:::api
+        I2[updateSplitter]:::api
+        I3[selectMark]:::api
+        I4[updateScrollTop]:::api
+        I5[addMark]:::api
+        I6[updateMark]:::api
+        I7[deleteMark]:::api
+        I8[saveWhiteboardSnapshot]:::api
+        I9[flushSession]:::api
+    end
+
+    %% -----------------------------------------
+    %% 4. Business Logic Services
+    %% -----------------------------------------
+    subgraph Services [Business Logic Services]
+        subgraph SessionSvc [session_service.ts]
+            S_load[loadSession]:::logic
+            S_upSplit[updateSplitter]:::logic
+            S_selMark[selectMark]:::logic
+            S_upScroll[updateScrollTop]:::logic
+            S_persist[persist forceImmediate: boolean]:::logic
+            S_debounce((debouncedPersist 600ms Timer)):::logic
+            S_flush((debouncedPersist.flush Immediate)):::logic
+        end
+
+        subgraph MarkSvc [mark_service.ts]
+            M_add[addMark]:::logic
+            M_update[updateMark]:::logic
+            M_delete[deleteMark]:::logic
+            M_saveWB[saveWhiteboardSnapshot]:::logic
+        end
+    end
+
+    %% -----------------------------------------
+    %% 5. Repositories (Persistence Layer)
+    %% -----------------------------------------
+    subgraph Repositories [Storage Repositories]
+        R_Content[(ContentRepository Table: CONTENTS ensureContentExists)]:::repodb
+        R_State[(StateInitialValuesRepository Tables: DEFAULT/SPECIFIC_INITIAL_VALUES setSpecificValue)]:::repodb
+        R_Mark[(MarkRepository Table: MARKS upsertMarks)]:::repodb
+        
+        R_Whiteboard[(WhiteboardRepository FileSystem: .tldr files save/load/deleteWhiteboard)]:::repofs
+    end
+
+    %% =========================================
+    %% BINDINGS: InputAPI -> Services
+    %% =========================================
+    I1 --> S_load
+    I2 --> S_upSplit
+    I3 --> S_selMark
+    I4 --> S_upScroll
+    I9 -->|Calls persist true| S_persist
+
+    I5 --> M_add
+    I6 --> M_update
+    I7 --> M_delete
+    I8 --> M_saveWB
+
+    %% =========================================
+    %% BINDINGS: Services -> Store Mutations
+    %% =========================================
+    S_load -->|Mutates entire State| Store
+    S_upSplit -->|Mutates leftPct| Store
+    S_selMark -->|Mutates selectedMarkId| Store
+    S_upScroll -->|Mutates scrollTop| Store
+    
+    M_add -->|marks.set| Store
+    M_update -->|marks.set| Store
+    M_delete -->|marks.delete| Store
+
+    %% =========================================
+    %% BINDINGS: Services -> Persistence Trigger
+    %% =========================================
+    S_upSplit -->|persist false| S_persist
+    S_selMark -->|persist false| S_persist
+    S_upScroll -->|persist false| S_persist
+    
+    M_add -->|persist true| S_persist
+    M_update -->|persist false| S_persist
+    M_delete -->|persist true| S_persist
+
+    %% =========================================
+    %% BINDINGS: Timer Logic
+    %% =========================================
+    S_persist -->|forceImmediate=false| S_debounce
+    S_persist -->|forceImmediate=true| S_flush
+    
+    S_flush -->|Instantly Executes| ExecuteAll
+    S_debounce -.->|Executes after 600ms| ExecuteAll
+
+    %% =========================================
+    %% BINDINGS: Database Writes
+    %% =========================================
+    ExecuteAll[[Execute Save Transaction]]:::logic
+    
+    ExecuteAll -->|1. ensureContentExists| R_Content
+    ExecuteAll -->|2. setSpecificValue| R_State
+    ExecuteAll -->|3. upsertMarks| R_Mark
+
+    %% =========================================
+    %% BINDINGS: Whiteboard interactions
+    %% =========================================
+    M_saveWB -->|Saves snapshot directly| R_Whiteboard
+    M_delete -->|Deletes snapshot file| R_Whiteboard
+    
+    Q4 -->|Loads snapshot directly| R_Whiteboard
+    
+    %% HomeScreen bypassing everything
+    HomeScreen[HomeScreen.jsx] -->|Creates standalone whiteboard| R_Whiteboard

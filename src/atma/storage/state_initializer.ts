@@ -22,7 +22,10 @@ const SEED_DEFAULTS = [
     { key: 'selectedMarkId', scope: 'global', value: null, type: 'personalizable' },
     
     // Personalized (Document Scoped Content)
-    { key: 'marks', scope: 'global', value: [], type: 'personalizable' }
+    { key: 'marks', scope: 'global', value: [], type: 'personalizable' },
+
+    // Workspace Layout (Replaces SCREEN_INSTANCES and SLOT_INSTANCES)
+    { key: 'workspace_layout', scope: 'global', value: { screens: [] }, type: 'personalizable' }
 ];
 
 /**

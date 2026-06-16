@@ -1,0 +1,107 @@
+erDiagram
+    %% --------------------------------
+    %% JODO LAYER (The Modding Engine)
+    %% --------------------------------
+    JODO_CONTENT_TYPES ||--o{ CONTENTS : "defines schema for"
+    JODO_MARK_TYPES ||--o{ MARKS : "defines schema for"
+
+    %% --------------------------------
+    %% DATA LAYER (The User's Workspace)
+    %% --------------------------------
+    CONTENTS ||--o{ MARKS : "contains"
+    MARKS ||--o{ LINKS : "source/target"
+    
+    CONTENTS ||--o{ CONTENT_TAGS : "tagged with"
+    TAGS ||--o{ CONTENT_TAGS : "applied to"
+    
+    MARKS ||--o{ MARK_TAGS : "tagged with"
+    TAGS ||--o{ MARK_TAGS : "applied to"
+
+    %% Table Definitions (Data Layer)
+    CONTENTS {
+        TEXT id PK "UUID"
+        TEXT jodo_content_type FK "e.g., 'core.pdf'"
+        TEXT file_path "Relative path to original file"
+    }
+
+    MARKS {
+        TEXT id PK "UUID"
+        TEXT content_id FK "Which content this belongs to"
+        TEXT jodo_mark_type FK "e.g., 'core.rect'"
+        TEXT payload "JSON string of specific coords"
+    }
+
+    LINKS {
+        TEXT id PK "UUID"
+        TEXT source_mark_id FK
+        TEXT target_mark_id FK
+        TEXT label "Optional edge label"
+    }
+
+    TAGS {
+        TEXT id PK "UUID"
+        TEXT name "e.g., 'urgent', 'thesis'"
+        TEXT color_hex
+    }
+
+    CONTENT_TAGS {
+        TEXT content_id FK
+        TEXT tag_id FK
+    }
+
+    MARK_TAGS {
+        TEXT mark_id FK
+        TEXT tag_id FK
+    }
+
+    %% --------------------------------
+    %% STATE INITIALIZATION LAYER
+    %% --------------------------------
+
+    DOCUMENT_UI_STATES {
+        TEXT key PK "e.g., 'document:123:zoom'"
+        TEXT value_json "JSON string of session state"
+    }
+
+    SETTINGS {
+        TEXT key PK "e.g., 'global_theme'"
+        TEXT value_json "JSON string of global setting"
+    }
+
+    DEFAULT_INITIAL_VALUES {
+        TEXT key PK "e.g., 'workspace_layout', 'tool_config:core.pen'"
+        TEXT scope PK "e.g., 'global', 'content:pdf123'"
+        TEXT value_json "Scoped Presets"
+        TEXT value_hash "Hash used to detect preset changes"
+        TEXT type "e.g., 'defaulted' or 'personalizable'"
+    }
+
+    SPECIFIC_INITIAL_VALUES {
+        TEXT key PK
+        TEXT scope PK
+        TEXT value_json "Personalized Session Restoration"
+        TEXT based_on_default_hash "Resets if out of sync with Scoped Preset"
+    }
+    
+    %% Jodo Table Definitions (Plugin Metadata)
+    JODO_CONTENT_TYPES {
+        TEXT id PK "e.g., 'core.pdf'"
+        TEXT name "e.g., 'PDF Document'"
+        TEXT version "e.g., '1.0.0'"
+        TEXT author 
+        BOOLEAN is_prebuilt 
+        BOOLEAN is_enabled 
+        TEXT plugin_dir 
+        TEXT capabilities_json 
+    }
+
+    JODO_MARK_TYPES {
+        TEXT id PK "e.g., 'core.rect'"
+        TEXT name "e.g., 'Rectangle'"
+        TEXT version "e.g., '1.0.0'"
+        TEXT author 
+        BOOLEAN is_prebuilt 
+        BOOLEAN is_enabled 
+        TEXT plugin_dir 
+        TEXT capabilities_json 
+    }
