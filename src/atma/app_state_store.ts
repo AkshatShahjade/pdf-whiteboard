@@ -13,6 +13,18 @@ export interface AppState {
   marks: Map<string, MarkDTO>;
 }
 
+export const DEFAULT_APP_STATE: Omit<AppState, 'marks'> = {
+  workspace_layout: { screens: [] },
+  tool_config: {},
+  zoom: 1.0,
+  libraryPath: null,
+  tool: 'select',
+  pdfPath: null,
+  leftPct: 50,
+  selectedMarkId: null,
+  scrollTop: 0,
+};
+
 export interface AppStateStore {
   getState(): AppState;
   setState(updater: (state: AppState) => void): void;
@@ -21,15 +33,7 @@ export interface AppStateStore {
 
 export function createAppStateStore(initialState?: Partial<AppState>): AppStateStore {
   let state: AppState = {
-    workspace_layout: { screens: [] },
-    tool_config: {},
-    zoom: 1.0,
-    libraryPath: null,
-    tool: 'select',
-    pdfPath: null,
-    leftPct: 50,
-    selectedMarkId: null,
-    scrollTop: 0,
+    ...DEFAULT_APP_STATE,
     marks: new Map(),
     ...initialState
   };

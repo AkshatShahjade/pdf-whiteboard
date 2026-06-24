@@ -22,7 +22,7 @@ direction TB
         direction TB
         subgraph UI["UI Layer"]
             
-            N1["UI State (Client State)"]
+            N1["UI State (volatile only)"]
             N2["UI Controller"]
             N3["UI React Components"]
             N5["Component Pool"]
@@ -32,7 +32,7 @@ direction TB
                 D8["Renderer Registries"]
             end
         end
-        subgraph BACK["Backend"]
+        subgraph BACK["Client Backend"]
             subgraph "Orchestration"
                 SERV["Data Services (Mark, tldraw)"]
                 SYNC["StateSyncService (Background Subscriber)"]

@@ -8,6 +8,7 @@ import { createUIStateStore } from './ui_state_store';
 import { createUIController } from './ui_controller';
 import { useUIState } from './useUIState';
 import { inputAPI, outputAPI, queryAPI } from '../atma/singletons';
+import { DEFAULT_APP_STATE } from '../atma/app_state_store';
 
 
 import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './registry_implementations/whiteboard/tools/editing/handwriting_whiteboard_editing_tool.jsx';
@@ -326,18 +327,13 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
   const [pdfData, setPdfData]     = useState(null);
   const pdfScrollRef = useRef(null);
   const documentFile = useMemo(() => pdfData ? { data: pdfData } : null, [pdfData]);
-  const syncSession = null;
-
   // UI Decoupled Store & Controller
   const uiStore = useMemo(() => createUIStateStore({
-    leftPct: syncSession?.leftPct ?? settings?.defaultSplit ?? 50,
-    zoom: syncSession?.zoom ?? 1.0,
-    selectedMarkId: syncSession?.selectedMarkId ?? null,
-    tool: syncSession?.tool ?? 'select',
-    marks: syncSession?.marks ?? [],
+    ...DEFAULT_APP_STATE,
+    leftPct: settings?.defaultSplit ?? DEFAULT_APP_STATE.leftPct,
+    marks: [],
     pdfPath: pdfPath,
-    scrollTop: syncSession?.scrollTop ?? 0,
-  }), [syncSession, pdfPath, settings]);
+  }), [pdfPath, settings]);
 
   const uiController = useMemo(() => createUIController(uiStore), [uiStore]);
   useEffect(() => {
@@ -356,7 +352,7 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
   // Shortcut Tool state adapter
   const { manager: shortcutManager, state: shortcutState, refreshAvailableWhiteboards } = useShortcutToolState({
     settings,
-    restoredSession: syncSession,
+    restoredSession: null,
     externalActions: { 
       setTool: uiController.setTool, 
       setSelectedMarkId: uiController.setSelectedMarkId 
@@ -598,11 +594,15 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
 
   const scrollRestored = useRef(false);
   useEffect(() => {
-    if (pdfReady && !scrollRestored.current && pdfScrollRef.current && syncSession?.scrollTop) {
-      pdfScrollRef.current.scrollTop = syncSession.scrollTop;
+    scrollRestored.current = false;
+  }, [pdfPath]);
+
+  useEffect(() => {
+    if (pdfReady && !scrollRestored.current && pdfScrollRef.current && uiState.scrollTop) {
+      pdfScrollRef.current.scrollTop = uiState.scrollTop;
       scrollRestored.current = true;
     }
-  }, [pdfReady, syncSession]);
+  }, [pdfReady, uiState.scrollTop]);
 
   const handleScroll = useCallback(() => {
     if (pdfScrollRef.current) {

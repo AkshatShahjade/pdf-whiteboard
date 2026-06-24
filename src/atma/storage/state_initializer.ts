@@ -1,5 +1,6 @@
 import { StateInitialValuesRepository } from './repositories/StateInitialValuesRepository';
 import { tauriSqlAdapter } from './storage_implementations/tauri_sqlite';
+import { DEFAULT_APP_STATE } from '../app_state_store';
 
 /**
  * Developer Seed Data.
@@ -9,24 +10,24 @@ import { tauriSqlAdapter } from './storage_implementations/tauri_sqlite';
  */
 const SEED_DEFAULTS = [
     // Defaulted
-    { key: 'tool', scope: 'global', value: 'select', type: 'defaulted' },
+    { key: 'tool', scope: 'global', value: DEFAULT_APP_STATE.tool, type: 'defaulted' },
     { key: 'currentDir', scope: 'global', value: null, type: 'defaulted' }, // Falls back to libraryPath's specific value dynamically
     
     // Personalized
-    { key: 'zoom', scope: 'global', value: 1.0, type: 'personalizable' },
-    { key: 'libraryPath', scope: 'global', value: null, type: 'personalizable' },
-    { key: 'backupPath', scope: 'global', value: null, type: 'personalizable' },
+    { key: 'zoom', scope: 'global', value: DEFAULT_APP_STATE.zoom, type: 'personalizable' },
+    { key: 'libraryPath', scope: 'global', value: DEFAULT_APP_STATE.libraryPath, type: 'personalizable' },
+    { key: 'backupPath', scope: 'global', value: DEFAULT_APP_STATE.backupPath, type: 'personalizable' },
     
     // Personalized (Document Scoped UI)
-    { key: 'leftPct', scope: 'global', value: 50, type: 'personalizable' },
-    { key: 'scrollTop', scope: 'global', value: 0, type: 'personalizable' },
-    { key: 'selectedMarkId', scope: 'global', value: null, type: 'personalizable' },
+    { key: 'leftPct', scope: 'global', value: DEFAULT_APP_STATE.leftPct, type: 'personalizable' },
+    { key: 'scrollTop', scope: 'global', value: DEFAULT_APP_STATE.scrollTop, type: 'personalizable' },
+    { key: 'selectedMarkId', scope: 'global', value: DEFAULT_APP_STATE.selectedMarkId, type: 'personalizable' },
     
     // Personalized (Document Scoped Content)
     { key: 'marks', scope: 'global', value: [], type: 'personalizable' },
 
     // Workspace Layout (Replaces SCREEN_INSTANCES and SLOT_INSTANCES)
-    { key: 'workspace_layout', scope: 'global', value: { screens: [] }, type: 'personalizable' },
+    { key: 'workspace_layout', scope: 'global', value: DEFAULT_APP_STATE.workspace_layout, type: 'personalizable' },
 
     // Global Settings & Recents
     { key: 'settings', scope: 'global', value: { defaultSplit: 50, theme: 'dark', autosaveMs: 800, maxGlobalPdfTools: 8, defaultTool: 'draw' }, type: 'personalizable' },

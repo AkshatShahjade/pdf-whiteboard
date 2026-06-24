@@ -28,7 +28,7 @@ export function createUIController(store: UIStateStore): UIController {
     return {
         // ─── UI Actions (Write/Command Path Delegates) ────────────────────────────
         setZoom: (zoom) => {
-            store.setState({ zoom });
+            inputAPI.updateZoom(zoom);
         },
         setLeftPct: (leftPct) => {
             inputAPI.updateSplitter(leftPct);
@@ -45,7 +45,7 @@ export function createUIController(store: UIStateStore): UIController {
             store.setState({ pageInput });
         },
         setTool: (tool) => {
-            store.setState({ tool });
+            inputAPI.updateTool(tool);
         },
         setSelectedMarkId: (selectedMarkId) => {
             inputAPI.selectMark(selectedMarkId);

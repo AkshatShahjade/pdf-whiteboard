@@ -20,6 +20,8 @@ export interface InputAPIInterface {
   saveRecents(recents: any[]): Promise<void>;
   saveLibraryPath(libraryPath: string | null): Promise<void>;
   saveBackupPath(backupPath: string | null): Promise<void>;
+  updateZoom(zoom: number): void;
+  updateTool(tool: string): void;
 }
 
 /**
@@ -84,6 +86,14 @@ export function createInputAPI(
 
     async saveBackupPath(backupPath: string | null): Promise<void> {
       await StateInitialValuesRepository.setSpecificValue('backupPath', ['global'], backupPath);
+    },
+
+    updateZoom(zoom: number): void {
+      store.setState(draft => { draft.zoom = zoom; });
+    },
+
+    updateTool(tool: string): void {
+      store.setState(draft => { draft.tool = tool; });
     }
   };
 }
