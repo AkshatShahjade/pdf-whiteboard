@@ -9,7 +9,10 @@ import { selectionTool } from "../registry_implementations/pdf/vertical_pane/too
 import { markRendererRegistry, registerMarkRendererType } from "./pdf/vertical_pane/mark_renderer_registry";
 import { registerToolRendererType, toolRendererRegistry } from "./pdf/vertical_pane/tool_renderer_registry";
 import { registerSlotRendererType, slotRendererRegistry } from "./pdf/slot_renderer_registry";
+import { contentRendererRegistry, registerContentRendererType } from "./content_renderer_registry";
 import { setupAllRegistries as setupAtmaRegistries } from "../../atma/capabilities_registry/setup";
+import { pdfContentRenderer } from "./content/pdf_content_renderer";
+import { whiteboardContentRenderer } from "./content/whiteboard_content_renderer";
 
 export function setupMarkRegistry() {
     if (!markRendererRegistry.has(lassoMark.id)) {
@@ -41,10 +44,20 @@ export function setupToolRegistry() {
     }
 }
 
+export function setupContentRendererRegistry() {
+    if (!contentRendererRegistry.has(pdfContentRenderer.id)) {
+        registerContentRendererType(pdfContentRenderer);
+    }
+    if (!contentRendererRegistry.has(whiteboardContentRenderer.id)) {
+        registerContentRendererType(whiteboardContentRenderer);
+    }
+}
+
 export function setupAllRegistries() {
     setupAtmaRegistries();
     setupMarkRegistry();
     setupToolRegistry();
+    setupContentRendererRegistry();
     if (!slotRendererRegistry.has("verticalPane")) {
         registerSlotRendererType({
             id: "verticalPane",

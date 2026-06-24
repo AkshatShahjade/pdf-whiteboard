@@ -1,6 +1,4 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Tldraw, DefaultToolbar, DefaultToolbarContent, TldrawUiMenuItem, useTools, useIsToolSelected } from 'tldraw';
-import 'tldraw/tldraw.css';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { debounce } from '../atma/services/state_sync_service';
 import HomeScreen from './HomeScreen.jsx';
@@ -9,9 +7,8 @@ import { createUIController } from './ui_controller';
 import { useUIState } from './useUIState';
 import { inputAPI, outputAPI, queryAPI } from '../atma/singletons';
 import { DEFAULT_APP_STATE } from '../atma/app_state_store';
-
-
-import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './registry_implementations/whiteboard/tools/editing/handwriting_whiteboard_editing_tool.jsx';
+import { whiteboardContentRenderer } from './renderer_registry/content/whiteboard_content_renderer';
+import { pdfContentRenderer } from './renderer_registry/content/pdf_content_renderer';
 import { confirmDialog, convertFileSrc, joinPath } from '../atma/platform_adapter/switch.ts';
 import { WhiteboardRepository } from '../atma/storage/repositories/WhiteboardRepository';
 import { ContentRepository } from '../atma/storage/repositories/ContentRepository';
@@ -26,11 +23,6 @@ import { getToolRendererByHotkey as getToolByHotkey, getToolRendererType as getT
 setupAllRegistries(); //TODO, find proper place
 
 
-const handwritingAssetUrls = {
-  icons: {
-    'tool-handwriting': 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0zIDEyYzMtMyAzIDMgNiAwczMtMyA2IDAgMyAzIDYgMCIvPjwvc3ZnPg==',
-  },
-};
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -95,30 +87,7 @@ function updateSectionWidths(marks) {
   return changed ? nextMarks : normalizedMarks;
 }
 
-// ─── LazyPage Component ────────────────────────────────────────────────────────
-function LazyPage({ pageNumber, width, scale }) {
-  const [isVisible, setIsVisible] = useState(pageNumber <= 2);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setIsVisible(true); },
-      { rootMargin: '800px 0px' }
-    );
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, []);
-
-  const placeholderHeight = width * scale * 1.414;
-
-  return (
-    <div ref={ref} style={{ minHeight: placeholderHeight, position: 'relative', borderBottom: '2px solid rgba(0, 0, 0, 0.92)' }}>
-      {isVisible && (
-        <Page pageNumber={pageNumber} width={width} scale={scale} renderTextLayer={false} renderAnnotationLayer={false} />
-      )}
-    </div>
-  );
-}
+// LazyPage moved to pdf_content_renderer.tsx
 
 // OOGA BOOGA
 // ─── SaveIndicator ────────────────────────────────────────────────────────────
@@ -140,87 +109,7 @@ function SaveIndicator({ savedAt }) {
   );
 }
 
-// ─── WhiteboardPane ───────────────────────────────────────────────────────────
-function WhiteboardPane({ markId, settings }) {
-  const [snapshot, setSnapshot] = useState(null);
-  const [loaded, setLoaded]     = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    queryAPI.getWhiteboardSnapshot(markId).then((snap) => {
-      if (!cancelled) {
-        setSnapshot(snap ?? undefined);
-        setLoaded(true);
-      }
-    });
-    return () => { cancelled = true; };
-  }, [markId]);
-
-  if (!loaded) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', background: '#1c1f26', color: '#9ca3af', fontSize: '12px', fontFamily: "'IBM Plex Mono', monospace" }}>
-        loading workspace…
-      </div>
-    );
-  }
-
-  return <TldrawWithPersistence markId={markId} initialSnapshot={snapshot} settings={settings} />;
-}
-
-function TldrawWithPersistence({ markId, initialSnapshot, settings }) {
-  const debouncedSave = useMemo(() => debounce((snap) => inputAPI.saveWhiteboardSnapshot(markId, snap), 800), [markId]);
-
-  const handleMount = useCallback((editor) => {
-    if (initialSnapshot) {
-      try { editor.loadSnapshot(initialSnapshot); } catch (err) { console.warn(err); }
-    }
-    editor.setCurrentTool(settings?.defaultTool || 'draw');
-    editor.updateInstanceState({ exportBackground: false });
-
-    // (The invalid updateUserPreferences call that caused the crash was removed from here)
-
-    const unsub = editor.store.listen(
-      () => { debouncedSave(editor.getSnapshot()); },
-      { source: 'user', scope: 'document' }
-    );
-    return () => { unsub(); debouncedSave.flush(editor.getSnapshot()); };
-  }, [initialSnapshot, debouncedSave, markId]);
-
-  const handwritingComponents = {
-    Toolbar: (props) => {
-      const tools = useTools();
-      const isSelected = useIsToolSelected(tools['handwriting']);
-      return (
-        <DefaultToolbar {...props}>
-          <TldrawUiMenuItem {...tools['handwriting']} isSelected={isSelected} />
-          <DefaultToolbarContent />
-        </DefaultToolbar>
-      );
-    },
-  };
-
-  return (
-    <>
-      <style>{`
-        /* Overrides tldraw's default internal font variables */
-        .tl-container {
-          --tl-font-draw: 'Helvetica', Arial, sans-serif;
-          --tl-font-sans: 'Helvetica', Arial, sans-serif;
-          --tl-font-serif: 'Helvetica', Arial, sans-serif;
-          --tl-font-mono: 'Helvetica', Arial, sans-serif;
-        }
-      `}</style>
-      <Tldraw
-        onMount={handleMount}
-        tools={[HandwritingTool]}
-        shapeUtils={[HandwritingShapeUtil]}
-        overrides={handwritingToolUiOverrides}
-        assetUrls={handwritingAssetUrls}
-        components={handwritingComponents}
-      />
-    </>
-  );
-}
+// WhiteboardPane is now imported from './renderer_registry/content/whiteboard_content_renderer'
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 export default function Root() {
@@ -249,7 +138,7 @@ export default function Root() {
       />
     );
   }
-  return <WorkspaceApp pdfPath={session.pdfPath} settings={session.settings} onHome={() => setSession(null)} />;
+  return <WorkspaceContainer pdfPath={session.pdfPath} settings={session.settings} onHome={() => setSession(null)} />;
 }
 
 function WorkspaceHeader({ title, onHome, onBackup, savedAt, headerVisible, setHeaderVisible }) {
@@ -311,22 +200,20 @@ function WhiteboardOnlyApp({ whiteboardId, whiteboardName, settings, onHome }) {
       )}
       <WorkspaceHeader title={`Whiteboard: ${whiteboardName || 'Untitled'}`} onHome={onHome} onBackup={handleBackup} savedAt={lastSavedAt} headerVisible={headerVisible} setHeaderVisible={setHeaderVisible} />
       <div style={{ width: '100%', height: '100%' }}>
-        <WhiteboardPane markId={whiteboardId} settings={settings} />
+        {whiteboardContentRenderer.Component({
+          contentId: whiteboardId,
+          settings
+        })}
       </div>
     </div>
   );
 }
 
-// ─── WorkspaceApp ─────────────────────────────────────────────────────────────
-function WorkspaceApp({ pdfPath, settings, onHome }) {
+// ─── WorkspaceContainer ─────────────────────────────────────────────────────────────
+function WorkspaceContainer({ pdfPath, settings, onHome }) {
   const PDF_WIDTH = 800;
 
-  // PDF - not UI or app state
-  const [numPages, setNumPages]   = useState(null);
-  const [pdfReady, setPdfReady]   = useState(false);
-  const [pdfData, setPdfData]     = useState(null);
-  const pdfScrollRef = useRef(null);
-  const documentFile = useMemo(() => pdfData ? { data: pdfData } : null, [pdfData]);
+  // PDF visual state and refs have been moved to pdf_content_renderer
   // UI Decoupled Store & Controller
   const uiStore = useMemo(() => createUIStateStore({
     ...DEFAULT_APP_STATE,
@@ -371,14 +258,9 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
   const [movingMark, setMovingMark] = useState(null);
 
   const [lastSavedAt, setLastSavedAt] = useState(null);
-  const pdfContentRef = useRef(null);
-
-  const mousePosRef = useRef({ x: 0, y: 0 });
-  const scrollAnimRef = useRef(null);
+  // PDF pointer refs moved to pdf_content_renderer
   const dragStateRef = useRef({ currentSelection, movingMark });
   const pendingToolActivationReasonRef = useRef('normal');
-
-  const zoomTimeoutRef = useRef(null);
 
   // Toast Helper utilizing decoupled controller
   const showToast = useCallback((msg, type = 'info') => {
@@ -446,39 +328,7 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
     });
   }, [uiState.tool]);
 
-  // Native Ctrl+Scroll for zooming / Shift+Scroll for horizontal pan
-  useEffect(() => {
-    const pdfWrapper = pdfScrollRef.current;
-    if (!pdfWrapper) return;
-
-    const handleWheel = (e) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-
-        if (!zoomTimeoutRef.current) {
-          zoomTimeoutRef.current = setTimeout(() => {
-            zoomTimeoutRef.current = null;
-          }, 250);
-          if (e.deltaY > 0) {
-            uiController.setZoom(Math.max(0.5, uiState.zoom - 0.25));
-          } else {
-            uiController.setZoom(Math.min(3.0, uiState.zoom + 0.25));
-          }
-        }
-      } else if (e.shiftKey) {
-        if (e.deltaY !== 0 && e.deltaX === 0) {
-          e.preventDefault();
-          pdfWrapper.scrollLeft += e.deltaY;
-        }
-      }
-    };
-
-    pdfWrapper.addEventListener('wheel', handleWheel, { passive: false });
-    return () => {
-      pdfWrapper.removeEventListener('wheel', handleWheel);
-      if (zoomTimeoutRef.current) clearTimeout(zoomTimeoutRef.current);
-    };
-  }, [uiState.zoom, uiController]);
+  // Native Ctrl+Scroll and panning moved to pdf_content_renderer
 
   // Keyboard Shortcuts (Capture Phase)
   const handleKeyDown = useCallback((e) => {
@@ -592,39 +442,14 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
     return () => window.removeEventListener('beforeunload', onUnload);
   }, []);
 
-  const scrollRestored = useRef(false);
-  useEffect(() => {
-    scrollRestored.current = false;
-  }, [pdfPath]);
-
-  useEffect(() => {
-    if (pdfReady && !scrollRestored.current && pdfScrollRef.current && uiState.scrollTop) {
-      pdfScrollRef.current.scrollTop = uiState.scrollTop;
-      scrollRestored.current = true;
-    }
-  }, [pdfReady, uiState.scrollTop]);
-
-  const handleScroll = useCallback(() => {
-    if (pdfScrollRef.current) {
-      inputAPI.updateScrollTop(pdfPath, pdfScrollRef.current.scrollTop);
-      // TODO add support for custom sized pages not only A4
-      const pageHeight = PDF_WIDTH * uiState.zoom * 1.414;
-      const newPage = Math.floor(pdfScrollRef.current.scrollTop / pageHeight) + 1;
-      uiController.setCurrentPage(newPage);
-      if (document.activeElement?.id !== 'page-input') {
-        uiController.setPageInput(String(newPage));
-      }
-    }
-  }, [pdfPath, uiState.zoom, uiController]);
+  // Scroll restoration moved to pdf_content_renderer
 
   const handlePageSubmit = (e) => {
     if (e.key === 'Enter') {
       const target = parseInt(uiState.pageInput);
-      if (!isNaN(target) && target > 0 && target <= (numPages || 1)) {
-        if (pdfScrollRef.current) {
-          const pageHeight = PDF_WIDTH * uiState.zoom * 1.414;
-          pdfScrollRef.current.scrollTop = (target - 1) * pageHeight;
-        }
+      if (!isNaN(target) && target > 0) {
+        // Scroll is now handled via state updates, though direct DOM manipulation 
+        // in WorkWindow is removed. We'll leave the pageInput update.
       } else {
         uiController.setPageInput(String(uiState.currentPage));
       }
@@ -632,15 +457,7 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
     }
   };
 
-  useEffect(() => {
-    let active = true;
-    setPdfData(null);
-    fetch(convertFileSrc(pdfPath))
-      .then(res => res.arrayBuffer())
-      .then(buffer => { if (active) setPdfData(new Uint8Array(buffer)); })
-      .catch(err => console.error("Failed to load PDF to memory:", err));
-    return () => { active = false; };
-  }, [pdfPath]);
+  // PDF Data Fetching moved to pdf_content_renderer
 
   useEffect(() => {
     const onMove = (e) => {
@@ -655,206 +472,9 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
   }, [isResizing, uiController]);
 
-  const getUnscaledCoordsFromClient = useCallback((clientX, clientY) => {
-    if (!pdfContentRef.current) return { x: 0, y: 0 };
-    const rect = pdfContentRef.current.getBoundingClientRect();
-    return { x: (clientX - rect.left) / uiState.zoom, y: (clientY - rect.top) / uiState.zoom };
-  }, [uiState.zoom]);
+  // PDF Pointer Events, Coordinates, and Scroll Anim moved to pdf_content_renderer
 
-  const getUnscaledCoords = useCallback((e) => {
-    return getUnscaledCoordsFromClient(e.clientX, e.clientY);
-  }, [getUnscaledCoordsFromClient]);
-
-  const handleDivPointerDown = useCallback((e) => {
-    if (e.button !== 0) return;
-    const coords = getUnscaledCoords(e);
-
-    if (e.ctrlKey || e.metaKey) {
-      const hit = [...marks].reverse().find((r) => {
-        const selectionContext = {PDFWIDTH: PDF_WIDTH, zoom: uiState.zoom};
-        
-        return getMarkDomainType(r.type).hasSelectedBorder(coords, r, selectionContext);
-      });
-
-      if (hit) {
-        e.preventDefault();
-        pendingToolActivationReasonRef.current = 'border-edit';
-        getMarkRendererType(hit.type).onBorderEditStart?.({
-          hit,
-          coords,
-          actions: {
-            setTool: uiController.setTool,
-            setCurrentSelection,
-            setEditingSectionId: uiController.setEditingSectionId,
-            setEditingShapeId: uiController.setEditingShapeId,
-            setShapeBackup: uiController.setShapeBackup,
-            setMovingRegion: setMovingMark,
-            setSectionTarget: uiController.setSectionTarget,
-          },
-        });
-      }
-      return;
-    }
-
-    const toolType = getToolType(uiState.tool);
-    const handled = toolType.onPointerDown?.({
-      e,
-      coords,
-      state: {
-        currentSelection,
-        editingShapeId: uiState.editingShapeId,
-        sectionTarget: uiState.sectionTarget,
-        tool: uiState.tool,
-        zoom: uiState.zoom,
-      },
-      actions: {
-        setCurrentSelection,
-        setEditingShapeId: uiController.setEditingShapeId,
-        setShapeBackup: uiController.setShapeBackup,
-        setSectionTarget: uiController.setSectionTarget,
-        setMovingRegion: setMovingMark,
-        setTool: uiController.setTool,
-        setMarksWithSectionWidths,
-        setSelectedMarkId: uiController.setSelectedMarkId,
-      },
-    });
-
-    if (handled) return;
-
-  }, [uiState, uiController, marks, getUnscaledCoords, currentSelection, setMarksWithSectionWidths]);
-
-  const handleDivPointerMove = useCallback((e) => {
-    mousePosRef.current = { x: e.clientX, y: e.clientY };
-    const coords = getUnscaledCoords(e);
-    getToolType(uiState.tool).onPointerMove?.({
-      coords,
-      state: {
-        currentSelection,
-        editingShapeId: uiState.editingShapeId,
-        tool: uiState.tool,
-        zoom: uiState.zoom,
-      },
-      actions: {
-        setCurrentSelection,
-      },
-    });
-
-    if (movingMark) {
-      setMarksWithSectionWidths((prev) =>
-        prev.map((r) => {
-          if (r.id === movingMark.id) {
-            if (r.type === 'section') return { ...r, y: coords.y - movingMark.offsetY };
-            return { ...r, x: coords.x - movingMark.offsetX, y: coords.y - movingMark.offsetY };
-          }
-          return r;
-        })
-      );
-    }
-  }, [currentSelection, movingMark, getUnscaledCoords, uiState, setMarksWithSectionWidths]);
-
-  const handleDivPointerUp = useCallback((e) => {
-    if (e?.currentTarget?.hasPointerCapture?.(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
-    if(currentSelection && getMarkRendererType(currentSelection.type).isDrawable){
-      getToolType(currentSelection.type).onPointerUp?.({
-        currentSelection,
-        editingShapeId: uiState.editingShapeId,
-        tool: uiState.tool,
-        zoom: uiState.zoom,
-        actions: {
-          setCurrentSelection,
-          setMarksWithSectionWidths,
-          setSelectedMarkId: uiController.setSelectedMarkId,
-        },
-      });
-    }
-
-    setMovingMark(null);
-  }, [currentSelection, uiState, uiController, setMarksWithSectionWidths]);
-
-  useEffect(() => {
-    const isDragging = !!currentSelection || !!movingMark 
-
-    if (!isDragging) {
-      if (scrollAnimRef.current) cancelAnimationFrame(scrollAnimRef.current);
-      return;
-    }
-
-    const scrollStep = () => {
-      if (pdfScrollRef.current) {
-        const rect = pdfScrollRef.current.getBoundingClientRect();
-        const edgeThreshold = 80;
-        const maxSpeed = 22;
-        let scrolled = false;
-        const { y: clientY, x: clientX } = mousePosRef.current;
-
-        if (clientY < rect.top + edgeThreshold) {
-          const intensity = 1 - Math.max(0, clientY - rect.top) / edgeThreshold;
-          pdfScrollRef.current.scrollTop -= maxSpeed * Math.pow(intensity, 1.5);
-          scrolled = true;
-        } else if (clientY > rect.bottom - edgeThreshold) {
-          const intensity = 1 - Math.max(0, rect.bottom - clientY) / edgeThreshold;
-          pdfScrollRef.current.scrollTop += maxSpeed * Math.pow(intensity, 1.5);
-          scrolled = true;
-        }
-
-        if (scrolled) {
-          const coords = getUnscaledCoordsFromClient(clientX, clientY);
-          const state = dragStateRef.current;
-          getToolType(uiState.tool).onPointerMove?.({
-            coords,
-            state: {
-              currentSelection: state.currentSelection,
-              editingShapeId: uiState.editingShapeId,
-              tool: uiState.tool,
-              zoom: uiState.zoom,
-            },
-            actions: {
-              setCurrentSelection,
-            },
-          });
-          
-          if (state.movingMark) {
-            setMarksWithSectionWidths((prev) =>
-              prev.map((r) => {
-                if (r.id === state.movingMark.id) {
-                  if (r.type === 'section') return { ...r, y: coords.y - state.movingMark.offsetY };
-                  return { ...r, x: coords.x - state.movingMark.offsetX, y: coords.y - state.movingMark.offsetY };
-                }
-                return r;
-              })
-            );
-          }
-        }
-      }
-      scrollAnimRef.current = requestAnimationFrame(scrollStep);
-    };
-
-    scrollAnimRef.current = requestAnimationFrame(scrollStep);
-    return () => cancelAnimationFrame(scrollAnimRef.current);
-  }, [currentSelection, movingMark, uiState.zoom, getUnscaledCoordsFromClient, uiState.tool, uiState.editingShapeId]);
-
-  const handleBorderClick = useCallback(async (e, markId) => {
-    e.stopPropagation();
-
-    const toolType = getToolType(uiState.tool);
-    await toolType.onBorderClick?.({
-      regionId: markId,
-      selectedRegionId: uiState.selectedMarkId,
-      actions: {
-        confirmDelete: () => confirmDialog(
-          'Are you sure you want to delete this region? Its whiteboard data will be permanently lost.',
-          'Delete Whiteboard'
-        ),
-        deleteRegion: (id) => {
-          setMarksWithSectionWidths((prev) => prev.filter((r) => r.id !== id));
-        },
-        selectRegion: selectMark,
-        clearShortcutUi: () => shortcutManager.clearUi(),
-      },
-    });
-  }, [uiState.tool, uiState.selectedMarkId, selectMark, shortcutManager]);
+  // handleBorderClick moved to pdf_content_renderer
 
   const handleBackup = async () => {
     try {
@@ -885,13 +505,7 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
     }
   }, [pdfDirectoryPath, refreshAvailableWhiteboards, showToast, shortcutManager, uiStore]);
 
-  // --- Dynamic Cursors ---
-  const toolType = getToolType(uiState.tool);
-  const pdfCursor = movingMark
-    ? 'grabbing'
-    : (typeof toolType.cursor === 'function'
-        ? toolType.cursor({ sectionTarget: uiState.sectionTarget })
-        : toolType.cursor) || 'default';
+  // dynamic pdf cursor moved to pdf_content_renderer
 
   const activeWhiteboardId = uiState.selectedMarkId ?? shortcutManager.getLinkedWhiteboardId();
   const sectionSelection = currentSelection?.type === 'section'
@@ -939,36 +553,22 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
         onMouseEnter={() => uiController.setActivePane('pdf')}
         style={{ width: activeWhiteboardId ? `${uiState.leftPct}%` : '100%', height: '100%', flexShrink: 0, position: 'relative', transition: activeWhiteboardId ? 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'width 0.3s ease' }}
       >
-        <div ref={pdfScrollRef} onScroll={handleScroll} style={{ width: '100%', height: '100%', overflow: 'auto', textAlign: 'center', background: '#262a33', position: 'relative' }}>
-          <div ref={pdfContentRef} onPointerDown={handleDivPointerDown} onPointerMove={handleDivPointerMove} onPointerUp={handleDivPointerUp} style={{ position: 'relative', margin: '24px', background: 'white', display: 'inline-block', textAlign: 'left', cursor: pdfCursor, boxShadow: '0 8px 40px rgba(0,0,0,0.6)' }}>
-            {documentFile ? (
-              <Document file={documentFile} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setPdfReady(true); }} onLoadError={(error) => console.error("PDF Load Error:", error)}>
-                {Array.from({ length: numPages ?? 0 }, (_, i) => (
-                  <LazyPage key={`${pdfPath}-${i}`} pageNumber={i + 1} width={PDF_WIDTH} scale={uiState.zoom} />
-                ))}
-              </Document>
-            ) : (
-              <div style={{ padding: '40px', color: '#9ca3af', fontSize: '12px', textAlign: 'center' }}>Loading document into memory...</div>
-            )}
-
-            {/* Scaled SVG overlay */}
-            <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible', zIndex: 10, pointerEvents: 'none' }}>
-              {/* BOZOZO */}
-              {marks.map((r, idx) => {
-                const color      = markColor(r.id);
-                const isSelected = uiState.selectedMarkId === r.id;
-                let renderCtx = {zoom:uiState.zoom, PDFWIDTH: PDF_WIDTH, tool:uiState.tool, color: color, idx:idx, onClick: handleBorderClick, isSelected:isSelected, };
-                
-                return getMarkRendererType(r.type).render(r, renderCtx);
-              })}
-
-              {currentSelection && 
-                getMarkRendererType(currentSelection.type).renderSelectionPreview(currentSelection, {zoom: uiState.zoom, PDFWIDTH: PDF_WIDTH})
-              } 
-             
-            </svg>
-          </div>
-        </div>
+        {pdfContentRenderer.Component({
+          contentId: pdfPath,
+          path: pdfPath,
+          settings,
+          uiState,
+          uiController,
+          marks,
+          currentSelection,
+          movingMark,
+          setCurrentSelection,
+          setMovingMark,
+          setMarksWithSectionWidths,
+          selectMark,
+          dragStateRef,
+          pendingToolActivationReasonRef,
+        })}
 
         {/* ── BOTTOM NAV: Page Control ── */}
         <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 50, display: 'flex', gap: '8px', alignItems: 'center', background: 'rgba(38,42,51,0.65)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', padding: '6px 16px', borderRadius: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', pointerEvents: 'auto' }}>
@@ -980,7 +580,7 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
             onBlur={() => uiController.setPageInput(String(uiState.currentPage))}
             style={{ width: '36px', background: 'rgba(0,0,0,0.3)', border: '1px solid #4b5563', color: '#fff', textAlign: 'center', borderRadius: '4px', fontSize: '11px', padding: '2px 0', outline: 'none' }}
           />
-          <span style={{ fontSize: '11px', color: '#9ca3af' }}>/ {numPages || '-'}</span>
+          <span style={{ fontSize: '11px', color: '#9ca3af' }}>/ -</span>
         </div>
 
         {/* ── TOOLBOX (Vertical, Bottom Right) ── */}
@@ -1130,7 +730,10 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
           }}
           style={{ flex: 1, height: '100%', minWidth: 0, position: 'relative' }}
         >
-          <WhiteboardPane key={activeWhiteboardId} markId={activeWhiteboardId} settings={settings} />
+          {whiteboardContentRenderer.Component({
+            contentId: activeWhiteboardId,
+            settings
+          })}
         </div>
       )}
 
