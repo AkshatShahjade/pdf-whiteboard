@@ -17,6 +17,7 @@ flowchart TD
         • workspace_layout: object
         • tool_config: object
         • zoom: number
+        • tool: string
         • libraryPath: string | null
         • leftPct: number
         • scrollTop: number
@@ -32,11 +33,19 @@ flowchart TD
         Q2[getMark]:::query
         Q3[getAllMarks]:::query
         Q4[getWhiteboardSnapshot]:::query
+        Q5[getSettings]:::query
+        Q6[getRecents]:::query
+        Q7[getLibraryPath]:::query
+        Q8[getBackupPath]:::query
     end
 
     Q1 -->|Reads| Store
     Q2 -->|Reads| Store
     Q3 -->|Reads| Store
+    Q5 -->|Reads DB| R_State
+    Q6 -->|Reads DB| R_State
+    Q7 -->|Reads DB| R_State
+    Q8 -->|Reads DB| R_State
 
     %% -----------------------------------------
     %% 3. Write Pathway (InputAPI)
@@ -50,6 +59,12 @@ flowchart TD
         I6[updateMark]:::api
         I7[deleteMark]:::api
         I8[saveWhiteboardSnapshot]:::api
+        I9[saveSettings]:::api
+        I10[saveRecents]:::api
+        I11[saveLibraryPath]:::api
+        I12[saveBackupPath]:::api
+        I13[updateZoom]:::api
+        I14[updateTool]:::api
     end
 
     %% -----------------------------------------
@@ -93,11 +108,19 @@ flowchart TD
     I2 -->|Mutates leftPct| Store
     I3 -->|Mutates selectedMarkId| Store
     I4 -->|Mutates scrollTop| Store
+    I13 -->|Mutates zoom| Store
+    I14 -->|Mutates tool| Store
 
     I5 --> M_add
     I6 --> M_update
     I7 --> M_delete
     I8 --> T_saveWB
+
+    %% Input API Writes Configurations Directly!
+    I9 -->|Writes DB| R_State
+    I10 -->|Writes DB| R_State
+    I11 -->|Writes DB| R_State
+    I12 -->|Writes DB| R_State
 
     %% =========================================
     %% BINDINGS: State Syncing (The Core Pattern)
