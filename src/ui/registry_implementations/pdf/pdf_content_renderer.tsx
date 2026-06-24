@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
-import { ContentRendererType, ContentRendererProps } from '../content_renderer_registry';
-import { slotRendererRegistry } from '../pdf/slot_renderer_registry';
+import { ContentRendererType, ContentRendererProps } from '../../renderer_registry/content_renderer_registry';
+import { slotRendererRegistry } from '../../renderer_registry/pdf/slot_renderer_registry';
 import { getMarkDomainType } from '../../../atma/capabilities_registry/pdf/mark_domain_registry';
-import { getMarkRendererType } from '../pdf/vertical_pane/mark_renderer_registry';
-import { getToolRendererType as getToolType } from '../pdf/vertical_pane/tool_renderer_registry';
+import { getMarkRendererType } from '../../renderer_registry/pdf/vertical_pane/mark_renderer_registry';
+import { getToolRendererType as getToolType } from '../../renderer_registry/pdf/vertical_pane/tool_renderer_registry';
 import { convertFileSrc } from '../../../atma/platform_adapter/switch';
 import { inputAPI } from '../../../atma/singletons';
 

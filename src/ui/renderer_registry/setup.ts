@@ -11,8 +11,8 @@ import { registerToolRendererType, toolRendererRegistry } from "./pdf/vertical_p
 import { registerSlotRendererType, slotRendererRegistry } from "./pdf/slot_renderer_registry";
 import { contentRendererRegistry, registerContentRendererType } from "./content_renderer_registry";
 import { setupAllRegistries as setupAtmaRegistries } from "../../atma/capabilities_registry/setup";
-import { pdfContentRenderer } from "./content/pdf_content_renderer";
-import { whiteboardContentRenderer } from "./content/whiteboard_content_renderer";
+import { pdfContentRenderer } from "../registry_implementations/pdf/pdf_content_renderer";
+import { whiteboardContentRenderer } from "../registry_implementations/whiteboard/whiteboard_content_renderer";
 
 export function setupMarkRegistry() {
     if (!markRendererRegistry.has(lassoMark.id)) {

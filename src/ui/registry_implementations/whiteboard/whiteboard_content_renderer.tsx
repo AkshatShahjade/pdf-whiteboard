@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Tldraw, DefaultToolbar, DefaultToolbarContent, TldrawUiMenuItem, useTools, useIsToolSelected } from 'tldraw'
 import 'tldraw/tldraw.css'
-import { debounce } from '../../../atma/services/state_sync_service'
-import { inputAPI, queryAPI } from '../../../atma/singletons'
-import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from '../../registry_implementations/whiteboard/tools/editing/handwriting_whiteboard_editing_tool.jsx'
-import { ContentRendererType, ContentRendererProps } from '../content_renderer_registry'
+import { debounce } from '../../../atma/services/state_sync_service.js'
+import { inputAPI, queryAPI } from '../../../atma/singletons.js'
+import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './tools/editing/handwriting_whiteboard_editing_tool.jsx'
+import { ContentRendererType, ContentRendererProps } from '../../renderer_registry/content_renderer_registry.js'
 
 const handwritingAssetUrls = {
   icons: {
