@@ -7,6 +7,7 @@ import { LastUIStateRepository } from '../atma/storage/repositories/LastUIStateR
 import { MarkRepository } from '../atma/storage/repositories/MarkRepository';
 import { WhiteboardRepository } from '../atma/storage/repositories/WhiteboardRepository';
 import { ContentRepository } from '../atma/storage/repositories/ContentRepository';
+import { queryAPI, inputAPI } from '../atma/singletons';
 import {
   basename,
   confirmDialog,
@@ -46,29 +47,6 @@ const ABOUT = {
   skills: ['Python', 'React', 'FastAPI', 'C++', 'Kotlin', 'SQL', 'LaTeX'],
 };
 
-const RECENTS_KEY = 'lemmamap:recents';
-
-function getRecents() {
-  try {
-    return JSON.parse(localStorage.getItem(RECENTS_KEY) || '[]');
-  } catch { return []; }
-}
-
-function pushRecent(entry) {
-  try {
-    const list = getRecents().filter(r => r.path !== entry.path).slice(0, 7);
-    list.unshift({ ...entry, openedAt: Date.now() });
-    localStorage.setItem(RECENTS_KEY, JSON.stringify(list));
-  } catch { /* ignore */ }
-}
-
-function removeRecent(path) {
-  try {
-    const list = getRecents().filter(r => r.path !== path);
-    localStorage.setItem(RECENTS_KEY, JSON.stringify(list));
-  } catch { /* ignore */ }
-}
-
 function timeAgo(ts) {
   if (!ts) return '';
   const d = Math.floor((Date.now() - ts) / 1000);
@@ -80,25 +58,6 @@ function timeAgo(ts) {
 
 function markCount(path) {
   return 0; // Deprecated synchronous markCount
-}
-
-const SETTINGS_KEY = 'lemmamap:settings';
-const DEFAULT_SETTINGS = {
-  defaultSplit: 50,
-  theme:        'dark',
-  autosaveMs:   800,
-  maxGlobalPdfTools: 8,
-  defaultTool: 'draw',
-};
-
-export function loadSettings() {
-  try {
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') };
-  } catch { return DEFAULT_SETTINGS; }
-}
-
-function saveSettings(s) {
-  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch { /* ignore */ }
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -247,12 +206,12 @@ function HelpModal({ open, onClose }) {
 
           <section>
             <h3 style={{ color: '#EC4899', margin: '0 0 12px 0', fontSize: '13px', textTransform: 'uppercase' }}>4. Technical Architecture</h3>
-            <p style={{ margin: '0 0 8px 0' }}>Data persistence is optimized into two deliberate backend pipelines to maximize performance:</p>
+            <p style={{ margin: '0 0 8px 0' }}>Data persistence is optimized using a high-performance SQLite database:</p>
             <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <li><strong>localStorage:</strong> Handles lightweight metadata (scroll position, pane splitter ratio, active region, and geometric bounds of drawn boxes). Ensures zero-latency layout reconstruction on startup.</li>
-              <li><strong>IndexedDB:</strong> Stores the heavy Tldraw shape/asset graphs. Each region acts as an independent record mapped to a primary key.</li>
+              <li><strong>SQLite Database:</strong> Replaces browser-local storage completely. Stores all workspace layouts, document-scoped UI states, global settings, drawing marks, and whiteboard snapshots.</li>
+              <li><strong>Relational Integrity:</strong> Built with cascade deletes and indexed tables to guarantee lightning-fast queries and zero data loss on restart.</li>
             </ul>
-            <p style={{ margin: '8px 0 0 0' }}>Rolling Backups seamlessly zip both storage mediums into unified JSON payloads, maintaining version control of your work.</p>
+            <p style={{ margin: '8px 0 0 0' }}>Rolling Backups seamlessly zip the database state into unified JSON payloads, maintaining version control of your work.</p>
           </section>
 
         </div>
@@ -265,18 +224,19 @@ function HelpModal({ open, onClose }) {
 }
 
 
-function SettingsDrawer({ open: isOpen, onClose, settings, onChange, backupPath, onSetBackupPath, showToast }) {
-  const [helpOpen, setHelpOpen] = useState(false);
-
-  const Field = ({ label, hint, children }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <span style={{ fontSize: '11px', color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{label}</span>
-        {hint && <span style={{ fontSize: '10px', color: '#6b7280' }}>{hint}</span>}
-      </div>
-      {children}
+const Field = ({ label, hint, children }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+      <span style={{ fontSize: '11px', color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{label}</span>
+      {hint && <span style={{ fontSize: '10px', color: '#6b7280' }}>{hint}</span>}
     </div>
-  );
+    {children}
+  </div>
+);
+
+
+function SettingsDrawer({ open: isOpen, onClose, settings, onChange, backupPath, onSetBackupPath, showToast, onClearRecents }) {
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const btnStyle = {
     flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #374151', background: 'transparent', color: '#d1d5db', fontSize: '11px', cursor: 'pointer', fontFamily: "'IBM Plex Mono', monospace",
@@ -289,8 +249,7 @@ function SettingsDrawer({ open: isOpen, onClose, settings, onChange, backupPath,
   const handleClearRecents = async () => {
     const yes = await confirmDialog('Clear all recent files? Whiteboard and session settings will be preserved.', 'Clear Recents');
     if (yes) {
-      localStorage.removeItem('lemmamap:recents');
-      window.location.reload();
+      await onClearRecents();
     }
   };
 
@@ -423,10 +382,16 @@ function AboutPanel({ open: isOpen, onClose }) {
 }
 
 export default function HomeScreen({ onOpen }) {
-  const [recents, setRecents]         = useState(getRecents);
+  const [recents, setRecents]         = useState([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aboutOpen, setAboutOpen]     = useState(false);
-  const [settings, setSettings]       = useState(loadSettings);
+  const [settings, setSettings]       = useState({
+    defaultSplit: 50,
+    theme:        'dark',
+    autosaveMs:   800,
+    maxGlobalPdfTools: 8,
+    defaultTool: 'draw',
+  });
   const [mounted, setMounted]         = useState(false);
 
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
@@ -434,11 +399,39 @@ export default function HomeScreen({ onOpen }) {
   const [isWhiteboardModalOpen, setIsWhiteboardModalOpen] = useState(false);
   const [newWhiteboardName, setNewWhiteboardName] = useState('');
 
-  const [libraryPath, setLibraryPath] = useState(localStorage.getItem('lemmamap:library') || null);
-  const [backupPath, setBackupPath]   = useState(localStorage.getItem('lemmamap:backupPath') || null);
-  const [currentDir, setCurrentDir]   = useState(localStorage.getItem('lemmamap:library') || null);
+  const [libraryPath, setLibraryPath] = useState(null);
+  const [backupPath, setBackupPath]   = useState(null);
+  const [currentDir, setCurrentDir]   = useState(null);
   const [entries, setEntries]         = useState([]);
+  const [loading, setLoading]         = useState(true);
 
+  // Load configuration from SQLite on mount
+  useEffect(() => {
+    let active = true;
+    async function loadConfig() {
+      try {
+        const [dbSettings, dbRecents, dbLibraryPath, dbBackupPath] = await Promise.all([
+          queryAPI.getSettings(),
+          queryAPI.getRecents(),
+          queryAPI.getLibraryPath(),
+          queryAPI.getBackupPath()
+        ]);
+        if (active) {
+          setSettings(dbSettings);
+          setRecents(dbRecents);
+          setLibraryPath(dbLibraryPath);
+          setBackupPath(dbBackupPath);
+          setCurrentDir(dbLibraryPath);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error("Failed to load configuration from SQLite:", err);
+        if (active) setLoading(false);
+      }
+    }
+    loadConfig();
+    return () => { active = false; };
+  }, []);
 
   // Toast State
   const [toast, setToast] = useState(null);
@@ -449,12 +442,28 @@ export default function HomeScreen({ onOpen }) {
 
   useEffect(() => { setTimeout(() => setMounted(true), 30); }, []);
 
-  const handleSettingsChange = useCallback((s) => { setSettings(s); saveSettings(s); }, []);
+  const handleSettingsChange = useCallback((s) => {
+    setSettings(s);
+    inputAPI.saveSettings(s);
+  }, []);
 
   const clearRecents = useCallback(() => {
-    localStorage.removeItem('lemmamap:recents');
     setRecents([]);
+    inputAPI.saveRecents([]);
   }, []);
+
+  const pushRecent = useCallback(async (entry) => {
+    const nextRecents = recents.filter(r => r.path !== entry.path).slice(0, 7);
+    nextRecents.unshift({ ...entry, openedAt: Date.now() });
+    setRecents(nextRecents);
+    await inputAPI.saveRecents(nextRecents);
+  }, [recents]);
+
+  const handleRemoveRecent = useCallback(async (path) => {
+    const nextRecents = recents.filter(r => r.path !== path);
+    setRecents(nextRecents);
+    await inputAPI.saveRecents(nextRecents);
+  }, [recents]);
 
   const refreshDir = useCallback(async (dir) => {
     if (!dir) return;
@@ -483,7 +492,7 @@ export default function HomeScreen({ onOpen }) {
           clearRecents();
         }
         setLibraryPath(nextLibraryPath); setCurrentDir(nextLibraryPath);
-        localStorage.setItem('lemmamap:library', nextLibraryPath);
+        await inputAPI.saveLibraryPath(nextLibraryPath);
       }
     } catch (err) { console.error(err); }
   };
@@ -493,7 +502,7 @@ export default function HomeScreen({ onOpen }) {
       const selected = await pickFolder(true);
       if (selected) {
         setBackupPath(selected);
-        localStorage.setItem('lemmamap:backupPath', selected);
+        await inputAPI.saveBackupPath(selected);
       }
     } catch (err) { console.error(err); }
   };
@@ -554,12 +563,12 @@ export default function HomeScreen({ onOpen }) {
           const id = entry.name.replace(/\.tldr$/i, '');
           const wbPath = `whiteboard:${id}`;
           const recentEntry = { path: wbPath, name: id, openedAt: Date.now(), isWhiteboard: true, sourcePath: fullPath };
-          pushRecent(recentEntry);
+          await pushRecent(recentEntry);
           onOpen(null, { id, name: id }, settings, null);
           return;
         }
         const recentEntry = { path: fullPath, name: entry.name, openedAt: Date.now(), isLocal: true };
-        pushRecent(recentEntry);
+        await pushRecent(recentEntry);
         onOpen(fullPath, null, settings);
       }
     } catch (err) { console.error(err); }
@@ -573,15 +582,15 @@ export default function HomeScreen({ onOpen }) {
     } catch (err) { console.error(err); }
   };
 
-  const handleRecentOpen = useCallback((entry) => {
-    pushRecent({ ...entry, openedAt: Date.now() });
+  const handleRecentOpen = useCallback(async (entry) => {
+    await pushRecent({ ...entry, openedAt: Date.now() });
     if (entry.path.startsWith('whiteboard:')) {
       const id = entry.path.replace('whiteboard:', '');
       onOpen(null, { id, name: entry.name || 'Whiteboard' }, settings, null);
       return;
     }
     onOpen(entry.sourcePath || entry.path, null, settings);
-  }, [onOpen, settings]);
+  }, [onOpen, settings, pushRecent]);
 
   const confirmNewWhiteboard = async () => {
     const trimmed = newWhiteboardName.trim();
@@ -598,8 +607,6 @@ export default function HomeScreen({ onOpen }) {
     }
   };
 
-  const handleRemoveRecent = useCallback((path) => { removeRecent(path); setRecents(getRecents()); }, []);
-
   const triggerBackup = async () => {
     showToast('Backup migrating to new SQLite DB', 'info');
   };
@@ -607,6 +614,14 @@ export default function HomeScreen({ onOpen }) {
   const fadeIn = (delay = 0) => ({
     opacity: mounted ? 1 : 0, transform: mounted ? 'translateY(0)' : 'translateY(12px)', transition: `opacity 0.5s ${delay}s ease, transform 0.5s ${delay}s ease`,
   });
+
+  if (loading) {
+    return (
+      <div style={{ width: '100%', height: '100vh', background: '#1c1f26', color: '#9ca3af', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'IBM Plex Mono', monospace", fontSize: '13px' }}>
+        loading workspace configuration…
+      </div>
+    );
+  }
 
   return (
     <div style={{ width: '100%', height: '100vh', background: '#1c1f26', color: '#e5e7eb', fontFamily: "'IBM Plex Mono', monospace", overflow: 'auto', position: 'relative' }}>
@@ -726,7 +741,7 @@ export default function HomeScreen({ onOpen }) {
         </div>
       </div>
 
-      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} onChange={handleSettingsChange} backupPath={backupPath} onSetBackupPath={handleSetBackupPath} showToast={showToast} />
+      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} onChange={handleSettingsChange} backupPath={backupPath} onSetBackupPath={handleSetBackupPath} showToast={showToast} onClearRecents={clearRecents} />
       <AboutPanel open={aboutOpen} onClose={() => setAboutOpen(false)} />
 
       {isFolderModalOpen && (

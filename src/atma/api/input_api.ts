@@ -4,9 +4,11 @@ import { OutputAPIInterface } from './output_api';
 import { stateSyncService } from '../services/state_sync_service';
 import { markService } from '../services/mark_service';
 import { whiteboardService } from '../services/tldraw_service';
+import { StateInitialValuesRepository } from '../storage/repositories/StateInitialValuesRepository';
 
 export interface InputAPIInterface {
   loadSession(pdfPath: string): Promise<void>;
+  flushSession(): void;
   updateSplitter(leftPct: number): void;
   selectMark(markId: string | null): void;
   updateScrollTop(pdfPath: string, scrollTop: number): void;
@@ -14,6 +16,10 @@ export interface InputAPIInterface {
   updateMark(mark: MarkDTO): Promise<void>;
   deleteMark(markId: string): Promise<void>;
   saveWhiteboardSnapshot(markId: string, snapshot: any): Promise<void>;
+  saveSettings(settings: any): Promise<void>;
+  saveRecents(recents: any[]): Promise<void>;
+  saveLibraryPath(libraryPath: string | null): Promise<void>;
+  saveBackupPath(backupPath: string | null): Promise<void>;
 }
 
 /**
@@ -26,6 +32,10 @@ export function createInputAPI(
   return {
     loadSession(pdfPath: string): Promise<void> {
       return stateSyncService.loadSession(store, output, pdfPath);
+    },
+
+    flushSession(): void {
+      stateSyncService.flushSession();
     },
 
     async updateSplitter(leftPct: number): Promise<void> {
@@ -58,6 +68,22 @@ export function createInputAPI(
 
     saveWhiteboardSnapshot(markId: string, snapshot: any): Promise<void> {
       return whiteboardService.saveWhiteboardSnapshot(store, output, markId, snapshot);
+    },
+
+    async saveSettings(settings: any): Promise<void> {
+      await StateInitialValuesRepository.setSpecificValue('settings', ['global'], settings);
+    },
+
+    async saveRecents(recents: any[]): Promise<void> {
+      await StateInitialValuesRepository.setSpecificValue('recents', ['global'], recents);
+    },
+
+    async saveLibraryPath(libraryPath: string | null): Promise<void> {
+      await StateInitialValuesRepository.setSpecificValue('libraryPath', ['global'], libraryPath);
+    },
+
+    async saveBackupPath(backupPath: string | null): Promise<void> {
+      await StateInitialValuesRepository.setSpecificValue('backupPath', ['global'], backupPath);
     }
   };
 }

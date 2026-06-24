@@ -1,4 +1,5 @@
 import { StateInitialValuesRepository } from './repositories/StateInitialValuesRepository';
+import { tauriSqlAdapter } from './storage_implementations/tauri_sqlite';
 
 /**
  * Developer Seed Data.
@@ -25,27 +26,39 @@ const SEED_DEFAULTS = [
     { key: 'marks', scope: 'global', value: [], type: 'personalizable' },
 
     // Workspace Layout (Replaces SCREEN_INSTANCES and SLOT_INSTANCES)
-    { key: 'workspace_layout', scope: 'global', value: { screens: [] }, type: 'personalizable' }
+    { key: 'workspace_layout', scope: 'global', value: { screens: [] }, type: 'personalizable' },
+
+    // Global Settings & Recents
+    { key: 'settings', scope: 'global', value: { defaultSplit: 50, theme: 'dark', autosaveMs: 800, maxGlobalPdfTools: 8, defaultTool: 'draw' }, type: 'personalizable' },
+    { key: 'recents', scope: 'global', value: [], type: 'personalizable' }
 ];
 
 /**
  * Initializes the DEFAULT_INITIAL_VALUES table with hardcoded fallback values.
- * Executed exactly once during database creation in `tauri_sqlite.ts`.
+ * Executed during database creation or application startup to ensure all defaults exist.
  * @param forceReset - If true, overwrites existing defaults with these hardcoded ones.
  */
 export async function initializeStateDefaults(forceReset: boolean) {
-    if (!forceReset) {
-        return;
-    }
-
-    console.log('[StateInitializer] Seeding default initial values into Scoped Presets...');
+    console.log(`[StateInitializer] Checking/seeding default initial values (forceReset: ${forceReset})...`);
     
     try {
         for (const preset of SEED_DEFAULTS) {
-            await StateInitialValuesRepository.setDefaultValue(preset.key, preset.scope, preset.value, preset.type as any);
+            let shouldSet = forceReset;
+            if (!shouldSet) {
+                const results = await tauriSqlAdapter.select<any>(
+                    `SELECT 1 FROM DEFAULT_INITIAL_VALUES WHERE key = ? AND scope = ?`,
+                    [preset.key, preset.scope]
+                );
+                shouldSet = results.length === 0;
+            }
+            if (shouldSet) {
+                console.log(`[StateInitializer] Seeding default for key="${preset.key}", scope="${preset.scope}"`);
+                await StateInitialValuesRepository.setDefaultValue(preset.key, preset.scope, preset.value, preset.type as any);
+            }
         }
-        console.log('[StateInitializer] Successfully seeded Scoped Presets.');
+        console.log('[StateInitializer] Seeding check complete.');
     } catch (err) {
         console.error('[StateInitializer] Failed to seed default initial values:', err);
     }
 }
+

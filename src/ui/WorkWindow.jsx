@@ -2,8 +2,8 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Tldraw, DefaultToolbar, DefaultToolbarContent, TldrawUiMenuItem, useTools, useIsToolSelected } from 'tldraw';
 import 'tldraw/tldraw.css';
 import { Document, Page, pdfjs } from 'react-pdf';
-import { debounce } from '../atma/services/session_service.ts';
-import HomeScreen, { loadSettings } from './HomeScreen.jsx';
+import { debounce } from '../atma/services/state_sync_service';
+import HomeScreen from './HomeScreen.jsx';
 import { createUIStateStore } from './ui_state_store';
 import { createUIController } from './ui_controller';
 import { useUIState } from './useUIState';
@@ -11,7 +11,9 @@ import { inputAPI, outputAPI, queryAPI } from '../atma/singletons';
 
 
 import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './registry_implementations/whiteboard/tools/editing/handwriting_whiteboard_editing_tool.jsx';
-import { confirmDialog, convertFileSrc } from '../atma/platform_adapter/switch.ts';
+import { confirmDialog, convertFileSrc, joinPath } from '../atma/platform_adapter/switch.ts';
+import { WhiteboardRepository } from '../atma/storage/repositories/WhiteboardRepository';
+import { ContentRepository } from '../atma/storage/repositories/ContentRepository';
 import { useShortcutToolState } from './window/useShortcutToolState.ts';
 import { getMarkDomainType } from '../atma/capabilities_registry/pdf/mark_domain_registry';
 import { getMarkRendererType } from './renderer_registry/pdf/vertical_pane/mark_renderer_registry';
@@ -329,8 +331,9 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
   // UI Decoupled Store & Controller
   const uiStore = useMemo(() => createUIStateStore({
     leftPct: syncSession?.leftPct ?? settings?.defaultSplit ?? 50,
+    zoom: syncSession?.zoom ?? 1.0,
     selectedMarkId: syncSession?.selectedMarkId ?? null,
-    tool: 'select',
+    tool: syncSession?.tool ?? 'select',
     marks: syncSession?.marks ?? [],
     pdfPath: pdfPath,
     scrollTop: syncSession?.scrollTop ?? 0,
@@ -868,7 +871,12 @@ function WorkspaceApp({ pdfPath, settings, onHome }) {
     const trimmed = newWhiteboardName.trim();
     if (!trimmed) return;
     try {
-      const wb = await createWhiteboard(trimmed, pdfDirectoryPath);
+      const id = `wb_${Date.now()}`;
+      await WhiteboardRepository.saveWhiteboard(id, { name: trimmed }, undefined, pdfDirectoryPath);
+      await ContentRepository.ensureContentExists(id, 'core.whiteboard', await joinPath(pdfDirectoryPath, `${id}.tldr`));
+      
+      const wb = { id, name: trimmed };
+
       shortcutManager.setNewWhiteboardName('');
       await refreshAvailableWhiteboards();
       shortcutManager.applySelection(selectPanelIdx, wb.id, wb.name, uiStore.getState().selectedMarkId);

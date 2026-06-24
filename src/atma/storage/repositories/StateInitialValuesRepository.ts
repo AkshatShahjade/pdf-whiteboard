@@ -147,5 +147,19 @@ export const StateInitialValuesRepository = {
                 based_on_default_hash = excluded.based_on_default_hash`,
             [key, saveScope, valueJson, defaultHash]
         );
+    },
+
+    /**
+     * Retrieves a mapping of all registered keys to their types from the default values table.
+     */
+    async getAllKeyTypes(): Promise<Record<string, string>> {
+        const results = await tauriSqlAdapter.select<{key: string, type: string}>(
+            `SELECT key, type FROM DEFAULT_INITIAL_VALUES`
+        );
+        const map: Record<string, string> = {};
+        for (const row of results) {
+            map[row.key] = row.type;
+        }
+        return map;
     }
 };

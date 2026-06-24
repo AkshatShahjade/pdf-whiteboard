@@ -12,6 +12,7 @@ import {
     WhiteboardInfo,
 } from '../registry_implementations/pdf/vertical_pane/tools/system/shortcut_tool_state.ts'
 import { ContentRepository } from '../../atma/storage/repositories/ContentRepository.ts'
+import { readTextFile, exists } from '@tauri-apps/plugin-fs';
 
 export interface UseShortcutToolStateOptions {
     settings: any
@@ -46,11 +47,24 @@ export function useShortcutToolState(options: UseShortcutToolStateOptions) {
     const refreshAvailableWhiteboards = useCallback(async () => {
         try {
             const results = await ContentRepository.getAllWhiteboards()
-            // Map file_path to name for now, in future we can add a 'name' column or parse it.
-            const deduped: WhiteboardInfo[] = results.map(row => ({
-                id: row.id,
-                name: row.file_path.split(/[\\/]/).pop() || row.id,
-                path: row.file_path
+            // Parse the actual whiteboard file to get the real name
+            const deduped: WhiteboardInfo[] = await Promise.all(results.map(async row => {
+                let actualName = row.file_path.split(/[\\/]/).pop()?.replace('.tldr', '') || row.id;
+                try {
+                    if (await exists(row.file_path)) {
+                        const content = await readTextFile(row.file_path);
+                        const parsed = JSON.parse(content);
+                        if (parsed && parsed.name) {
+                            actualName = parsed.name;
+                        }
+                    }
+                } catch (e) {}
+                
+                return {
+                    id: row.id,
+                    name: actualName,
+                    path: row.file_path
+                };
             }))
             manager.setAvailableWhiteboards(deduped)
         } catch (err) {

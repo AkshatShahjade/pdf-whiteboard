@@ -5,12 +5,14 @@
 
 import { MarkDTO } from '../shared_doman_models_and_dtos/dtos';
 
+import { AppState } from '../atma/app_state_store';
+
 export interface ToastState {
     msg: string;
     type: 'info' | 'success' | 'error';
 }
 
-export interface UIState {
+export type UIState = AppState & {
     currentPage: number;
     pageInput: string;
     activePane: 'pdf' | 'whiteboard';

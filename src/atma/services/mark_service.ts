@@ -31,7 +31,7 @@ export const markService = {
     const pdfPath = store.getState().pdfPath;
     if (pdfPath) {
       try {
-        await MarkRepository.upsertMarks(pdfPath, [newMark]);
+        await MarkRepository.upsertMarks(pdfPath, Array.from(store.getState().marks.values()));
       } catch (err) {
         console.error(`[MarkService] Failed to persist new mark ${id}:`, err);
       }
@@ -63,7 +63,7 @@ export const markService = {
       try {
         // We might want to debounce this in the future for rapid dragging, 
         // but explicit data writes are safer done immediately or handled specifically.
-        await MarkRepository.upsertMarks(pdfPath, [mark]);
+        await MarkRepository.upsertMarks(pdfPath, Array.from(store.getState().marks.values()));
       } catch (err) {
         console.error(`[MarkService] Failed to persist updated mark ${mark.id}:`, err);
       }

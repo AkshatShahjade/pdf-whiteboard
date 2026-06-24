@@ -38,19 +38,13 @@ export function createAppStateStore(initialState?: Partial<AppState>): AppStateS
 
   return {
     getState(): AppState {
-      // Return a shallow copy of state and map to prevent accidental external mutations
-      return {
-        ...state,
-        marks: new Map(state.marks)
-      };
+      // We return state directly instead of copying the map to avoid O(N) allocations
+      // on every state read, which was causing the subscriber to constantly detect changes.
+      return state;
     },
 
     setState(updater: (state: AppState) => void): void {
-      const nextMarks = new Map(state.marks);
-      const draftState: AppState = {
-        ...state,
-        marks: nextMarks
-      };
+      const draftState: AppState = { ...state };
 
       updater(draftState);
       state = draftState;

@@ -1,5 +1,6 @@
 import { writeTextFile, readTextFile, remove, exists } from '@tauri-apps/plugin-fs';
 import { join, dirname } from '@tauri-apps/api/path';
+import { StateInitialValuesRepository } from './StateInitialValuesRepository';
 
 export const WhiteboardRepository = {
     async resolvePath(id: string, parentPdfPath?: string, libraryFolder?: string): Promise<string> {
@@ -9,7 +10,7 @@ export const WhiteboardRepository = {
         } else if (libraryFolder) {
             folder = libraryFolder;
         } else {
-            const fallback = localStorage.getItem('lemmamap:library');
+            const fallback = await StateInitialValuesRepository.getInitialValue<string | null>('personalized', 'libraryPath', ['global']);
             if (!fallback) {
                 throw new Error("Cannot save whiteboard: neither parentPdfPath nor libraryFolder was provided.");
             }

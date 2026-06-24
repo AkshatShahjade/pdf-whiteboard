@@ -40,7 +40,8 @@ async function initializeDatabaseIfEmpty(db: Database) {
         // Seed the default state variables
         await initializeStateDefaults(true);
     } else {
-        console.log('[tauri_sqlite] Database already initialized. Skipping schema execution.');
+        console.log('[tauri_sqlite] Database already initialized. Ensuring missing defaults are seeded...');
+        await initializeStateDefaults(false);
     }
 }
 

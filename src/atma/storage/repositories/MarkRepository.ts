@@ -4,8 +4,17 @@ import { MarkDTO } from '../../../shared_doman_models_and_dtos/dtos';
 export const MarkRepository = {
     // TODO: add better algorithm
     async upsertMarks(contentId: string, marks: MarkDTO[]): Promise<void> {
-        // Simple implementation: delete all marks for this content and re-insert
-        await tauriSqlAdapter.execute(`DELETE FROM MARKS WHERE content_id = ?`, [contentId]);
+        // Delete marks that are no longer in the provided list
+        const markIds = marks.map(m => m.id);
+        if (markIds.length > 0) {
+            const placeholders = markIds.map(() => '?').join(',');
+            await tauriSqlAdapter.execute(
+                `DELETE FROM MARKS WHERE content_id = ? AND id NOT IN (${placeholders})`,
+                [contentId, ...markIds]
+            );
+        } else {
+            await tauriSqlAdapter.execute(`DELETE FROM MARKS WHERE content_id = ?`, [contentId]);
+        }
         
         for (const mark of marks) {
             const payload = JSON.stringify(mark);

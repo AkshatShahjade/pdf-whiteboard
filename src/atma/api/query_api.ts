@@ -1,12 +1,17 @@
 import { MarkDTO, SessionDTO } from '../../shared_doman_models_and_dtos/dtos';
 import { AppStateStore } from '../app_state_store';
 import { WhiteboardRepository } from '../storage/repositories/WhiteboardRepository';
+import { StateInitialValuesRepository } from '../storage/repositories/StateInitialValuesRepository';
 
 export interface QueryAPIInterface {
   getCurrentSession(): SessionDTO | null;
   getMark(markId: string): MarkDTO | null;
   getAllMarks(): MarkDTO[];
   getWhiteboardSnapshot(markId: string): Promise<any | null>;
+  getSettings(): Promise<any>;
+  getRecents(): Promise<any[]>;
+  getLibraryPath(): Promise<string | null>;
+  getBackupPath(): Promise<string | null>;
 }
 
 /**
@@ -40,6 +45,22 @@ export function createQueryAPI(store: AppStateStore): QueryAPIInterface {
     getWhiteboardSnapshot(markId: string): Promise<any | null> {
       const pdfPath = store.getState().pdfPath;
       return WhiteboardRepository.loadWhiteboard(markId, pdfPath || undefined);
+    },
+
+    getSettings(): Promise<any> {
+      return StateInitialValuesRepository.getInitialValue('personalized', 'settings', ['global']);
+    },
+
+    getRecents(): Promise<any[]> {
+      return StateInitialValuesRepository.getInitialValue('personalized', 'recents', ['global']);
+    },
+
+    getLibraryPath(): Promise<string | null> {
+      return StateInitialValuesRepository.getInitialValue<string | null>('personalized', 'libraryPath', ['global']);
+    },
+
+    getBackupPath(): Promise<string | null> {
+      return StateInitialValuesRepository.getInitialValue<string | null>('personalized', 'backupPath', ['global']);
     }
   };
 }

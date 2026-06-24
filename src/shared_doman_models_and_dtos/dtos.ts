@@ -35,6 +35,8 @@ export type MarkDTO = RectMarkDTO | LassoMarkDTO | SectionMarkDTO;
 export interface SessionDTO {
   pdfPath: string;
   leftPct: number;
+  zoom: number;
+  tool: string;
   selectedMarkId: string | null;
   scrollTop: number;
   marks: MarkDTO[];

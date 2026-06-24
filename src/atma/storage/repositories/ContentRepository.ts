@@ -2,10 +2,13 @@ import { tauriSqlAdapter } from '../storage_implementations/tauri_sqlite';
 
 export const ContentRepository = {
     async ensureContentExists(id: string, jodoType: string, filePath: string): Promise<void> {
-        // We use INSERT OR REPLACE because SQLite's ON CONFLICT requires a UNIQUE constraint on the specific columns
-        // For the PRIMARY KEY id, INSERT OR REPLACE is equivalent.
+        // We use INSERT INTO ... ON CONFLICT DO UPDATE so we don't delete and re-insert the row,
+        // which prevents ON DELETE CASCADE from wiping marks.
         await tauriSqlAdapter.execute(
-            `INSERT OR REPLACE INTO CONTENTS (id, jodo_content_type, file_path) VALUES (?, ?, ?)`,
+            `INSERT INTO CONTENTS (id, jodo_content_type, file_path) VALUES (?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+                jodo_content_type = excluded.jodo_content_type,
+                file_path = excluded.file_path`,
             [id, jodoType, filePath]
         );
     },

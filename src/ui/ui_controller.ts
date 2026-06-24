@@ -82,15 +82,14 @@ export function createUIController(store: UIStateStore): UIController {
                         marks: session.marks,
                         pdfPath: session.pdfPath,
                         leftPct: session.leftPct,
+                        zoom: session.zoom,
+                        tool: session.tool,
                         selectedMarkId: session.selectedMarkId,
                         scrollTop: session.scrollTop
                     });
                 }),
-                outputAPI.subscribe('SPLITTER_CHANGED', (payload) => {
-                    store.setState({ leftPct: payload.leftPct });
-                }),
-                outputAPI.subscribe('MARK_SELECTED', (payload) => {
-                    store.setState({ selectedMarkId: payload.markId });
+                outputAPI.subscribe('APPSTATE_MUTATED', (patch) => {
+                    store.setState(patch as Partial<UIState>);
                 }),
                 outputAPI.subscribe('MARK_ADDED', (mark) => {
                     const { marks } = store.getState();

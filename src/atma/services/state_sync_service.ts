@@ -2,25 +2,51 @@ import { AppStateStore, AppState } from '../app_state_store';
 import { OutputAPIInterface } from '../api/output_api';
 import { StateInitialValuesRepository } from '../storage/repositories/StateInitialValuesRepository';
 import { MarkRepository } from '../storage/repositories/MarkRepository';
+import { ContentRepository } from '../storage/repositories/ContentRepository';
 import { parseRawMark } from '../../shared_doman_models_and_dtos/factories';
 import { SessionDTO } from '../../shared_doman_models_and_dtos/dtos';
 
 export function debounce(fn: Function, ms: number) {
   let timer: any = null;
-  return (...args: any[]) => {
+  let lastArgs: any[] | null = null;
+  
+  const debounced = (...args: any[]) => {
+    lastArgs = args;
     clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), ms);
+    timer = setTimeout(() => {
+      fn(...args);
+      lastArgs = null;
+      timer = null;
+    }, ms);
   };
+
+  debounced.flush = (...args: any[]) => {
+    clearTimeout(timer);
+    timer = null;
+    if (args.length > 0) {
+      fn(...args);
+    } else if (lastArgs) {
+      fn(...lastArgs);
+    }
+    lastArgs = null;
+  };
+
+  return debounced;
 }
 
-// Keys that are registered in our 4-layer architecture
-const PERSISTENT_KEYS: Array<keyof AppState> = [
-  'workspace_layout', 'tool_config', 'zoom', 'libraryPath', 'tool', 
-  'leftPct', 'scrollTop', 'selectedMarkId'
-];
+// We will asynchronously fetch the types of all state keys from the database
+let keyTypes: Record<string, string> = {};
 
 export const stateSyncService = {
   
+  _flushPersist: null as (() => void) | null,
+
+  flushSession() {
+    if (this._flushPersist) {
+      this._flushPersist();
+    }
+  },
+
   /**
    * Starts the background subscriber that watches the AppStore, diffs changes,
    * emits OutputAPI events, and debounces SQLite persistence.
@@ -28,19 +54,31 @@ export const stateSyncService = {
   startSubscriber(store: AppStateStore, output: OutputAPIInterface) {
     let prevState = store.getState();
 
+    // Fire and forget fetch of key types. 
+    // This will definitely finish before the user's first 600ms debounced persist.
+    StateInitialValuesRepository.getAllKeyTypes()
+      .then(types => { keyTypes = types; })
+      .catch(console.error);
+
     const persistChanges = debounce(async (changedKeys: (keyof AppState)[], newState: AppState) => {
       for (const key of changedKeys) {
-        if (PERSISTENT_KEYS.includes(key)) {
+        if (key === 'marks') continue; // Marks are persisted directly by MarkRepository
+
+        // If the key exists in our DB schema and is not volatile, persist it.
+        const type = keyTypes[key as string];
+        if (type && type !== 'volatile') {
           try {
              const val = newState[key];
-             // For now we use ['global'] scope as defined in state_initializer
-             await StateInitialValuesRepository.setSpecificValue(key, ['global'], val);
+             const scope = ['doc:' + newState.pdfPath, 'global'];
+             await StateInitialValuesRepository.setSpecificValue(key as string, scope, val);
           } catch (err) {
              console.error(`[StateSyncService] Failed to persist ${key}:`, err);
           }
         }
       }
     }, 600);
+
+    this._flushPersist = () => persistChanges.flush();
 
     store.subscribe(() => {
       const newState = store.getState();
@@ -57,15 +95,15 @@ export const stateSyncService = {
 
       // 1. Automatic Event Publishing
       // We only publish keys that are simple state variables (excluding 'marks')
-      const patch: Partial<AppState> = {};
+      const delta: Partial<AppState> = {};
       for (const key of changedKeys) {
         if (key !== 'marks') {
-          (patch as any)[key] = newState[key];
+          (delta as any)[key] = newState[key];
         }
       }
 
-      if (Object.keys(patch).length > 0) {
-        output.publish('APPSTATE_MUTATED', patch);
+      if (Object.keys(delta).length > 0) {
+        output.publish('APPSTATE_MUTATED', delta);
       }
 
       // 2. Debounced Background Persistence
@@ -80,12 +118,16 @@ export const stateSyncService = {
    */
   async loadSession(store: AppStateStore, output: OutputAPIInterface, pdfPath: string) {
     try {
+      // Ensure the content is registered in the DB before we do any relational writing (like marks)
+      await ContentRepository.ensureContentExists(pdfPath, 'core.pdf', pdfPath);
+
       // Load individual keys via cascading scopes
-      const leftPct = await StateInitialValuesRepository.getInitialValue('leftPct', ['global']);
-      const selectedMarkId = await StateInitialValuesRepository.getInitialValue('selectedMarkId', ['global']);
-      const scrollTop = await StateInitialValuesRepository.getInitialValue('scrollTop', ['global']);
-      const zoom = await StateInitialValuesRepository.getInitialValue('zoom', ['global']);
-      const tool = await StateInitialValuesRepository.getInitialValue('tool', ['global']);
+      const docScope = ['doc:' + pdfPath, 'global'];
+      const leftPct = await StateInitialValuesRepository.getInitialValue('personalized', 'leftPct', docScope);
+      const selectedMarkId = await StateInitialValuesRepository.getInitialValue('personalized', 'selectedMarkId', docScope);
+      const scrollTop = await StateInitialValuesRepository.getInitialValue('personalized', 'scrollTop', docScope);
+      const zoom = await StateInitialValuesRepository.getInitialValue('personalized', 'zoom', docScope);
+      const tool = await StateInitialValuesRepository.getInitialValue('personalized', 'tool', docScope);
       
       // Marks are still stored in MARKS table as they are relational data, not 4-layer state presets
       const rawMarks = await MarkRepository.loadMarksByContentId(pdfPath);
@@ -106,6 +148,8 @@ export const stateSyncService = {
       const sessionDTO: SessionDTO = {
         pdfPath,
         leftPct,
+        zoom,
+        tool,
         selectedMarkId,
         scrollTop,
         marks: parsedMarks
