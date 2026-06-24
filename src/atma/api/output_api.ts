@@ -1,4 +1,5 @@
 import { MarkDTO, SessionDTO } from '../../shared_doman_models_and_dtos/dtos';
+import { AppState } from '../app_state_store';
 
 export type EventPayloads = {
   SESSION_LOADED: SessionDTO;
@@ -6,8 +7,7 @@ export type EventPayloads = {
   MARK_UPDATED: MarkDTO;
   MARK_DELETED: { markId: string };
   WHITEBOARD_UPDATED: { markId: string };
-  SPLITTER_CHANGED: { leftPct: number };
-  MARK_SELECTED: { markId: string | null };
+  APPSTATE_MUTATED: Partial<AppState>;
 };
 
 export type EventType = keyof EventPayloads;

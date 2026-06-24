@@ -1,0 +1,105 @@
+graph TB
+direction TB
+
+    subgraph STORE["Platform & Storage"]
+            I1["Data Repositories"]
+            I2["Storage Adapter"]
+            I3["Platform Utilities Adapter"]
+            I9["State Repository"]
+            I8["4-layer System"]
+            subgraph FILES["Files Library"]
+                I4["Data File System"]
+                I6["JODO Plugin Files"]
+            end
+            subgraph SQL["SQL Database"]
+                I5["Data SQL Tables"]
+                I10["StateInitialValues SQL Tables"]
+                I7["Roopa, Kram SQL"]
+            end
+        end
+
+    subgraph ATMA["Atma"]
+        direction TB
+        subgraph UI["UI Layer"]
+            
+            N1["UI State (Client State)"]
+            N2["UI Controller"]
+            N3["UI React Components"]
+            N5["Component Pool"]
+            N4['Signal???']
+
+            subgraph Function_UI["Functionality Layer"]
+                D8["Renderer Registries"]
+            end
+        end
+        subgraph BACK["Backend"]
+            subgraph "Orchestration"
+                SERV["Data Services (Mark, tldraw)"]
+                SYNC["StateSyncService (Background Subscriber)"]
+                COMM["Command Processor (undo/redo)"]  
+            end
+            S3["AppStateStore (Server State Cache)"]
+            
+            subgraph API["Backend Boundary"]
+                APIIN["Input Processor"]
+                APIOUT["Output Processor & Event Stream"]
+                QUERY["Query Processor"]
+            end
+            subgraph Function_Backend["Functionality Layer"]
+                D2["Factories"]
+                D3["Capability Registries"]
+                D4["State Machines??"]
+            end
+        end
+        subgraph DOM["Shared Interfaces"]
+            D1["Domain Models"]
+            DTO["DTOs"]
+        end
+    end
+
+    subgraph JODO["JODO API"]
+        J1["Plugins Loaded"]
+    end
+
+    JODO --> D3 & D8
+
+    UI <--> DOM<--> BACK
+
+    I9 --> I8
+    I8 --> I10
+
+    N2 -->|"App State Mutations"| APIIN
+    N2 --> |"Queries and their Responses"| QUERY
+    N3 --> |"on User Interaction"| N2
+    N2 --> |"UI State Mutations"| N1
+    N1 --> |"Reactive Stream"|N3
+    APIOUT --> |"listener"|N2
+    N5 --> |Speed| N3
+
+    %% N2 -->|"App State Mutations"| APIIN
+    %% N2 --> |"Queries and their Responses"| QUERY
+    %% N3 --> |"User Interactions"| N2
+    %% N1 --> |"Reacts to"| N3
+    %% N3 --> |"Read / Render"| N1
+    %% APIOUT --> |"Broadcasts to"| N2
+    %% N2 -->|"Updates UI State / Re-renders"| N3
+    
+    QUERY -->|"Possibly"| SERV
+    QUERY -->|"Read Only"| STORE
+    QUERY --> |"Read Only"| S3
+    APIIN -->|"Direct Mutation"| S3
+    APIIN -->|"No Undo"| SERV
+    APIIN -->|"Undoable actions"| COMM
+    
+    S3 -->|"Notifies Subscriber"| SYNC
+    SYNC -->|"Diffs & Publishes"| APIOUT
+    SYNC -->|"Debounced Persistence"| I9
+    
+
+    %% Explicit Relational Data Writes (Bypassing StateSyncService)
+    SERV -->|"Explicit Data Writes"| I1
+    I1 --> I2
+    I2 --> I4
+    I2 --> I5
+    COMM --> SERV
+    SERV --> I3

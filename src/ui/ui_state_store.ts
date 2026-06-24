@@ -11,22 +11,14 @@ export interface ToastState {
 }
 
 export interface UIState {
-    zoom: number;
     currentPage: number;
     pageInput: string;
-    tool: string;
     activePane: 'pdf' | 'whiteboard';
     editingShapeId: string | null;
     shapeBackup: any | null;
     editingSectionId: string | null;
     sectionTarget: 'start' | 'end';
     toast: ToastState | null;
-    // Core Domain Variables cached for UI presentation
-    leftPct: number;
-    selectedMarkId: string | null;
-    marks: MarkDTO[];
-    pdfPath: string | null;
-    scrollTop: number;
 }
 
 export type UIStateListener = (state: UIState) => void;
@@ -42,18 +34,7 @@ export interface UIStateStore {
  */
 export function createUIStateStore(initialState: Partial<UIState> = {}): UIStateStore {
     let state: UIState = {
-        // non volatile In App State
-        pdfPath: null,
-        leftPct: 50,
-        marks: [],
-        scrollTop: 0,
-        selectedMarkId: null,
-        
-        // non volatile, not in app state        
-        zoom: 1.0,
-        tool: 'select',
-        
-        // volatile
+        // purely volatile UI states
         currentPage: 1,
         pageInput: '1',
         activePane: 'pdf',

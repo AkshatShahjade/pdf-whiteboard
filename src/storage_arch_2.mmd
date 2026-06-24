@@ -13,7 +13,7 @@ flowchart TD
     subgraph State [AppStateStore - In-Memory]
         Store["getState() / setState()
         ---
-        State Variables (Managed by 4-Layer Architecture):
+        Server State Variables:
         • workspace_layout: object
         • tool_config: object
         • zoom: number
@@ -50,28 +50,26 @@ flowchart TD
         I6[updateMark]:::api
         I7[deleteMark]:::api
         I8[saveWhiteboardSnapshot]:::api
-        I9[flushSession]:::api
     end
 
     %% -----------------------------------------
     %% 4. Business Logic Services
     %% -----------------------------------------
     subgraph Services [Business Logic Services]
-        subgraph SessionSvc [session_service.ts]
+        subgraph SyncSvc [state_sync_service.ts]
             S_load[loadSession]:::logic
-            S_upSplit[updateSplitter]:::logic
-            S_selMark[selectMark]:::logic
-            S_upScroll[updateScrollTop]:::logic
-            S_persist[persist forceImmediate: boolean]:::logic
+            S_sub[Store Subscriber]:::logic
             S_debounce((debouncedPersist 600ms Timer)):::logic
-            S_flush((debouncedPersist.flush Immediate)):::logic
         end
 
         subgraph MarkSvc [mark_service.ts]
             M_add[addMark]:::logic
             M_update[updateMark]:::logic
             M_delete[deleteMark]:::logic
-            M_saveWB[saveWhiteboardSnapshot]:::logic
+        end
+
+        subgraph TLDrawSvc [tldraw_service.ts]
+            T_saveWB[saveWhiteboardSnapshot]:::logic
         end
     end
 
@@ -87,67 +85,53 @@ flowchart TD
     end
 
     %% =========================================
-    %% BINDINGS: InputAPI -> Services
+    %% BINDINGS: InputAPI
     %% =========================================
     I1 --> S_load
-    I2 --> S_upSplit
-    I3 --> S_selMark
-    I4 --> S_upScroll
-    I9 -->|Calls persist true| S_persist
+    
+    %% Input API Mutates Store Directly!
+    I2 -->|Mutates leftPct| Store
+    I3 -->|Mutates selectedMarkId| Store
+    I4 -->|Mutates scrollTop| Store
 
     I5 --> M_add
     I6 --> M_update
     I7 --> M_delete
-    I8 --> M_saveWB
+    I8 --> T_saveWB
 
     %% =========================================
-    %% BINDINGS: Services -> Store Mutations
+    %% BINDINGS: State Syncing (The Core Pattern)
     %% =========================================
-    S_load -->|Mutates entire State| Store
-    S_upSplit -->|Mutates leftPct| Store
-    S_selMark -->|Mutates selectedMarkId| Store
-    S_upScroll -->|Mutates scrollTop| Store
+    S_load -->|Initializes| Store
     
-    M_add -->|marks.set| Store
-    M_update -->|marks.set| Store
-    M_delete -->|marks.delete| Store
-
-    %% =========================================
-    %% BINDINGS: Services -> Persistence Trigger
-    %% =========================================
-    S_upSplit -->|persist false| S_persist
-    S_selMark -->|persist false| S_persist
-    S_upScroll -->|persist false| S_persist
+    Store -->|On Mutation| S_sub
+    S_sub -->|1. Emits Event| OutputAPI
+    S_sub -->|2. Enqueues the Delta| S_debounce
     
-    M_add -->|persist true| S_persist
-    M_update -->|persist false| S_persist
-    M_delete -->|persist true| S_persist
-
-    %% =========================================
-    %% BINDINGS: Timer Logic
-    %% =========================================
-    S_persist -->|forceImmediate=false| S_debounce
-    S_persist -->|forceImmediate=true| S_flush
-    
-    S_flush -->|Instantly Executes| ExecuteAll
     S_debounce -.->|Executes after 600ms| ExecuteAll
+
+    %% =========================================
+    %% BINDINGS: Direct Data Writes (Bypassing Sync)
+    %% =========================================
+    M_add -->|Immediate SQL Write| R_Mark
+    M_update -->|Immediate SQL Write| R_Mark
+    M_delete -->|Immediate SQL Write| R_Mark
+
+    M_add -->|Updates Cache| Store
+    M_update -->|Updates Cache| Store
+    M_delete -->|Updates Cache| Store
 
     %% =========================================
     %% BINDINGS: Database Writes
     %% =========================================
     ExecuteAll[[Execute Save Transaction]]:::logic
     
-    ExecuteAll -->|1. ensureContentExists| R_Content
-    ExecuteAll -->|2. setSpecificValue| R_State
-    ExecuteAll -->|3. upsertMarks| R_Mark
+    ExecuteAll -->|setSpecificValue| R_State
 
     %% =========================================
     %% BINDINGS: Whiteboard interactions
     %% =========================================
-    M_saveWB -->|Saves snapshot directly| R_Whiteboard
+    T_saveWB -->|Saves snapshot directly| R_Whiteboard
     M_delete -->|Deletes snapshot file| R_Whiteboard
     
     Q4 -->|Loads snapshot directly| R_Whiteboard
-    
-    %% HomeScreen bypassing everything
-    HomeScreen[HomeScreen.jsx] -->|Creates standalone whiteboard| R_Whiteboard
