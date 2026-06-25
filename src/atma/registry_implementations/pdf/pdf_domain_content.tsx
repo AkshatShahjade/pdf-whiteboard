@@ -14,4 +14,16 @@ export const pdfContentDomain: ContentDomainType = {
         },
     },
     markDomainRegistry: markDomainRegistry,
+    stateVariables: [
+        { name: 'zoom', scope: 'app', persistence: 'personalizable', defaultValue: 1.0 },
+        { name: 'tool', scope: 'app', persistence: 'personalizable', defaultValue: 'select' },
+        { name: 'scrollTop', scope: 'app', persistence: 'personalizable', defaultValue: 0 },
+        { name: 'selectedMarkId', scope: 'app', persistence: 'personalizable', defaultValue: null },
+        { name: 'currentPage', scope: 'ui', persistence: 'volatile', defaultValue: 1 },
+        { name: 'pageInput', scope: 'ui', persistence: 'volatile', defaultValue: '1' },
+        { name: 'editingShapeId', scope: 'ui', persistence: 'volatile', defaultValue: null },
+        { name: 'shapeBackup', scope: 'ui', persistence: 'volatile', defaultValue: null },
+        { name: 'editingSectionId', scope: 'ui', persistence: 'volatile', defaultValue: null },
+        { name: 'sectionTarget', scope: 'ui', persistence: 'volatile', defaultValue: 'start' }
+    ]
 }

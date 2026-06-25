@@ -1,6 +1,13 @@
 import { content_type, ImportCapability, ExportCapability, RAGCapability } from "../../shared_doman_models_and_dtos/content_domain_models"
 import { MarkDomainType } from "./pdf/mark_domain_registry"
 
+export interface SlotStateVariable {
+    name: string;
+    scope: 'app' | 'ui';
+    persistence: 'defaulted' | 'personalizable' | 'volatile';
+    defaultValue: any;
+}
+
 export interface ContentDomainType {
     id: content_type
 
@@ -14,6 +21,7 @@ export interface ContentDomainType {
     }
 
     markDomainRegistry: Map<string, MarkDomainType>
+    stateVariables?: SlotStateVariable[]
 }
 
 export const contentDomainRegistry = new Map<string, ContentDomainType>()
@@ -31,4 +39,17 @@ export function getContentDomainType(id: string): ContentDomainType {
         throw new Error(`No content domain type registered for id: ${id}`)
     }
     return impl
+}
+
+export function createDefaultSlotState(contentId: string, contentType: string, scope: 'app' | 'ui'): any {
+    const domain = getContentDomainType(contentType);
+    const state: Record<string, any> = { contentId, contentType, marks: new Map() };
+    if (domain.stateVariables) {
+        for (const v of domain.stateVariables) {
+            if (scope === 'ui' || v.scope === 'app') {
+                state[v.name] = v.defaultValue;
+            }
+        }
+    }
+    return state;
 }

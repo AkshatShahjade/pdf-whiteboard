@@ -22,6 +22,7 @@ export interface InputAPIInterface {
   saveBackupPath(backupPath: string | null): Promise<void>;
   updateZoom(slotId: string, zoom: number): void;
   updateTool(slotId: string, tool: string): void;
+  updateSlotState(slotId: string, key: string, val: any): void;
 }
 
 /**
@@ -104,6 +105,14 @@ export function createInputAPI(
       store.setState(draft => { 
         if (draft.slots[slotId]) {
           draft.slots[slotId].tool = tool; 
+        }
+      });
+    },
+
+    updateSlotState(slotId: string, key: string, val: any): void {
+      store.setState(draft => {
+        if (draft.slots[slotId]) {
+          (draft.slots[slotId] as any)[key] = val;
         }
       });
     }

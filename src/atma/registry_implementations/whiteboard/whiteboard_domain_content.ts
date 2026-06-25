@@ -13,4 +13,5 @@ export const whiteboardContentDomain: ContentDomainType = {
         }
     },
     markDomainRegistry: new Map(),
+    stateVariables: []
 }

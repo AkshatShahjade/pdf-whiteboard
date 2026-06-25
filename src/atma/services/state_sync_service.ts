@@ -5,6 +5,7 @@ import { MarkRepository } from '../storage/repositories/MarkRepository';
 import { ContentRepository } from '../storage/repositories/ContentRepository';
 import { parseRawMark } from '../../shared_doman_models_and_dtos/factories';
 import { SessionDTO } from '../../shared_doman_models_and_dtos/dtos';
+import { getContentDomainType } from '../capabilities_registry/content_domain_registry';
 
 export function debounce(fn: Function, ms: number) {
   let timer: any = null;
@@ -107,17 +108,33 @@ export const stateSyncService = {
 
       // We need to diff slots manually because mutations are in-place
       const delta: Partial<AppState> = {};
+      const slotDeltas: Record<string, any> = {};
       let slotsChanged = false;
 
       if (!prevState.slots) prevState.slots = {};
       for (const [slotId, slot] of Object.entries(newState.slots)) {
         const prevSlot = prevState.slots[slotId] || {} as any;
-        for (const key of ['zoom', 'tool', 'scrollTop', 'selectedMarkId']) {
+        const slotDelta: Record<string, any> = {};
+        
+        let persistentKeys: string[] = [];
+        try {
+          const domain = getContentDomainType(slot.contentType);
+          persistentKeys = domain.stateVariables
+            ?.filter(v => v.scope === 'app' && v.persistence === 'personalizable')
+            .map(v => v.name) || [];
+        } catch (err) {
+          persistentKeys = ['zoom', 'tool', 'scrollTop', 'selectedMarkId'];
+        }
+
+        for (const key of persistentKeys) {
           if ((slot as any)[key] !== prevSlot[key]) {
              slotsChanged = true;
-             // Publish the change? OutputAPI expects APPSTATE_MUTATED
+             slotDelta[key] = (slot as any)[key];
              persistSlotVar(slotId, key, (slot as any)[key], slot.contentId);
           }
+        }
+        if (Object.keys(slotDelta).length > 0) {
+          slotDeltas[slotId] = slotDelta;
         }
       }
 
@@ -135,7 +152,7 @@ export const stateSyncService = {
 
       if (slotsChanged) {
         // Publish slots changed
-        output.publish('APPSTATE_MUTATED', { slots: newState.slots });
+        output.publish('APPSTATE_MUTATED', { slots: slotDeltas });
       }
 
       // Deep clone prev state for primitive diffing next time

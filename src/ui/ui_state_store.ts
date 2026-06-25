@@ -22,7 +22,7 @@ export interface SlotUIState extends SlotAppState {
 }
 
 export type UIState = Omit<AppState, 'slots'> & {
-    activePane: string; // slotId of active pane
+    activeSlot: string; // slotId of active slot
     toast: ToastState | null;
     slots: Record<string, SlotUIState>;
 }
@@ -41,7 +41,7 @@ export interface UIStateStore {
 export function createUIStateStore(initialState: Partial<UIState> = {}): UIStateStore {
     let state: UIState = {
         // purely volatile UI states
-        activePane: 'main', // default active slot
+        activeSlot: 'main', // default active slot
         toast: null,
         slots: {},
         // These are required by AppState but usually provided by initialState:

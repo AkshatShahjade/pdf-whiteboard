@@ -42,7 +42,7 @@ function WhiteboardPane({ slotId, markId, settings, uiController }: { slotId: st
 function TldrawWithPersistence({ slotId, markId, initialSnapshot, settings, uiController }: { slotId: string; markId: string; initialSnapshot?: any; settings?: any; uiController?: UIController }) {
   const debouncedSave = useMemo(() => debounce((snap: any) => {
     if (uiController) {
-      uiController.saveWhiteboardSnapshot(slotId, snap, markId) 
+      uiController.saveWhiteboardSnapshot(markId, snap, slotId) 
     } else {
       inputAPI.saveWhiteboardSnapshot(slotId, markId, snap) // fallback if no controller is provided
     }
