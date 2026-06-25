@@ -477,7 +477,7 @@ function PDFContentComponent({
       regionId: markId,
       selectedRegionId: slotState.selectedMarkId,
       actions: {
-        confirmDelete: async () => true, // Extracted simplified
+        confirmDelete: async () => await confirmDialog('Delete this mark?', 'Delete Mark'),
         deleteRegion: (id) => {
           setMarksWithSectionWidths?.((prev: any) => prev.filter((r: any) => r.id !== id));
         },
