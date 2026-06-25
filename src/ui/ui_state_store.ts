@@ -5,22 +5,26 @@
 
 import { MarkDTO } from '../shared_doman_models_and_dtos/dtos';
 
-import { AppState } from '../atma/app_state_store';
+import { AppState, SlotAppState } from '../atma/app_state_store';
 
 export interface ToastState {
     msg: string;
     type: 'info' | 'success' | 'error';
 }
 
-export type UIState = AppState & {
+export interface SlotUIState extends SlotAppState {
     currentPage: number;
     pageInput: string;
-    activePane: 'pdf' | 'whiteboard';
     editingShapeId: string | null;
     shapeBackup: any | null;
     editingSectionId: string | null;
     sectionTarget: 'start' | 'end';
+}
+
+export type UIState = Omit<AppState, 'slots'> & {
+    activePane: string; // slotId of active pane
     toast: ToastState | null;
+    slots: Record<string, SlotUIState>;
 }
 
 export type UIStateListener = (state: UIState) => void;
@@ -37,14 +41,14 @@ export interface UIStateStore {
 export function createUIStateStore(initialState: Partial<UIState> = {}): UIStateStore {
     let state: UIState = {
         // purely volatile UI states
-        currentPage: 1,
-        pageInput: '1',
-        activePane: 'pdf',
-        editingShapeId: null,
-        shapeBackup: null,
-        editingSectionId: null,
-        sectionTarget: 'start',
+        activePane: 'main', // default active slot
         toast: null,
+        slots: {},
+        // These are required by AppState but usually provided by initialState:
+        workspace_layout: { screens: [] },
+        tool_config: {},
+        libraryPath: null,
+        leftPct: 50,
         ...initialState,
     };
 

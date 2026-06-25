@@ -40,6 +40,7 @@ function LazyPage({ pageNumber, width, scale }: { pageNumber: number, width: num
 }
 
 function PDFContentComponent({ 
+  slotId,
   contentId: pdfPath, 
   settings,
   uiState,
@@ -55,6 +56,8 @@ function PDFContentComponent({
   pendingToolActivationReasonRef,
 }: ContentRendererProps & any) {
   const PDF_WIDTH = 800;
+
+  const slotState = uiState?.slots[slotId];
 
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pdfReady, setPdfReady] = useState(false);
@@ -92,9 +95,9 @@ function PDFContentComponent({
             zoomTimeoutRef.current = null;
           }, 250);
           if (e.deltaY > 0) {
-            uiController.setZoom(Math.max(0.5, uiState.zoom - 0.25));
+            uiController.setZoom(Math.max(0.5, (slotState?.zoom || 1) - 0.25), slotId);
           } else {
-            uiController.setZoom(Math.min(3.0, uiState.zoom + 0.25));
+            uiController.setZoom(Math.min(3.0, (slotState?.zoom || 1) + 0.25), slotId);
           }
         }
       } else if (e.shiftKey) {
@@ -110,7 +113,7 @@ function PDFContentComponent({
       pdfWrapper.removeEventListener('wheel', handleWheel);
       if (zoomTimeoutRef.current) clearTimeout(zoomTimeoutRef.current);
     };
-  }, [uiState?.zoom, uiController]);
+  }, [slotState?.zoom, uiController, slotId]);
 
   // Scroll Restoration
   const scrollRestored = useRef(false);
@@ -119,23 +122,23 @@ function PDFContentComponent({
   }, [pdfPath]);
 
   useEffect(() => {
-    if (pdfReady && !scrollRestored.current && pdfScrollRef.current && uiState?.scrollTop) {
-      pdfScrollRef.current.scrollTop = uiState.scrollTop;
+    if (pdfReady && !scrollRestored.current && pdfScrollRef.current && slotState?.scrollTop) {
+      pdfScrollRef.current.scrollTop = slotState.scrollTop;
       scrollRestored.current = true;
     }
-  }, [pdfReady, uiState?.scrollTop]);
+  }, [pdfReady, slotState?.scrollTop]);
 
   const handleScroll = useCallback(() => {
-    if (pdfScrollRef.current && pdfPath && uiState && uiController) {
-      inputAPI.updateScrollTop(pdfPath, pdfScrollRef.current.scrollTop);
-      const pageHeight = PDF_WIDTH * uiState.zoom * 1.414;
+    if (pdfScrollRef.current && pdfPath && slotState && uiController) {
+      inputAPI.updateScrollTop(slotId, pdfScrollRef.current.scrollTop);
+      const pageHeight = PDF_WIDTH * slotState.zoom * 1.414;
       const newPage = Math.floor(pdfScrollRef.current.scrollTop / pageHeight) + 1;
-      uiController.setCurrentPage(newPage);
+      uiController.setCurrentPage(newPage, slotId);
       if (document.activeElement?.id !== 'page-input') {
-        uiController.setPageInput(String(newPage));
+        uiController.setPageInput(String(newPage), slotId);
       }
     }
-  }, [pdfPath, uiState?.zoom, uiController]);
+  }, [pdfPath, slotState?.zoom, uiController, slotId, slotState]);
 
   // Scrolling animation for drag
   useEffect(() => {
@@ -165,15 +168,15 @@ function PDFContentComponent({
 
         if (scrolled && pdfContentRef.current && dragStateRef?.current) {
           const contentRect = pdfContentRef.current.getBoundingClientRect();
-          const coords = { x: (clientX - contentRect.left) / uiState.zoom, y: (clientY - contentRect.top) / uiState.zoom };
+          const coords = { x: (clientX - contentRect.left) / slotState.zoom, y: (clientY - contentRect.top) / slotState.zoom };
           const state = dragStateRef.current;
-          getToolType(uiState.tool).onPointerMove?.({
+          if (slotState.tool) getToolType(slotState.tool).onPointerMove?.({
             coords,
             state: {
               currentSelection: state.currentSelection,
-              editingShapeId: uiState.editingShapeId,
-              tool: uiState.tool,
-              zoom: uiState.zoom,
+              editingShapeId: slotState.editingShapeId,
+              tool: slotState.tool,
+              zoom: slotState.zoom,
             },
             actions: {
               setCurrentSelection,
@@ -198,25 +201,25 @@ function PDFContentComponent({
 
     scrollAnimRef.current = requestAnimationFrame(scrollStep);
     return () => { if (scrollAnimRef.current) cancelAnimationFrame(scrollAnimRef.current); }
-  }, [currentSelection, movingMark, uiState?.zoom, uiState?.tool, uiState?.editingShapeId, setMarksWithSectionWidths, setCurrentSelection, dragStateRef]);
+  }, [currentSelection, movingMark, slotState?.zoom, slotState?.tool, slotState?.editingShapeId, setMarksWithSectionWidths, setCurrentSelection, dragStateRef]);
 
   const getUnscaledCoordsFromClient = useCallback((clientX: number, clientY: number) => {
-    if (!pdfContentRef.current || !uiState) return { x: 0, y: 0 };
+    if (!pdfContentRef.current || !slotState) return { x: 0, y: 0 };
     const rect = pdfContentRef.current.getBoundingClientRect();
-    return { x: (clientX - rect.left) / uiState.zoom, y: (clientY - rect.top) / uiState.zoom };
-  }, [uiState?.zoom]);
+    return { x: (clientX - rect.left) / slotState.zoom, y: (clientY - rect.top) / slotState.zoom };
+  }, [slotState?.zoom]);
 
   const getUnscaledCoords = useCallback((e: React.PointerEvent) => {
     return getUnscaledCoordsFromClient(e.clientX, e.clientY);
   }, [getUnscaledCoordsFromClient]);
 
   const handleDivPointerDown = useCallback((e: React.PointerEvent) => {
-    if (e.button !== 0 || !uiState) return;
+    if (e.button !== 0 || !slotState) return;
     const coords = getUnscaledCoords(e);
 
     if (e.ctrlKey || e.metaKey) {
       const hit = [...marks].reverse().find((r) => {
-        const selectionContext = {PDFWIDTH: PDF_WIDTH, zoom: uiState.zoom};
+        const selectionContext = {PDFWIDTH: PDF_WIDTH, zoom: slotState.zoom};
         return getMarkDomainType(r.type).hasSelectedBorder(coords, r, selectionContext);
       });
 
@@ -227,56 +230,58 @@ function PDFContentComponent({
           hit,
           coords,
           actions: {
-            setTool: uiController.setTool,
+            setTool: (tool) => uiController.setTool(tool, slotId),
             setCurrentSelection,
-            setEditingSectionId: uiController.setEditingSectionId,
-            setEditingShapeId: uiController.setEditingShapeId,
-            setShapeBackup: uiController.setShapeBackup,
+            setEditingSectionId: (id) => uiController.setEditingSectionId(id, slotId),
+            setEditingShapeId: (id) => uiController.setEditingShapeId(id, slotId),
+            setShapeBackup: (backup) => uiController.setShapeBackup(backup, slotId),
             setMovingRegion: setMovingMark,
-            setSectionTarget: uiController.setSectionTarget,
+            setSectionTarget: (target) => uiController.setSectionTarget(target, slotId),
           },
         });
       }
       return;
     }
 
-    const toolType = getToolType(uiState.tool);
+    if (!slotState?.tool) return;
+    if (!slotState?.tool) return;
+    const toolType = getToolType(slotState.tool);
     const handled = toolType.onPointerDown?.({
       e,
       coords,
       state: {
         currentSelection,
-        editingShapeId: uiState.editingShapeId,
-        sectionTarget: uiState.sectionTarget,
-        tool: uiState.tool,
-        zoom: uiState.zoom,
+        editingShapeId: slotState.editingShapeId,
+        sectionTarget: slotState.sectionTarget,
+        tool: slotState.tool,
+        zoom: slotState.zoom,
       },
       actions: {
         setCurrentSelection,
-        setEditingShapeId: uiController.setEditingShapeId,
-        setShapeBackup: uiController.setShapeBackup,
-        setSectionTarget: uiController.setSectionTarget,
+        setEditingShapeId: (id) => uiController.setEditingShapeId(id, slotId),
+        setShapeBackup: (backup) => uiController.setShapeBackup(backup, slotId),
+        setSectionTarget: (target) => uiController.setSectionTarget(target, slotId),
         setMovingRegion: setMovingMark,
-        setTool: uiController.setTool,
+        setTool: (tool) => uiController.setTool(tool, slotId),
         setMarksWithSectionWidths,
-        setSelectedMarkId: uiController.setSelectedMarkId,
+        setSelectedMarkId: (id) => uiController.setSelectedMarkId(id, slotId),
       },
     });
 
     if (handled) return;
-  }, [uiState, uiController, marks, getUnscaledCoords, currentSelection, setMarksWithSectionWidths, setCurrentSelection, setMovingMark, pendingToolActivationReasonRef]);
+  }, [slotState, uiController, marks, getUnscaledCoords, currentSelection, setMarksWithSectionWidths, setCurrentSelection, setMovingMark, pendingToolActivationReasonRef, slotId]);
 
   const handleDivPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!uiState) return;
+    if (!slotState) return;
     mousePosRef.current = { x: e.clientX, y: e.clientY };
     const coords = getUnscaledCoords(e);
-    getToolType(uiState.tool).onPointerMove?.({
+    if (slotState?.tool) getToolType(slotState.tool).onPointerMove?.({
       coords,
       state: {
         currentSelection,
-        editingShapeId: uiState.editingShapeId,
-        tool: uiState.tool,
-        zoom: uiState.zoom,
+        editingShapeId: slotState.editingShapeId,
+        tool: slotState.tool,
+        zoom: slotState.zoom,
       },
       actions: {
         setCurrentSelection,
@@ -297,33 +302,35 @@ function PDFContentComponent({
   }, [currentSelection, movingMark, getUnscaledCoords, uiState, setMarksWithSectionWidths, setCurrentSelection]);
 
   const handleDivPointerUp = useCallback((e: React.PointerEvent) => {
-    if (!uiState) return;
+    if (!slotState) return;
     if (e?.currentTarget?.hasPointerCapture?.(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
     if(currentSelection && getMarkRendererType(currentSelection.type).isDrawable){
-      getToolType(currentSelection.type).onPointerUp?.({
+      if (currentSelection?.type) getToolType(currentSelection.type).onPointerUp?.({
         currentSelection,
-        editingShapeId: uiState.editingShapeId,
-        tool: uiState.tool,
-        zoom: uiState.zoom,
+        editingShapeId: slotState.editingShapeId,
+        tool: slotState.tool,
+        zoom: slotState.zoom,
         actions: {
           setCurrentSelection,
           setMarksWithSectionWidths,
-          setSelectedMarkId: uiController.setSelectedMarkId,
+          setSelectedMarkId: (id) => uiController.setSelectedMarkId(id, slotId),
         },
       });
     }
     setMovingMark(null);
-  }, [currentSelection, uiState, uiController, setMarksWithSectionWidths, setCurrentSelection, setMovingMark]);
+  }, [currentSelection, slotState, uiController, setMarksWithSectionWidths, setCurrentSelection, setMovingMark, slotId]);
 
   const handleBorderClick = useCallback(async (e: any, markId: string) => {
     e.stopPropagation();
-    if (!uiState) return;
-    const toolType = getToolType(uiState.tool);
+    if (!slotState) return;
+    if (!slotState?.tool) return;
+    if (!slotState?.tool) return;
+    const toolType = getToolType(slotState.tool);
     await toolType.onBorderClick?.({
       regionId: markId,
-      selectedRegionId: uiState.selectedMarkId,
+      selectedRegionId: slotState.selectedMarkId,
       actions: {
         confirmDelete: async () => true, // Extracted simplified
         deleteRegion: (id) => {
@@ -333,14 +340,14 @@ function PDFContentComponent({
         clearShortcutUi: () => {}, // Handled by shortcutManager in WorkspaceContainer
       },
     });
-  }, [uiState, selectMark, setMarksWithSectionWidths]);
+  }, [slotState, selectMark, setMarksWithSectionWidths]);
 
   // Determine cursor
-  const toolType = uiState ? getToolType(uiState.tool) : null;
+  const toolType = slotState?.tool ? getToolType(slotState.tool) : null;
   const pdfCursor = movingMark
     ? 'grabbing'
     : (toolType && typeof toolType.cursor === 'function'
-        ? toolType.cursor({ sectionTarget: uiState?.sectionTarget })
+        ? toolType.cursor({ sectionTarget: slotState?.sectionTarget })
         : toolType?.cursor) || 'default';
 
   return (
@@ -355,7 +362,7 @@ function PDFContentComponent({
         {documentFile ? (
           <Document file={documentFile} onLoadSuccess={({ numPages }) => { setNumPages(numPages); setPdfReady(true); }} onLoadError={(error) => console.error("PDF Load Error:", error)}>
             {Array.from({ length: numPages ?? 0 }, (_, i) => (
-              <LazyPage key={`${pdfPath}-${i}`} pageNumber={i + 1} width={PDF_WIDTH} scale={uiState?.zoom || 1} />
+              <LazyPage key={`${pdfPath}-${i}`} pageNumber={i + 1} width={PDF_WIDTH} scale={slotState?.zoom || 1} />
             ))}
           </Document>
         ) : (
@@ -365,12 +372,12 @@ function PDFContentComponent({
         <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible', zIndex: 10, pointerEvents: 'none' }}>
           {marks.map((r: any, idx: number) => {
             const color = markColor(r.id);
-            const isSelected = uiState?.selectedMarkId === r.id;
-            let renderCtx = { zoom: uiState?.zoom || 1, PDFWIDTH: PDF_WIDTH, tool: uiState?.tool, color, idx, onClick: handleBorderClick, isSelected };
+            const isSelected = slotState?.selectedMarkId === r.id;
+            let renderCtx = { zoom: slotState?.zoom || 1, PDFWIDTH: PDF_WIDTH, tool: slotState?.tool, color, idx, onClick: handleBorderClick, isSelected };
             return getMarkRendererType(r.type).render(r, renderCtx);
           })}
           {currentSelection && 
-            getMarkRendererType(currentSelection.type).renderSelectionPreview(currentSelection, { zoom: uiState?.zoom || 1, PDFWIDTH: PDF_WIDTH })
+            getMarkRendererType(currentSelection.type).renderSelectionPreview(currentSelection, { zoom: slotState?.zoom || 1, PDFWIDTH: PDF_WIDTH })
           } 
         </svg>
       </div>

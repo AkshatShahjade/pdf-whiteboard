@@ -32,15 +32,19 @@ export interface SectionMarkDTO {
 
 export type MarkDTO = RectMarkDTO | LassoMarkDTO | SectionMarkDTO;
 
-export interface SessionDTO {
-  pdfPath: string;
-  leftPct: number;
+export interface SlotSessionDTO {
+  contentId: string;
+  contentType: string;
   zoom: number;
   tool: string;
   selectedMarkId: string | null;
   scrollTop: number;
   marks: MarkDTO[];
-  // Extended metadata slot for future integrations
+}
+
+export interface SessionDTO {
+  leftPct: number;
+  slots: Record<string, SlotSessionDTO>;
   metadata?: Record<string, any>;
 }
 

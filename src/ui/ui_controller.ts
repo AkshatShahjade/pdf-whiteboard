@@ -5,19 +5,20 @@ import { inputAPI, outputAPI } from '../atma/singletons';
  * UIController - Interface encapsulating all low-frequency UI state mutations.
  */
 export interface UIController {
-    setZoom: (zoom: number) => void;
+    setZoom: (zoom: number, slotId?: string) => void;
     setLeftPct: (pct: number) => void;
-    setCurrentPage: (currentPage: number) => void;
-    setPageInput: (pageInput: string) => void;
-    setTool: (tool: string) => void;
-    setSelectedMarkId: (selectedMarkId: string | null) => void;
-    setActivePane: (activePane: 'pdf' | 'whiteboard') => void;
-    setEditingShapeId: (editingShapeId: string | null) => void;
-    setShapeBackup: (shapeBackup: any) => void;
-    setEditingSectionId: (editingSectionId: string | null) => void;
-    setSectionTarget: (sectionTarget: 'start' | 'end') => void;
+    setCurrentPage: (currentPage: number, slotId?: string) => void;
+    setPageInput: (pageInput: string, slotId?: string) => void;
+    setTool: (tool: string, slotId?: string) => void;
+    setSelectedMarkId: (selectedMarkId: string | null, slotId?: string) => void;
+    setActivePane: (activePane: string) => void;
+    setEditingShapeId: (editingShapeId: string | null, slotId?: string) => void;
+    setShapeBackup: (shapeBackup: any, slotId?: string) => void;
+    setEditingSectionId: (editingSectionId: string | null, slotId?: string) => void;
+    setSectionTarget: (sectionTarget: 'start' | 'end', slotId?: string) => void;
     showToast: (msg: string, type?: ToastState['type']) => void;
     clearToast: () => void;
+    saveWhiteboardSnapshot: (markId: string, snapshot: any, slotId?: string) => void;
     connect: () => () => void;
 }
 
@@ -27,43 +28,64 @@ export interface UIController {
 export function createUIController(store: UIStateStore): UIController {
     return {
         // ─── UI Actions (Write/Command Path Delegates) ────────────────────────────
-        setZoom: (zoom) => {
-            inputAPI.updateZoom(zoom);
+        setZoom: (zoom, slotId) => {
+            inputAPI.updateZoom(slotId || store.getState().activePane, zoom);
         },
         setLeftPct: (leftPct) => {
             inputAPI.updateSplitter(leftPct);
         },
-        setCurrentPage: (currentPage) => {
-            if (store.getState().currentPage === currentPage) return;
+        setCurrentPage: (currentPage, slotId) => {
+            const target = slotId || store.getState().activePane;
+            const state = store.getState();
+            if (state.slots[target]?.currentPage === currentPage) return;
             store.setState({
-                currentPage,
-                pageInput: String(currentPage),
+                slots: { ...state.slots, [target]: { ...state.slots[target], currentPage, pageInput: String(currentPage) } }
             });
         },
-        setPageInput: (pageInput) => {
-            if (store.getState().pageInput === pageInput) return;
-            store.setState({ pageInput });
+        setPageInput: (pageInput, slotId) => {
+            const target = slotId || store.getState().activePane;
+            const state = store.getState();
+            if (state.slots[target]?.pageInput === pageInput) return;
+            store.setState({
+                slots: { ...state.slots, [target]: { ...state.slots[target], pageInput } }
+            });
         },
-        setTool: (tool) => {
-            inputAPI.updateTool(tool);
+        setTool: (tool, slotId) => {
+            inputAPI.updateTool(slotId || store.getState().activePane, tool);
         },
-        setSelectedMarkId: (selectedMarkId) => {
-            inputAPI.selectMark(selectedMarkId);
+        setSelectedMarkId: (selectedMarkId, slotId) => {
+            inputAPI.selectMark(slotId || store.getState().activePane, selectedMarkId);
         },
         setActivePane: (activePane) => {
             store.setState({ activePane });
         },
-        setEditingShapeId: (editingShapeId) => {
-            store.setState({ editingShapeId });
+        setEditingShapeId: (editingShapeId, slotId) => {
+            const target = slotId || store.getState().activePane;
+            const state = store.getState();
+            store.setState({
+                slots: { ...state.slots, [target]: { ...state.slots[target], editingShapeId } }
+            });
         },
-        setShapeBackup: (shapeBackup) => {
-            store.setState({ shapeBackup });
+        setShapeBackup: (shapeBackup, slotId) => {
+            const target = slotId || store.getState().activePane;
+            const state = store.getState();
+            store.setState({
+                slots: { ...state.slots, [target]: { ...state.slots[target], shapeBackup } }
+            });
         },
-        setEditingSectionId: (editingSectionId) => {
-            store.setState({ editingSectionId });
+        setEditingSectionId: (editingSectionId, slotId) => {
+            const target = slotId || store.getState().activePane;
+            const state = store.getState();
+            store.setState({
+                slots: { ...state.slots, [target]: { ...state.slots[target], editingSectionId } }
+            });
         },
-        setSectionTarget: (sectionTarget) => {
-            store.setState({ sectionTarget });
+        setSectionTarget: (sectionTarget, slotId) => {
+            const target = slotId || store.getState().activePane;
+            const state = store.getState();
+            store.setState({
+                slots: { ...state.slots, [target]: { ...state.slots[target], sectionTarget } }
+            });
         },
         showToast: (msg, type = 'info') => {
             store.setState({
@@ -73,40 +95,86 @@ export function createUIController(store: UIStateStore): UIController {
         clearToast: () => {
             store.setState({ toast: null });
         },
+        saveWhiteboardSnapshot: (markId, snapshot, slotId) => {
+            inputAPI.saveWhiteboardSnapshot(slotId || store.getState().activePane, markId, snapshot);
+        },
 
         // ─── OutputAPI Event Subscriptions (Read/Event Path) ──────────────────────
         connect: () => {
             const subs = [
-                outputAPI.subscribe('SESSION_LOADED', (session) => {
+                outputAPI.subscribe('SESSION_LOADED', (session: any) => {
+                    const newSlots: Record<string, any> = {};
+                    for (const [slotId, slotSession] of Object.entries(session.slots)) {
+                        newSlots[slotId] = {
+                            ...(store.getState().slots[slotId] || {}),
+                            ...slotSession,
+                            marks: new Map((slotSession as any).marks.map((m: any) => [m.id, m])),
+                            currentPage: 1, // Reset UI specifics
+                            pageInput: '1',
+                            editingShapeId: null,
+                            shapeBackup: null,
+                            editingSectionId: null,
+                            sectionTarget: 'start'
+                        };
+                    }
+
                     store.setState({
-                        marks: session.marks,
-                        pdfPath: session.pdfPath,
                         leftPct: session.leftPct,
-                        zoom: session.zoom,
-                        tool: session.tool,
-                        selectedMarkId: session.selectedMarkId,
-                        scrollTop: session.scrollTop
+                        slots: newSlots
                     });
                 }),
-                outputAPI.subscribe('APPSTATE_MUTATED', (patch) => {
-                    store.setState(patch as Partial<UIState>);
+                outputAPI.subscribe('APPSTATE_MUTATED', (patch: any) => {
+                    const currentState = store.getState();
+                    if (patch.slots) {
+                        const newSlots = { ...currentState.slots };
+                        for (const [slotId, slotPatch] of Object.entries(patch.slots)) {
+                           newSlots[slotId] = { ...(newSlots[slotId] || {}), ...(slotPatch as any) };
+                        }
+                        store.setState({ ...patch, slots: newSlots });
+                    } else {
+                        store.setState(patch as Partial<UIState>);
+                    }
                 }),
-                outputAPI.subscribe('MARK_ADDED', (mark) => {
-                    const { marks } = store.getState();
-                    store.setState({ marks: [...marks, mark] });
+                outputAPI.subscribe('MARK_ADDED', (mark: any) => {
+                    // Requires activePane because MARK_ADDED output doesn't broadcast slotId natively.
+                    // To do it perfectly, MARK_ADDED could contain slotId.
+                    const state = store.getState();
+                    const activeSlot = state.activePane;
+                    if (state.slots[activeSlot]) {
+                        const newMarks = new Map(state.slots[activeSlot].marks);
+                        newMarks.set(mark.id, mark);
+                        store.setState({
+                            slots: { ...state.slots, [activeSlot]: { ...state.slots[activeSlot], marks: newMarks } }
+                        });
+                    }
                 }),
-                outputAPI.subscribe('MARK_UPDATED', (mark) => {
-                    const { marks } = store.getState();
-                    store.setState({
-                        marks: marks.map(m => m.id === mark.id ? mark : m)
-                    });
+                outputAPI.subscribe('MARK_UPDATED', (mark: any) => {
+                    const state = store.getState();
+                    const activeSlot = state.activePane;
+                    if (state.slots[activeSlot]) {
+                        const newMarks = new Map(state.slots[activeSlot].marks);
+                        newMarks.set(mark.id, mark);
+                        store.setState({
+                            slots: { ...state.slots, [activeSlot]: { ...state.slots[activeSlot], marks: newMarks } }
+                        });
+                    }
                 }),
-                outputAPI.subscribe('MARK_DELETED', (payload) => {
-                    const { marks, selectedMarkId } = store.getState();
-                    store.setState({
-                        marks: marks.filter(m => m.id !== payload.markId),
-                        ...(selectedMarkId === payload.markId ? { selectedMarkId: null } : {})
-                    });
+                outputAPI.subscribe('MARK_DELETED', (payload: any) => {
+                    const state = store.getState();
+                    const activeSlot = state.activePane;
+                    if (state.slots[activeSlot]) {
+                        const newMarks = new Map(state.slots[activeSlot].marks);
+                        newMarks.delete(payload.markId);
+                        
+                        let newSelectedId = state.slots[activeSlot].selectedMarkId;
+                        if (newSelectedId === payload.markId) {
+                            newSelectedId = null;
+                        }
+
+                        store.setState({
+                            slots: { ...state.slots, [activeSlot]: { ...state.slots[activeSlot], marks: newMarks, selectedMarkId: newSelectedId } }
+                        });
+                    }
                 })
             ];
 

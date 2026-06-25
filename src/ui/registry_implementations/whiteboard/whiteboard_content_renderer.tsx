@@ -5,6 +5,7 @@ import { debounce } from '../../../atma/services/state_sync_service.js'
 import { inputAPI, queryAPI } from '../../../atma/singletons.js'
 import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './tools/editing/handwriting_whiteboard_editing_tool.jsx'
 import { ContentRendererType, ContentRendererProps } from '../../renderer_registry/content_renderer_registry.js'
+import { UIController } from '../../ui_controller.js'
 
 const handwritingAssetUrls = {
   icons: {
@@ -12,20 +13,20 @@ const handwritingAssetUrls = {
   },
 }
 
-function WhiteboardPane({ markId, settings }: { markId: string; settings?: any }) {
+function WhiteboardPane({ slotId, markId, settings, uiController }: { slotId: string; markId: string; settings?: any; uiController?: UIController }) {
   const [snapshot, setSnapshot] = useState<any>(null)
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    queryAPI.getWhiteboardSnapshot(markId).then((snap: any) => {
+    queryAPI.getWhiteboardSnapshot(slotId, markId).then((snap: any) => {
       if (!cancelled) {
         setSnapshot(snap ?? undefined)
         setLoaded(true)
       }
     })
     return () => { cancelled = true }
-  }, [markId])
+  }, [slotId, markId])
 
   if (!loaded) {
     return (
@@ -35,11 +36,17 @@ function WhiteboardPane({ markId, settings }: { markId: string; settings?: any }
     )
   }
 
-  return <TldrawWithPersistence markId={markId} initialSnapshot={snapshot} settings={settings} />
+  return <TldrawWithPersistence slotId={slotId} markId={markId} initialSnapshot={snapshot} settings={settings} uiController={uiController} />
 }
 
-function TldrawWithPersistence({ markId, initialSnapshot, settings }: { markId: string; initialSnapshot?: any; settings?: any }) {
-  const debouncedSave = useMemo(() => debounce((snap: any) => inputAPI.saveWhiteboardSnapshot(markId, snap), 800), [markId])
+function TldrawWithPersistence({ slotId, markId, initialSnapshot, settings, uiController }: { slotId: string; markId: string; initialSnapshot?: any; settings?: any; uiController?: UIController }) {
+  const debouncedSave = useMemo(() => debounce((snap: any) => {
+    if (uiController) {
+      uiController.saveWhiteboardSnapshot(slotId, snap, markId) 
+    } else {
+      inputAPI.saveWhiteboardSnapshot(slotId, markId, snap) // fallback if no controller is provided
+    }
+  }, 800), [slotId, markId, uiController])
 
   const handleMount = useCallback((editor: any) => {
     if (initialSnapshot) {
@@ -90,10 +97,10 @@ function TldrawWithPersistence({ markId, initialSnapshot, settings }: { markId: 
   )
 }
 
-function WhiteboardContentComponent({ contentId, settings }: ContentRendererProps) {
+function WhiteboardContentComponent({ slotId, contentId, settings, uiController }: ContentRendererProps) {
   return (
     <div style={{ width: '100%', height: '100%' }}>
-      <WhiteboardPane markId={contentId} settings={settings} />
+      <WhiteboardPane slotId={slotId} markId={contentId} settings={settings} uiController={uiController as UIController | undefined} />
     </div>
   )
 }

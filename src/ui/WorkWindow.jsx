@@ -115,6 +115,25 @@ function SaveIndicator({ savedAt }) {
 export default function Root() {
   const [session, setSession] = useState(null);
 
+  const uiStore = useMemo(() => {
+    if (!session) return null;
+    return createUIStateStore({
+      ...DEFAULT_APP_STATE,
+      leftPct: session.settings?.defaultSplit ?? DEFAULT_APP_STATE.leftPct,
+      marks: [],
+      pdfPath: session.pdfPath || null,
+      activePane: session.mode === 'whiteboard' ? 'whiteboard' : 'pdf',
+    });
+  }, [session]);
+
+  const uiController = useMemo(() => uiStore ? createUIController(uiStore) : null, [uiStore]);
+  
+  useEffect(() => {
+    if (uiController) {
+      return uiController.connect();
+    }
+  }, [uiController]);
+
   if (!session) {
     return (
       <HomeScreen
@@ -128,6 +147,7 @@ export default function Root() {
       />
     );
   }
+
   if (session.mode === 'whiteboard') {
     return (
       <WhiteboardOnlyApp
@@ -135,10 +155,11 @@ export default function Root() {
         whiteboardName={session.whiteboardName}
         settings={session.settings}
         onHome={() => setSession(null)}
+        uiController={uiController}
       />
     );
   }
-  return <WorkspaceContainer pdfPath={session.pdfPath} settings={session.settings} onHome={() => setSession(null)} />;
+  return <WorkspaceContainer pdfPath={session.pdfPath} settings={session.settings} onHome={() => setSession(null)} uiStore={uiStore} uiController={uiController} />;
 }
 
 function WorkspaceHeader({ title, onHome, onBackup, savedAt, headerVisible, setHeaderVisible }) {
@@ -179,7 +200,7 @@ function WorkspaceHeader({ title, onHome, onBackup, savedAt, headerVisible, setH
   );
 }
 
-function WhiteboardOnlyApp({ whiteboardId, whiteboardName, settings, onHome }) {
+function WhiteboardOnlyApp({ whiteboardId, whiteboardName, settings, onHome, uiController }) {
   const [headerVisible, setHeaderVisible] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const [toast, setToast] = useState(null);
@@ -202,8 +223,10 @@ function WhiteboardOnlyApp({ whiteboardId, whiteboardName, settings, onHome }) {
       <WorkspaceHeader title={`Whiteboard: ${whiteboardName || 'Untitled'}`} onHome={onHome} onBackup={handleBackup} savedAt={lastSavedAt} headerVisible={headerVisible} setHeaderVisible={setHeaderVisible} />
       <div style={{ width: '100%', height: '100%' }}>
         {whiteboardContentRenderer.Component({
+          slotId: 'main',
           contentId: whiteboardId,
-          settings
+          settings,
+          uiController
         })}
       </div>
     </div>
@@ -211,23 +234,15 @@ function WhiteboardOnlyApp({ whiteboardId, whiteboardName, settings, onHome }) {
 }
 
 // ─── WorkspaceContainer ─────────────────────────────────────────────────────────────
-function WorkspaceContainer({ pdfPath, settings, onHome }) {
+function WorkspaceContainer({ pdfPath, settings, onHome, uiStore, uiController }) {
   const PDF_WIDTH = 800;
 
   // PDF visual state and refs have been moved to pdf_content_renderer
-  // UI Decoupled Store & Controller
-  const uiStore = useMemo(() => createUIStateStore({
-    ...DEFAULT_APP_STATE,
-    leftPct: settings?.defaultSplit ?? DEFAULT_APP_STATE.leftPct,
-    marks: [],
-    pdfPath: pdfPath,
-  }), [pdfPath, settings]);
-
-  const uiController = useMemo(() => createUIController(uiStore), [uiStore]);
-  useEffect(() => {
-    return uiController.connect();
-  }, [uiController]);
+  // UI Decoupled Store & Controller lifted to Root
   const uiState = useUIState(uiStore);
+  const activeSlotId = uiState.activePane || 'main';
+  const activeSlotState = uiState.slots?.[activeSlotId] || {};
+  const mainSlotState = uiState.slots?.['main'] || {};
 
   // Layout & UI State (High Frequency / Visual only)
   const [isResizing, setIsResizing] = useState(false);
@@ -235,7 +250,12 @@ function WorkspaceContainer({ pdfPath, settings, onHome }) {
   const containerRef = useRef(null);
 
   // AppState (Derived synchronously from UI State Cache)
-  const marks = useMemo(() => updateSectionWidths(uiState.marks), [uiState.marks]);
+  const marksArr = useMemo(() => {
+    const rawMap = mainSlotState.marks;
+    if (!rawMap) return [];
+    return Array.isArray(rawMap) ? rawMap : Array.from(rawMap.values());
+  }, [mainSlotState.marks]);
+  const marks = useMemo(() => updateSectionWidths(marksArr), [marksArr]);
 
   // Shortcut Tool state adapter
   const { manager: shortcutManager, state: shortcutState, refreshAvailableWhiteboards } = useShortcutToolState({
@@ -275,7 +295,7 @@ function WorkspaceContainer({ pdfPath, settings, onHome }) {
   }, [uiController, shortcutManager]);
 
   const setMarksWithSectionWidths = useCallback((updater) => {
-    const prevMarks = uiState.marks;
+    const prevMarks = mainSlotState.marks;
     const nextMarks = typeof updater === 'function' ? updater(prevMarks) : updater;
     if (nextMarks == null || nextMarks === prevMarks) return;
 
@@ -302,22 +322,24 @@ function WorkspaceContainer({ pdfPath, settings, onHome }) {
         inputAPI.updateMark(m);
       }
     }
-  }, [uiState.marks]);
+  }, [mainSlotState.marks]);
 
   useEffect(() => { dragStateRef.current = { currentSelection, movingMark }; }, [currentSelection, movingMark]);
 
+  // good
   useEffect(() => {
     const activationReason = pendingToolActivationReasonRef.current;
     pendingToolActivationReasonRef.current = 'normal';
     if (activationReason === 'border-edit') return;
 
-    getToolType(uiState.tool).onActivate?.({
+    if (!activeSlotState.tool) return;
+    getToolType(activeSlotState.tool).onActivate?.({
       state: {
         currentSelection,
-        editingShapeId: uiState.editingShapeId,
-        editingSectionId: uiState.editingSectionId,
-        sectionTarget: uiState.sectionTarget,
-        tool: uiState.tool,
+        editingShapeId: activeSlotState.editingShapeId,
+        editingSectionId: activeSlotState.editingSectionId,
+        sectionTarget: activeSlotState.sectionTarget,
+        tool: activeSlotState.tool,
       },
       actions: {
         setCurrentSelection,
@@ -327,7 +349,7 @@ function WorkspaceContainer({ pdfPath, settings, onHome }) {
         setShapeBackup: uiController.setShapeBackup,
       },
     });
-  }, [uiState.tool]);
+  }, [activeSlotState.tool]);
 
   // Native Ctrl+Scroll and panning moved to pdf_content_renderer
 
@@ -349,7 +371,7 @@ function WorkspaceContainer({ pdfPath, settings, onHome }) {
 
     if (e.key === '\\' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
-      if (!uiState.selectedMarkId && shortcutState.selectedIdx === null) return;
+      if (!activeSlotState.selectedMarkId && shortcutState.selectedIdx === null) return;
       uiController.setLeftPct(55);
       return;
     }
@@ -359,6 +381,8 @@ function WorkspaceContainer({ pdfPath, settings, onHome }) {
       uiController.setZoom(1);
       return;
     }
+
+
 
     // Shortcut tool shortcuts: I->1, II->2, III->3, ...
     if (!e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -370,17 +394,22 @@ function WorkspaceContainer({ pdfPath, settings, onHome }) {
         return;
       }
     }
-    const toolType = getToolType(uiState.tool);
+
+
+
+
+    if (!activeSlotState.tool) return;
+    const toolType = getToolType(activeSlotState.tool);
     const toolHandledKey = toolType.onKeyDown?.({
       e,
       state: {
         currentSelection,
-        editingShapeId: uiState.editingShapeId,
-        editingSectionId: uiState.editingSectionId,
-        sectionTarget: uiState.sectionTarget,
-        tool: uiState.tool,
-        zoom: uiState.zoom,
-        shapeBackup: uiState.shapeBackup,
+        editingShapeId: activeSlotState.editingShapeId,
+        editingSectionId: activeSlotState.editingSectionId,
+        sectionTarget: activeSlotState.sectionTarget,
+        tool: activeSlotState.tool,
+        zoom: activeSlotState.zoom,
+        shapeBackup: activeSlotState.shapeBackup,
       },
       actions: {
         setTool: uiController.setTool,
@@ -411,7 +440,7 @@ function WorkspaceContainer({ pdfPath, settings, onHome }) {
         shortcutManager.setSelectedIdx(null);
         shortcutManager.setSelectPanelIdx(null);
         uiController.setTool(
-          hotkeyTool.activationMode === 'toggle' && uiState.tool === hotkeyTool.id.id
+          hotkeyTool.activationMode === 'toggle' && activeSlotState.tool === hotkeyTool.id.id
             ? 'select'
             : hotkeyTool.id.id
         );
@@ -434,7 +463,7 @@ function WorkspaceContainer({ pdfPath, settings, onHome }) {
     }
   }, [pdfPath]);
 
-  // Unload handler: Flush any pending saves to local storage
+  // Unload handler: Flush any pending saves
   useEffect(() => {
     const onUnload = () => {
       inputAPI.flushSession();
@@ -447,12 +476,12 @@ function WorkspaceContainer({ pdfPath, settings, onHome }) {
 
   const handlePageSubmit = (e) => {
     if (e.key === 'Enter') {
-      const target = parseInt(uiState.pageInput);
+      const target = parseInt(activeSlotState.pageInput);
       if (!isNaN(target) && target > 0) {
         // Scroll is now handled via state updates, though direct DOM manipulation 
         // in WorkWindow is removed. We'll leave the pageInput update.
       } else {
-        uiController.setPageInput(String(uiState.currentPage));
+        uiController.setPageInput(String(activeSlotState.currentPage));
       }
       document.activeElement?.blur();
     }
@@ -508,7 +537,7 @@ function WorkspaceContainer({ pdfPath, settings, onHome }) {
 
   // dynamic pdf cursor moved to pdf_content_renderer
 
-  const activeWhiteboardId = uiState.selectedMarkId ?? shortcutManager.getLinkedWhiteboardId();
+  const activeWhiteboardId = activeSlotState.selectedMarkId ?? shortcutManager.getLinkedWhiteboardId();
   const sectionSelection = currentSelection?.type === 'section'
     ? currentSelection
     : { start: null, end: null };
@@ -555,6 +584,7 @@ function WorkspaceContainer({ pdfPath, settings, onHome }) {
         style={{ width: activeWhiteboardId ? `${uiState.leftPct}%` : '100%', height: '100%', flexShrink: 0, position: 'relative', transition: activeWhiteboardId ? 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'width 0.3s ease' }}
       >
         {pdfContentRenderer.Component({
+          slotId: 'main',
           contentId: pdfPath,
           path: pdfPath,
           settings,
@@ -575,10 +605,10 @@ function WorkspaceContainer({ pdfPath, settings, onHome }) {
         <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 50, display: 'flex', gap: '8px', alignItems: 'center', background: 'rgba(38,42,51,0.65)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', padding: '6px 16px', borderRadius: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', pointerEvents: 'auto' }}>
           <span style={{ fontSize: '11px', color: '#9ca3af' }}>Page</span>
           <input
-            id="page-input" type="text" value={uiState.pageInput}
+            id="page-input" type="text" value={activeSlotState.pageInput}
             onChange={e => uiController.setPageInput(e.target.value)}
             onKeyDown={handlePageSubmit}
-            onBlur={() => uiController.setPageInput(String(uiState.currentPage))}
+            onBlur={() => uiController.setPageInput(String(activeSlotState.currentPage))}
             style={{ width: '36px', background: 'rgba(0,0,0,0.3)', border: '1px solid #4b5563', color: '#fff', textAlign: 'center', borderRadius: '4px', fontSize: '11px', padding: '2px 0', outline: 'none' }}
           />
           <span style={{ fontSize: '11px', color: '#9ca3af' }}>/ -</span>
@@ -599,24 +629,24 @@ function WorkspaceContainer({ pdfPath, settings, onHome }) {
                   onClick={() => {
                     shortcutManager.clearUi();
                     const buttonToolType = getToolType(id);
-                    const nextTool = buttonToolType.activationMode === 'toggle' && uiState.tool === id ? 'select' : id;
+                    const nextTool = buttonToolType.activationMode === 'toggle' && activeSlotState.tool === id ? 'select' : id;
                     uiController.setTool(nextTool);
                   }}
                   title={`${label} [${key}]`}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '6px', border: `1px solid ${uiState.tool === id ? '#3B82F6' : 'transparent'}`, background: uiState.tool === id ? 'rgba(59,130,246,0.2)' : 'transparent', color: uiState.tool === id ? '#93C5FD' : '#d1d5db', cursor: 'pointer', fontSize: '18px', transition: 'all 0.15s' }}
-                  onMouseEnter={e => { if (uiState.tool !== id) { e.currentTarget.style.color='#fff'; e.currentTarget.style.background='rgba(255,255,255,0.1)'; } }}
-                  onMouseLeave={e => { if (uiState.tool !== id) { e.currentTarget.style.color='#d1d5db'; e.currentTarget.style.background='transparent'; } }}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '6px', border: `1px solid ${activeSlotState.tool === id ? '#3B82F6' : 'transparent'}`, background: activeSlotState.tool === id ? 'rgba(59,130,246,0.2)' : 'transparent', color: activeSlotState.tool === id ? '#93C5FD' : '#d1d5db', cursor: 'pointer', fontSize: '18px', transition: 'all 0.15s' }}
+                  onMouseEnter={e => { if (activeSlotState.tool !== id) { e.currentTarget.style.color='#fff'; e.currentTarget.style.background='rgba(255,255,255,0.1)'; } }}
+                  onMouseLeave={e => { if (activeSlotState.tool !== id) { e.currentTarget.style.color='#d1d5db'; e.currentTarget.style.background='transparent'; } }}
                 >
                   {icon}
                 </button>
                 {getToolType(id).renderToolbarExtras?.({
                   toolId: id,
-                  tool: uiState.tool,
-                  sectionTarget: uiState.sectionTarget,
+                  tool: activeSlotState.tool,
+                  sectionTarget: activeSlotState.sectionTarget,
                   sectionSelection,
-                  editingShapeId: uiState.editingShapeId,
-                  editingSectionId: uiState.editingSectionId,
-                  shapeBackup: uiState.shapeBackup,
+                  editingShapeId: activeSlotState.editingShapeId,
+                  editingSectionId: activeSlotState.editingSectionId,
+                  shapeBackup: activeSlotState.shapeBackup,
                   actions: {
                     setTool: uiController.setTool,
                     setSectionTarget: uiController.setSectionTarget,
@@ -643,7 +673,7 @@ function WorkspaceContainer({ pdfPath, settings, onHome }) {
               return (
                 <div key={`gtool-${idx}`} style={{ position: 'relative' }}>
                   <button
-                    onClick={() => shortcutManager.openSlot(idx, uiState.selectedMarkId)}
+                    onClick={() => shortcutManager.openSlot(idx, activeSlotState.selectedMarkId)}
                     title={`Shortcut Tool ${idx + 1}`}
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '6px', border: `1px solid ${isActive ? '#3B82F6' : 'transparent'}`, background: isActive ? 'rgba(59,130,246,0.2)' : 'transparent', color: isActive ? '#93C5FD' : '#d1d5db', cursor: 'pointer', fontSize: '16px' }}
                   >
@@ -688,7 +718,7 @@ function WorkspaceContainer({ pdfPath, settings, onHome }) {
                         {shortcutState.availableWhiteboards.map((wb) => (
                           <button
                             key={wb.id}
-                            onClick={() => shortcutManager.applySelection(idx, wb.id, wb.name, uiState.selectedMarkId)}
+                            onClick={() => shortcutManager.applySelection(idx, wb.id, wb.name, activeSlotState.selectedMarkId)}
                             style={{ textAlign: 'left', padding: '8px 10px', borderRadius: '6px', border: `1px solid ${shortcutState.draftId === wb.id ? '#3B82F6' : '#374151'}`, background: shortcutState.draftId === wb.id ? 'rgba(59,130,246,0.18)' : '#262a33', color: '#e5e7eb', cursor: 'pointer', fontSize: '12px', minHeight: '30px' }}
                           >
                             {wb.name}
@@ -708,9 +738,9 @@ function WorkspaceContainer({ pdfPath, settings, onHome }) {
           </div>
 
           <div style={{ background: 'rgba(38,42,51,0.65)', backdropFilter: 'blur(10px)', borderRadius: '8px', padding: '6px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
-            <button onClick={() => uiController.setZoom(Math.min(uiState.zoom + 0.25, 3.0))} title="Zoom In" style={{ width: '32px', height: '32px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '18px', borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.1)'} onMouseLeave={e => e.currentTarget.style.background='transparent'}>+</button>
-            <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '500', margin: '2px 0' }}>{Math.round(uiState.zoom * 100)}%</span>
-            <button onClick={() => uiController.setZoom(Math.max(uiState.zoom - 0.25, 0.5))} title="Zoom Out" style={{ width: '32px', height: '32px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '18px', borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.1)'} onMouseLeave={e => e.currentTarget.style.background='transparent'}>-</button>
+            <button onClick={() => uiController.setZoom(Math.min(activeSlotState.zoom + 0.25, 3.0))} title="Zoom In" style={{ width: '32px', height: '32px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '18px', borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.1)'} onMouseLeave={e => e.currentTarget.style.background='transparent'}>+</button>
+            <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '500', margin: '2px 0' }}>{Math.round(activeSlotState.zoom * 100)}%</span>
+            <button onClick={() => uiController.setZoom(Math.max(activeSlotState.zoom - 0.25, 0.5))} title="Zoom Out" style={{ width: '32px', height: '32px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '18px', borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.1)'} onMouseLeave={e => e.currentTarget.style.background='transparent'}>-</button>
           </div>
         </div>
       </div>
@@ -732,6 +762,7 @@ function WorkspaceContainer({ pdfPath, settings, onHome }) {
           style={{ flex: 1, height: '100%', minWidth: 0, position: 'relative' }}
         >
           {whiteboardContentRenderer.Component({
+            slotId: 'side',
             contentId: activeWhiteboardId,
             settings
           })}

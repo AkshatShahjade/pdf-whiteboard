@@ -10,18 +10,18 @@ export interface InputAPIInterface {
   loadSession(pdfPath: string): Promise<void>;
   flushSession(): void;
   updateSplitter(leftPct: number): void;
-  selectMark(markId: string | null): void;
-  updateScrollTop(pdfPath: string, scrollTop: number): void;
-  addMark(mark: Omit<MarkDTO, 'id'> & { id?: string }): Promise<string>;
-  updateMark(mark: MarkDTO): Promise<void>;
-  deleteMark(markId: string): Promise<void>;
-  saveWhiteboardSnapshot(markId: string, snapshot: any): Promise<void>;
+  selectMark(slotId: string, markId: string | null): void;
+  updateScrollTop(slotId: string, scrollTop: number): void;
+  addMark(slotId: string, mark: Omit<MarkDTO, 'id'> & { id?: string }): Promise<string>;
+  updateMark(slotId: string, mark: MarkDTO): Promise<void>;
+  deleteMark(slotId: string, markId: string): Promise<void>;
+  saveWhiteboardSnapshot(slotId: string | null, markId: string, snapshot: any): Promise<void>;
   saveSettings(settings: any): Promise<void>;
   saveRecents(recents: any[]): Promise<void>;
   saveLibraryPath(libraryPath: string | null): Promise<void>;
   saveBackupPath(backupPath: string | null): Promise<void>;
-  updateZoom(zoom: number): void;
-  updateTool(tool: string): void;
+  updateZoom(slotId: string, zoom: number): void;
+  updateTool(slotId: string, tool: string): void;
 }
 
 /**
@@ -44,32 +44,36 @@ export function createInputAPI(
       store.setState(draft => { draft.leftPct = leftPct; });
     },
 
-    selectMark(markId: string | null): void {
-      store.setState(draft => { draft.selectedMarkId = markId; });
-    },
-
-    updateScrollTop(pdfPath: string, scrollTop: number): void {
-      store.setState(draft => {
-        if (draft.pdfPath === pdfPath) {
-          draft.scrollTop = scrollTop;
+    selectMark(slotId: string, markId: string | null): void {
+      store.setState(draft => { 
+        if (draft.slots[slotId]) {
+          draft.slots[slotId].selectedMarkId = markId; 
         }
       });
     },
 
-    addMark(mark: Omit<MarkDTO, 'id'> & { id?: string }): Promise<string> {
-      return markService.addMark(store, output, mark);
+    updateScrollTop(slotId: string, scrollTop: number): void {
+      store.setState(draft => {
+        if (draft.slots[slotId]) {
+          draft.slots[slotId].scrollTop = scrollTop;
+        }
+      });
     },
 
-    updateMark(mark: MarkDTO): Promise<void> {
-      return markService.updateMark(store, output, mark);
+    addMark(slotId: string, mark: Omit<MarkDTO, 'id'> & { id?: string }): Promise<string> {
+      return markService.addMark(store, output, slotId, mark);
     },
 
-    deleteMark(markId: string): Promise<void> {
-      return markService.deleteMark(store, output, markId);
+    updateMark(slotId: string, mark: MarkDTO): Promise<void> {
+      return markService.updateMark(store, output, slotId, mark);
     },
 
-    saveWhiteboardSnapshot(markId: string, snapshot: any): Promise<void> {
-      return whiteboardService.saveWhiteboardSnapshot(store, output, markId, snapshot);
+    deleteMark(slotId: string, markId: string): Promise<void> {
+      return markService.deleteMark(store, output, slotId, markId);
+    },
+
+    saveWhiteboardSnapshot(slotId: string | null, markId: string, snapshot: any): Promise<void> {
+      return whiteboardService.saveWhiteboardSnapshot(store, output, slotId, markId, snapshot);
     },
 
     async saveSettings(settings: any): Promise<void> {
@@ -88,12 +92,20 @@ export function createInputAPI(
       await StateInitialValuesRepository.setSpecificValue('backupPath', ['global'], backupPath);
     },
 
-    updateZoom(zoom: number): void {
-      store.setState(draft => { draft.zoom = zoom; });
+    updateZoom(slotId: string, zoom: number): void {
+      store.setState(draft => { 
+        if (draft.slots[slotId]) {
+          draft.slots[slotId].zoom = zoom; 
+        }
+      });
     },
 
-    updateTool(tool: string): void {
-      store.setState(draft => { draft.tool = tool; });
+    updateTool(slotId: string, tool: string): void {
+      store.setState(draft => { 
+        if (draft.slots[slotId]) {
+          draft.slots[slotId].tool = tool; 
+        }
+      });
     }
   };
 }

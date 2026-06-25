@@ -1,26 +1,33 @@
 import { MarkDTO } from '../shared_doman_models_and_dtos/dtos';
 
-export interface AppState {
-  workspace_layout: any;
-  tool_config: any;
+export interface SlotAppState {
+  contentId: string;
+  contentType: string; // 'pdf' | 'whiteboard'
   zoom: number;
-  libraryPath: string | null;
   tool: string;
-  pdfPath: string | null;
-  leftPct: number;
-  selectedMarkId: string | null;
   scrollTop: number;
+  selectedMarkId: string | null;
   marks: Map<string, MarkDTO>;
 }
 
-export const DEFAULT_APP_STATE: Omit<AppState, 'marks'> = {
+export interface AppState {
+  workspace_layout: any;
+  tool_config: any;
+  libraryPath: string | null;
+  leftPct: number;
+  slots: Record<string, SlotAppState>;
+}
+
+export const DEFAULT_APP_STATE: Omit<AppState, 'slots'> = {
   workspace_layout: { screens: [] },
   tool_config: {},
-  zoom: 1.0,
   libraryPath: null,
-  tool: 'select',
-  pdfPath: null,
   leftPct: 50,
+};
+
+export const DEFAULT_SLOT_APP_STATE: Omit<SlotAppState, 'contentId' | 'contentType' | 'marks'> = {
+  zoom: 1.0,
+  tool: 'select',
   selectedMarkId: null,
   scrollTop: 0,
 };
@@ -34,7 +41,7 @@ export interface AppStateStore {
 export function createAppStateStore(initialState?: Partial<AppState>): AppStateStore {
   let state: AppState = {
     ...DEFAULT_APP_STATE,
-    marks: new Map(),
+    slots: {},
     ...initialState
   };
 

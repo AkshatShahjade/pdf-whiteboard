@@ -3,6 +3,7 @@ import { content_type } from "../../shared_doman_models_and_dtos/content_domain_
 import { SlotRendererType } from "./pdf/slot_renderer_registry"
 
 export interface ContentRendererProps {
+    slotId: string
     contentId: string
     path?: string
     settings?: any

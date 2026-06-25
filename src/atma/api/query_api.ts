@@ -5,9 +5,9 @@ import { StateInitialValuesRepository } from '../storage/repositories/StateIniti
 
 export interface QueryAPIInterface {
   getCurrentSession(): SessionDTO | null;
-  getMark(markId: string): MarkDTO | null;
-  getAllMarks(): MarkDTO[];
-  getWhiteboardSnapshot(markId: string): Promise<any | null>;
+  getMark(slotId: string, markId: string): MarkDTO | null;
+  getAllMarks(slotId: string): MarkDTO[];
+  getWhiteboardSnapshot(slotId: string | null, markId: string): Promise<any | null>;
   getSettings(): Promise<any>;
   getRecents(): Promise<any[]>;
   getLibraryPath(): Promise<string | null>;
@@ -19,32 +19,44 @@ export interface QueryAPIInterface {
  */
 export function createQueryAPI(store: AppStateStore): QueryAPIInterface {
   return {
-    getCurrentSession(): SessionDTO | null {
+    getCurrentSession(): SessionDTO {
       const state = store.getState();
-      if (!state.pdfPath) return null;
       
+      const slotsDto: Record<string, any> = {};
+      for (const [slotId, slotState] of Object.entries(state.slots)) {
+        slotsDto[slotId] = {
+          ...slotState,
+          marks: Array.from(slotState.marks.values())
+        };
+      }
+
       return {
-        pdfPath: state.pdfPath,
         leftPct: state.leftPct,
-        selectedMarkId: state.selectedMarkId,
-        scrollTop: state.scrollTop,
-        marks: Array.from(state.marks.values())
+        slots: slotsDto
       };
     },
 
-    getMark(markId: string): MarkDTO | null {
+    getMark(slotId: string, markId: string): MarkDTO | null {
       const state = store.getState();
-      return state.marks.get(markId) ?? null;
+      const slot = state.slots[slotId];
+      if (!slot) return null;
+      return slot.marks.get(markId) ?? null;
     },
 
-    getAllMarks(): MarkDTO[] {
+    getAllMarks(slotId: string): MarkDTO[] {
       const state = store.getState();
-      return Array.from(state.marks.values());
+      const slot = state.slots[slotId];
+      if (!slot) return [];
+      return Array.from(slot.marks.values());
     },
 
-    getWhiteboardSnapshot(markId: string): Promise<any | null> {
-      const pdfPath = store.getState().pdfPath;
-      return WhiteboardRepository.loadWhiteboard(markId, pdfPath || undefined);
+    getWhiteboardSnapshot(slotId: string | null, markId: string): Promise<any | null> {
+      let contentId: string | undefined;
+      if (slotId) {
+        const state = store.getState();
+        contentId = state.slots[slotId]?.contentId;
+      }
+      return WhiteboardRepository.loadWhiteboard(markId, contentId);
     },
 
     getSettings(): Promise<any> {

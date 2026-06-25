@@ -60,16 +60,15 @@ export const stateSyncService = {
       .then(types => { keyTypes = types; })
       .catch(console.error);
 
-    const persistChanges = debounce(async (changedKeys: (keyof AppState)[], newState: AppState) => {
+    const persistFlat = debounce(async (changedKeys: (keyof AppState)[], newState: AppState) => {
       for (const key of changedKeys) {
-        if (key === 'marks') continue; // Marks are persisted directly by MarkRepository
+        if (key === 'slots') continue; // Handled separately
 
-        // If the key exists in our DB schema and is not volatile, persist it.
         const type = keyTypes[key as string];
-        if (type && type !== 'volatile') {
+        if (type === 'personalizable') {
           try {
              const val = newState[key];
-             const scope = ['doc:' + newState.pdfPath, 'global'];
+             const scope = ['global']; // Flat state is global for now
              await StateInitialValuesRepository.setSpecificValue(key as string, scope, val);
           } catch (err) {
              console.error(`[StateSyncService] Failed to persist ${key}:`, err);
@@ -78,7 +77,22 @@ export const stateSyncService = {
       }
     }, 600);
 
-    this._flushPersist = () => persistChanges.flush();
+    const persistSlotVar = debounce(async (slotId: string, key: string, val: any, contentId: string) => {
+        const type = keyTypes[key];
+        if (type === 'personalizable') {
+          try {
+             const scope = ['doc:' + contentId, 'global'];
+             await StateInitialValuesRepository.setSpecificValue(key, scope, val);
+          } catch (err) {
+             console.error(`[StateSyncService] Failed to persist slot ${slotId} key ${key}:`, err);
+          }
+        }
+    }, 600);
+
+    this._flushPersist = () => {
+      persistFlat.flush();
+      persistSlotVar.flush();
+    };
 
     store.subscribe(() => {
       const newState = store.getState();
@@ -91,25 +105,44 @@ export const stateSyncService = {
         }
       }
 
-      if (changedKeys.length === 0) return;
-
-      // 1. Automatic Event Publishing
-      // We only publish keys that are simple state variables (excluding 'marks')
+      // We need to diff slots manually because mutations are in-place
       const delta: Partial<AppState> = {};
-      for (const key of changedKeys) {
-        if (key !== 'marks') {
-          (delta as any)[key] = newState[key];
+      let slotsChanged = false;
+
+      if (!prevState.slots) prevState.slots = {};
+      for (const [slotId, slot] of Object.entries(newState.slots)) {
+        const prevSlot = prevState.slots[slotId] || {} as any;
+        for (const key of ['zoom', 'tool', 'scrollTop', 'selectedMarkId']) {
+          if ((slot as any)[key] !== prevSlot[key]) {
+             slotsChanged = true;
+             // Publish the change? OutputAPI expects APPSTATE_MUTATED
+             persistSlotVar(slotId, key, (slot as any)[key], slot.contentId);
+          }
         }
       }
 
-      if (Object.keys(delta).length > 0) {
-        output.publish('APPSTATE_MUTATED', delta);
+      if (changedKeys.length > 0) {
+        for (const key of changedKeys) {
+          if (key !== 'slots') {
+            (delta as any)[key] = newState[key];
+          }
+        }
+        if (Object.keys(delta).length > 0) {
+          output.publish('APPSTATE_MUTATED', delta);
+          persistFlat(changedKeys, newState);
+        }
       }
 
-      // 2. Debounced Background Persistence
-      persistChanges(changedKeys, newState);
+      if (slotsChanged) {
+        // Publish slots changed
+        output.publish('APPSTATE_MUTATED', { slots: newState.slots });
+      }
 
-      prevState = newState;
+      // Deep clone prev state for primitive diffing next time
+      prevState = { ...newState, slots: {} };
+      for (const [id, s] of Object.entries(newState.slots)) {
+        prevState.slots[id] = { ...s }; // shallow clone of the slot is enough for primitives
+      }
     });
   },
 
@@ -136,23 +169,31 @@ export const stateSyncService = {
 
       // Mutate store (Subscriber will automatically pick this up, but we'll ignore initial load diffing or just let it re-persist safely)
       store.setState(draft => {
-        draft.pdfPath = pdfPath;
         draft.leftPct = leftPct;
-        draft.selectedMarkId = selectedMarkId;
-        draft.scrollTop = scrollTop;
-        draft.zoom = zoom;
-        draft.tool = tool;
-        draft.marks = marksMap;
+        draft.slots['main'] = {
+          contentId: pdfPath,
+          contentType: 'pdf',
+          zoom,
+          tool,
+          selectedMarkId,
+          scrollTop,
+          marks: marksMap
+        };
       });
 
       const sessionDTO: SessionDTO = {
-        pdfPath,
         leftPct,
-        zoom,
-        tool,
-        selectedMarkId,
-        scrollTop,
-        marks: parsedMarks
+        slots: {
+          'main': {
+            contentId: pdfPath,
+            contentType: 'pdf',
+            zoom,
+            tool,
+            selectedMarkId,
+            scrollTop,
+            marks: parsedMarks
+          }
+        }
       };
 
       output.publish('SESSION_LOADED', sessionDTO);
