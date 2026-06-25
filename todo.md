@@ -1,0 +1,6 @@
+- Session .mode -> .screen
+- toasts are handled inside the slot components. It should be screen level.
+- pdf page size adapts to content size (eg- ppt should be landscape....)
+- ui_state_store = app_state_store & screen_specific_state + slot_specific_state for each slot
+- app_state_store is also screen specific + slot specific for each slot
+- ui store and controller instantiated not in WorkSpaceContainer, but instead at the beginning on app launch

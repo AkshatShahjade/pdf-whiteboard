@@ -183,6 +183,7 @@ function WhiteboardOnlyApp({ whiteboardId, whiteboardName, settings, onHome }) {
   const [headerVisible, setHeaderVisible] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const [toast, setToast] = useState(null);
+  
   const showToast = useCallback((msg, type = 'info') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
