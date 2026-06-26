@@ -1,14 +1,12 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { pdfjs } from 'react-pdf';
-import { debounce } from '../atma/services/state_sync_service';
 import HomeScreen from './HomeScreen.jsx';
 import { createUIStateStore } from './ui_state_store';
 import { createUIController } from './ui_controller';
 import { useUIState } from './useUIState';
-import { inputAPI, outputAPI, queryAPI } from '../atma/singletons';
+import { inputAPI, queryAPI } from '../atma/singletons';
 import { DEFAULT_APP_STATE } from '../atma/app_state_store';
 import { getContentRendererType } from './renderer_registry/content_renderer_registry';
-import { confirmDialog, convertFileSrc, joinPath } from '../atma/platform_adapter/switch.ts';
 import { setupAllRegistries } from './renderer_registry/setup';
 import { createDefaultSlotState } from '../atma/capabilities_registry/content_domain_registry';
 import Screen from '../roopa/Screen';
@@ -62,9 +60,9 @@ export default function Root() {
       leftPct: session.settings?.defaultSplit ?? DEFAULT_APP_STATE.leftPct,
       marks: [],
       pdfPath: session.pdfPath || null,
-      activeSlot: 'main',
+      activeSlot: 'left',
       slots: {
-        'main': createDefaultSlotState(contentId, contentType, 'verticalPane', 'ui')
+        'left': createDefaultSlotState(contentId, contentType, 'verticalPane', 'ui')
       }
     });
   }, [session]);
@@ -153,7 +151,7 @@ function WorkspaceHeader({ title, onHome, onBackup, savedAt, headerVisible, setH
 
 function WhiteboardOnlyApp({ whiteboardId, whiteboardName, settings, onHome, uiController }) {
   const [headerVisible, setHeaderVisible] = useState(false);
-  const [lastSavedAt, setLastSavedAt] = useState(null);
+  const lastSavedAt = null;
   const [toast, setToast] = useState(null);
   
   const showToast = useCallback((msg, type = 'info') => {
@@ -177,7 +175,7 @@ function WhiteboardOnlyApp({ whiteboardId, whiteboardName, settings, onHome, uiC
           const Renderer = getContentRendererType('whiteboard').Component;
           return (
             <Renderer
-              slotId="main"
+              slotId="left"
               contentId={whiteboardId}
               settings={settings}
               uiController={uiController}
@@ -193,7 +191,7 @@ function WhiteboardOnlyApp({ whiteboardId, whiteboardName, settings, onHome, uiC
 function WorkspaceContainer({ pdfPath, settings, onHome, uiStore, uiController }) {
   const uiState = useUIState(uiStore);
   const [headerVisible, setHeaderVisible] = useState(false);
-  const [lastSavedAt, setLastSavedAt] = useState(null);
+  const lastSavedAt = null;
 
   const showToast = useCallback((msg, type = 'info') => {
     uiController.showToast(msg, type);
@@ -219,12 +217,12 @@ function WorkspaceContainer({ pdfPath, settings, onHome, uiStore, uiController }
   };
 
   // Derive active slot configs from uiState — only slots with content are shown.
-  // Order: 'main' first, then any additional slots (e.g. 'side').
+  // Order: 'left' first, then any additional slots (e.g. 'right').
   const slotConfigs = useMemo(() => {
     const activeSlots = [];
     const slotEntries = uiState.slots || {};
-    // Ensure 'main' comes first, then remaining slots in insertion order
-    const orderedIds = ['main', ...Object.keys(slotEntries).filter(id => id !== 'main')];
+    // Ensure 'left' comes first, then remaining slots in insertion order
+    const orderedIds = ['left', ...Object.keys(slotEntries).filter(id => id !== 'left')];
     for (const id of orderedIds) {
       const slot = slotEntries[id];
       if (slot?.contentType && slot?.slotType && slot?.contentId) {

@@ -22,17 +22,19 @@ export const markService = {
     } as MarkDTO;
 
 
+    const contentId = store.getState().slots[slotId]?.contentId;
+
     store.setState(draft => {
-      const slot = draft.slots[slotId];
-      if (slot) {
-        slot.marks.set(id, newMark);
+      for (const slot of Object.values(draft.slots)) {
+        if (slot && slot.contentId === contentId) {
+          slot.marks.set(id, newMark);
+        }
       }
     });
 
-    output.publish('MARK_ADDED', newMark);
+    output.publish('MARK_ADDED', { ...newMark, contentId: contentId || '' });
 
     // Persist relational data directly
-    const contentId = store.getState().slots[slotId]?.contentId;
     if (contentId) {
       try {
         await MarkRepository.upsertMarks(contentId, Array.from(store.getState().slots[slotId].marks.values()));
@@ -54,17 +56,19 @@ export const markService = {
     mark: MarkDTO
   ): Promise<void> {
 
+    const contentId = store.getState().slots[slotId]?.contentId;
+
     store.setState(draft => {
-      const slot = draft.slots[slotId];
-      if (slot && slot.marks.has(mark.id)) {
-        slot.marks.set(mark.id, mark);
+      for (const slot of Object.values(draft.slots)) {
+        if (slot && slot.contentId === contentId) {
+          slot.marks.set(mark.id, mark);
+        }
       }
     });
 
-    output.publish('MARK_UPDATED', mark);
+    output.publish('MARK_UPDATED', { ...mark, contentId: contentId || '' });
 
     // Persist relational data directly
-    const contentId = store.getState().slots[slotId]?.contentId;
     if (contentId) {
       try {
         // We might want to debounce this in the future for rapid dragging, 
@@ -88,16 +92,17 @@ export const markService = {
     const contentId = store.getState().slots[slotId]?.contentId;
 
     store.setState(draft => {
-      const slot = draft.slots[slotId];
-      if (slot) {
-        slot.marks.delete(markId);
-        if (slot.selectedMarkId === markId) {
-          slot.selectedMarkId = null;
+      for (const slot of Object.values(draft.slots)) {
+        if (slot && slot.contentId === contentId) {
+          slot.marks.delete(markId);
+          if (slot.selectedMarkId === markId) {
+            slot.selectedMarkId = null;
+          }
         }
       }
     });
 
-    output.publish('MARK_DELETED', { markId });
+    output.publish('MARK_DELETED', { markId, contentId: contentId || '' });
 
     // Delete relational data directly
     // Note: Assuming MarkRepository has a deleteMark method. If not, it needs to be implemented.

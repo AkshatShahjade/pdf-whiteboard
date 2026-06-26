@@ -19,6 +19,7 @@ export interface SlotUIState extends SlotAppState {
     shapeBackup: any | null;
     editingSectionId: string | null;
     sectionTarget: 'start' | 'end';
+    history?: Omit<SlotUIState, 'history'>[];
 }
 
 export type UIState = Omit<AppState, 'slots'> & {
@@ -41,7 +42,7 @@ export interface UIStateStore {
 export function createUIStateStore(initialState: Partial<UIState> = {}): UIStateStore {
     let state: UIState = {
         // purely volatile UI states
-        activeSlot: 'main', // default active slot
+        activeSlot: 'left', // default active slot
         toast: null,
         slots: {},
         // These are required by AppState but usually provided by initialState:

@@ -15,7 +15,8 @@ export const contentSelectorTool: PDFToolRendererType = {
     activationMode: 'set',
 
     onActivate(ctx) {
-        ctx.actions.setSlotStates('side', {
+        const otherSlotId = (ctx as any).state?.slotId === 'left' ? 'right' : 'left';
+        ctx.actions.setSlotStates(otherSlotId, {
             contentId: 'content_selector_global',
             contentType: 'content_selector',
             slotType: 'verticalPane'

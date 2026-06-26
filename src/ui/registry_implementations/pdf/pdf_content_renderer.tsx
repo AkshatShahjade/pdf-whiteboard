@@ -179,6 +179,7 @@ function PDFContentComponent({
 
     getToolType(slotState.tool).onActivate?.({
       state: {
+        slotId,
         currentSelection,
         editingShapeId: slotState.editingShapeId,
         editingSectionId: slotState.editingSectionId,
@@ -197,23 +198,44 @@ function PDFContentComponent({
     });
   }, [slotState?.tool]);
 
-  const currentSideType = uiState?.slots?.['side']?.contentType;
-  const currentSideId = uiState?.slots?.['side']?.contentId || '';
-  const resolvedSideId = slotState?.selectedMarkId || shortcutManager.getLinkedWhiteboardId() || '';
+  const otherSlotId = slotId === 'left' ? 'right' : 'left';
+  const currentOtherType = uiState?.slots?.[otherSlotId]?.contentType;
+  const currentOtherId = uiState?.slots?.[otherSlotId]?.contentId || '';
+  const resolvedOtherId = slotState?.selectedMarkId || shortcutManager.getLinkedWhiteboardId() || '';
 
-  // Synchronize active whiteboard id to the side slot state
+  // Synchronize active whiteboard id to the other slot state
+  const lastSyncedIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (resolvedSideId) {
-      if (currentSideId !== resolvedSideId || currentSideType !== 'whiteboard') {
-        uiController.setSlotStates('side', { contentId: resolvedSideId, contentType: 'whiteboard', slotType: 'verticalPane' });
+    if (resolvedOtherId) {
+      if (currentOtherId === resolvedOtherId && currentOtherType === 'whiteboard') {
+        lastSyncedIdRef.current = resolvedOtherId;
+      } else {
+        if (lastSyncedIdRef.current === resolvedOtherId) {
+          // The target slot has been closed or changed by the user. Clear the local selection in the source slot.
+          lastSyncedIdRef.current = null;
+          if (slotState?.selectedMarkId) {
+            selectMark(null);
+          } else if (shortcutManager.getLinkedWhiteboardId()) {
+            shortcutManager.clearUi();
+          }
+        } else {
+          // Open the whiteboard in the target slot
+          lastSyncedIdRef.current = resolvedOtherId;
+          uiController.setSlotStates(otherSlotId, {
+            contentId: resolvedOtherId,
+            contentType: 'whiteboard',
+            slotType: 'verticalPane',
+          });
+        }
       }
     } else {
-      // Clear whiteboard if active, but do not override or close content_selector
-      if (currentSideType === 'whiteboard' && currentSideId !== '') {
-        uiController.setSlotStates('side', { contentId: '', contentType: 'whiteboard', slotType: 'verticalPane' });
+      if (lastSyncedIdRef.current && currentOtherId === lastSyncedIdRef.current && currentOtherType === 'whiteboard') {
+        uiController.closeSlot(otherSlotId);
       }
+      lastSyncedIdRef.current = null;
     }
-  }, [resolvedSideId, currentSideId, currentSideType, uiController]);
+  }, [resolvedOtherId, currentOtherId, currentOtherType, uiController, otherSlotId, slotState?.selectedMarkId, selectMark, shortcutManager]);
 
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pdfReady, setPdfReady] = useState(false);

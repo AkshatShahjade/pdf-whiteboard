@@ -1,11 +1,21 @@
 import { writeTextFile, readTextFile, remove, exists } from '@tauri-apps/plugin-fs';
 import { join, dirname } from '@tauri-apps/api/path';
 import { StateInitialValuesRepository } from './StateInitialValuesRepository';
+import { ContentRepository } from './ContentRepository';
 
 export const WhiteboardRepository = {
     async resolvePath(id: string, parentPdfPath?: string, libraryFolder?: string): Promise<string> {
+        try {
+            const content = await ContentRepository.getContentById(id);
+            if (content && content.file_path) {
+                return content.file_path;
+            }
+        } catch (e) {
+            // Database query failed or table doesn't exist, fall back to default path resolution
+        }
+
         let folder = '';
-        if (parentPdfPath) {
+        if (parentPdfPath && (parentPdfPath.includes('/') || parentPdfPath.includes('\\'))) {
             folder = await dirname(parentPdfPath);
         } else if (libraryFolder) {
             folder = libraryFolder;

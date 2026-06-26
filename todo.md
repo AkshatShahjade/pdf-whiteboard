@@ -1,10 +1,24 @@
 read workwinodw, and the pdf renderer implementaiton, coapability implementations. Get a feel of whethere the content separation is proper or not. Then work on creating slot datas, and screens
 
-reuse much of the style and code of the recents panel, and library explorer from the homescreen. 
-In fact, create a separate folder called selector_components in roopa, where each of the individual sub pieces of the homescreen are stored like library explorer, recents tab, import document, etc. modify them a little so that they can be used elsewhere, then build the system_search logic and ui from these components. Each component file should contain renderer and capability code separated. 
-Also add the search file component. 
+Critique all the recent changes that were made to the codebase from 2 commits back. These included generalizing the slot system to left and right, and making contents be callable from the left and right. adding path showing bars at the top, etc. Score them based on how much they followed the pre-existing architecture. Then ideate how all the logic in the 2-slot system we have made, can be generalized into the Kram sequencing system to be applied at the screen level. so that all the logic and behavioural stuff that if this then that for slot opening, onMarkActivation, onLoading, onClosing, etc. can be edited by users, and new behaviours can be created. Allowing for a modular UX. no implementation.
 
-now, let us add a system_search content type. this is a system content - not user editable content like pdf or whiteboard -  but it is a content because it can be put into whatever slot type we want. This content has a search bar, a recents subpanel and its job is to show and allow selection of new contents from the library. it can be opened with a ui tool called system_search_tool from the pdf.
+I want the current slot sequencing, and logic (that if mark activated opens whiteboard in opposite slot, and closing slot leads to going to the last open content in that slot or closing the slot - but not showing system contents like content_selector) - to be generalized and flexible, using the kram sequencing framework. I hate the refs and the hacks that were used inthe current sprint. I want the proper architecture, separation of concerns and modularity to return to the project.
+For this kram must be implemented.
+How to describe rules:
+Its a bunch of triggers based on user action, of the format on<user_action>. Then some action is taken.
+rough eg of the current 2-pane system:
+- onClick : library explorer or recents card or library search result -> open content in left slot
+- onActivateMark(when creating new mark or clicking preexisting mark) : open content on opposite slot
+- onCloseSlot : open previous content in this slot. If none exists, close the slot. If this is the only slot and it is closed, return to homescreen
+
+The kram elements can be thought of as nodes. each kram nodes allows certain actions. Then a state graph could be created where the edges are the user interactions triggering kram node webs that lead to some change in at the beginning just be of navigation and slot sequencing, but later it can also be for more complicated stuff and automation. 
+kram elements include:
+- marks -> actions: onMarkActivate, onMarkResize, onMarkMove, onMarkDelete
+- slots -> actions: onSlotClose, onSlotOpen, etc.
+- screen -> actions: openSlot, rearrangeSlots?....
+- tools -> actions: onToolSelected, .....
+
+
 
 now, we must add whiteboard marks. We do this by both creating custom tools, integrated into tldraw - similar to how the handwriting tool was made - and by creating a shape mark type which creates a mark out of any pre-existing shape. 
 

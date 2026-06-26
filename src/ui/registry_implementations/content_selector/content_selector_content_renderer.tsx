@@ -147,11 +147,7 @@ function ContentSelectorComponent({
   };
 
   const handleClose = () => {
-    uiController.setSlotStates(slotId, {
-      contentId: '',
-      contentType: 'content_selector',
-      slotType: 'verticalPane'
-    });
+    uiController.closeSlot(slotId);
   };
 
   return (

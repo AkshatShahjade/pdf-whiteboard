@@ -3,9 +3,9 @@ import { AppState } from '../app_state_store';
 
 export type EventPayloads = {
   SESSION_LOADED: SessionDTO;
-  MARK_ADDED: MarkDTO;
-  MARK_UPDATED: MarkDTO;
-  MARK_DELETED: { markId: string };
+  MARK_ADDED: MarkDTO & { contentId: string };
+  MARK_UPDATED: MarkDTO & { contentId: string };
+  MARK_DELETED: { markId: string; contentId: string };
   WHITEBOARD_UPDATED: { markId: string };
   APPSTATE_MUTATED: Partial<AppState>;
 };

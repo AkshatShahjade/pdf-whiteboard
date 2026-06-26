@@ -73,8 +73,8 @@ export function useLibraryExplorer(
   const createWhiteboard = async (whiteboardName: string) => {
     if (!currentDir || !whiteboardName.trim()) return;
     try {
-      const id = `wb_${Date.now()}`;
-      await WhiteboardRepository.saveWhiteboard(id, { name: whiteboardName.trim() }, undefined, currentDir);
+      const id = whiteboardName.trim();
+      await WhiteboardRepository.saveWhiteboard(id, { name: id }, undefined, currentDir);
       await ContentRepository.ensureContentExists(id, 'core.whiteboard', await joinPath(currentDir, `${id}.tldr`));
       setIsWhiteboardModalOpen(false);
       refreshDir(currentDir);

@@ -5,7 +5,7 @@ import { MarkRepository } from '../storage/repositories/MarkRepository';
 import { ContentRepository } from '../storage/repositories/ContentRepository';
 import { parseRawMark } from '../../shared_doman_models_and_dtos/factories';
 import { SessionDTO } from '../../shared_doman_models_and_dtos/dtos';
-import { getContentDomainType } from '../capabilities_registry/content_domain_registry';
+import { getContentDomainType, createDefaultSlotState } from '../capabilities_registry/content_domain_registry';
 
 export function debounce(fn: Function, ms: number) {
   let timer: any = null;
@@ -180,7 +180,7 @@ export const stateSyncService = {
   /**
    * Hydrates the store with the resolved session state from the 4-layer architecture.
    */
-  async loadSession(store: AppStateStore, output: OutputAPIInterface, pdfPath: string, slotId: string = 'main') {
+  async loadSession(store: AppStateStore, output: OutputAPIInterface, pdfPath: string, slotId: string = 'left') {
     try {
       // Ensure the content is registered in the DB before we do any relational writing (like marks)
       await ContentRepository.ensureContentExists(pdfPath, 'core.pdf', pdfPath);
@@ -198,18 +198,24 @@ export const stateSyncService = {
       const parsedMarks = rawMarks.map(parseRawMark);
       const marksMap = new Map(parsedMarks.map((m: any) => [m.id, m]));
 
+      const existingSlot = store.getState().slots[slotId];
+      const baseState = existingSlot && existingSlot.contentType === 'pdf'
+        ? existingSlot
+        : createDefaultSlotState(pdfPath, 'pdf', 'verticalPane', 'ui');
+
       // Mutate store (Subscriber will automatically pick this up, but we'll ignore initial load diffing or just let it re-persist safely)
       store.setState(draft => {
         draft.leftPct = leftPct;
         draft.slots[slotId] = {
+          ...baseState,
           contentId: pdfPath,
           contentType: 'pdf',
-          zoom,
-          tool,
-          selectedMarkId,
-          scrollTop,
+          zoom: zoom ?? baseState.zoom ?? 1.0,
+          tool: tool ?? baseState.tool ?? 'select',
+          selectedMarkId: selectedMarkId ?? baseState.selectedMarkId ?? null,
+          scrollTop: scrollTop ?? baseState.scrollTop ?? 0,
           marks: marksMap,
-          slotType: slotId === 'main' ? 'verticalPane' : 'verticalPane' // maintain structure
+          slotType: 'verticalPane'
         };
       });
 

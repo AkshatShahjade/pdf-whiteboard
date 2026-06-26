@@ -17,5 +17,13 @@ export const ContentRepository = {
         return await tauriSqlAdapter.select<{id: string, file_path: string}>(
             `SELECT id, file_path FROM CONTENTS WHERE jodo_content_type = 'core.whiteboard'`
         );
+    },
+
+    async getContentById(id: string): Promise<{id: string, file_path: string} | null> {
+        const results = await tauriSqlAdapter.select<{id: string, file_path: string}>(
+            `SELECT id, file_path FROM CONTENTS WHERE id = ?`,
+            [id]
+        );
+        return results[0] || null;
     }
 };

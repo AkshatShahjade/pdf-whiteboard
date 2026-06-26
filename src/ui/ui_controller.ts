@@ -22,6 +22,7 @@ export interface UIController {
     saveWhiteboardSnapshot: (markId: string, snapshot: any, slotId?: string) => void;
     setSlotState: (slotId: string, key: string, val: any) => void;
     setSlotStates: (slotId: string, patch: Record<string, any>) => void;
+    closeSlot: (slotId: string) => void;
     connect: () => () => void;
 }
 
@@ -152,6 +153,19 @@ export function createUIController(store: UIStateStore): UIController {
                 }
             }
 
+            // Push old slot state to history if content changes to a new valid content
+            let history = slot?.history || [];
+            if (slot && (patch.contentId !== undefined || patch.contentType !== undefined)) {
+                const nextContentId = patch.contentId ?? slot.contentId;
+                const nextContentType = patch.contentType ?? slot.contentType;
+                if (nextContentId !== slot.contentId || nextContentType !== slot.contentType) {
+                    if (slot.contentId && slot.contentType) {
+                        const { history: _, ...snapshot } = slot;
+                        history = [...history, snapshot];
+                    }
+                }
+            }
+
             const appPatch: Record<string, any> = {};
             const uiPatch: Record<string, any> = {};
 
@@ -180,7 +194,58 @@ export function createUIController(store: UIStateStore): UIController {
                         ...state.slots,
                         [slotId]: {
                             ...baseState,
-                            ...uiPatch
+                            ...uiPatch,
+                            history
+                        }
+                    }
+                });
+            }
+        },
+
+        closeSlot: (slotId) => {
+            const state = store.getState();
+            const slot = state.slots[slotId];
+            if (!slot) return;
+
+            // Deselect active mark on the other slot if it matches the content being closed
+            const otherSlotId = slotId === 'left' ? 'right' : 'left';
+            const otherSlot = state.slots[otherSlotId];
+            
+            let otherSlotPatch = {};
+            if (slot.contentType === 'whiteboard' && otherSlot?.selectedMarkId === slot.contentId) {
+                inputAPI.selectMark(otherSlotId, null);
+                otherSlotPatch = {
+                    [otherSlotId]: {
+                        ...otherSlot,
+                        selectedMarkId: null
+                    }
+                };
+            }
+
+            if (slot.history && slot.history.length > 0) {
+                const history = [...slot.history];
+                const prevState = history.pop()!;
+                store.setState({
+                    slots: {
+                        ...state.slots,
+                        ...otherSlotPatch,
+                        [slotId]: {
+                            ...prevState,
+                            history
+                        }
+                    }
+                });
+            } else {
+                // No history, clear slot to hide/close it
+                store.setState({
+                    slots: {
+                        ...state.slots,
+                        ...otherSlotPatch,
+                        [slotId]: {
+                            ...slot,
+                            contentId: '',
+                            contentType: '',
+                            history: []
                         }
                     }
                 });
@@ -218,45 +283,62 @@ export function createUIController(store: UIStateStore): UIController {
                         store.setState(patch as Partial<UIState>);
                     }
                 }),
-                outputAPI.subscribe('MARK_ADDED', (mark: any) => {
-                    // Requires activeSlot because MARK_ADDED output doesn't broadcast slotId natively.
-                    // To do it perfectly, MARK_ADDED could contain slotId.
+                outputAPI.subscribe('MARK_ADDED', (payload: any) => {
                     const state = store.getState();
-                    const activeSlot = state.activeSlot;
-                    if (state.slots[activeSlot]) {
-                        const newMarks = new Map(state.slots[activeSlot].marks);
-                        newMarks.set(mark.id, mark);
-                        store.setState({
-                            slots: { ...state.slots, [activeSlot]: { ...state.slots[activeSlot], marks: newMarks } }
-                        });
+                    const contentId = payload.contentId;
+                    const { contentId: _, ...mark } = payload;
+                    const newSlots = { ...state.slots };
+                    let changed = false;
+                    for (const [slotId, slot] of Object.entries(newSlots)) {
+                        if (slot && slot.contentId === contentId) {
+                            const newMarks = new Map(slot.marks);
+                            newMarks.set(mark.id, mark);
+                            newSlots[slotId] = { ...slot, marks: newMarks };
+                            changed = true;
+                        }
+                    }
+                    if (changed) {
+                        store.setState({ slots: newSlots });
                     }
                 }),
-                outputAPI.subscribe('MARK_UPDATED', (mark: any) => {
+                outputAPI.subscribe('MARK_UPDATED', (payload: any) => {
                     const state = store.getState();
-                    const activeSlot = state.activeSlot;
-                    if (state.slots[activeSlot]) {
-                        const newMarks = new Map(state.slots[activeSlot].marks);
-                        newMarks.set(mark.id, mark);
-                        store.setState({
-                            slots: { ...state.slots, [activeSlot]: { ...state.slots[activeSlot], marks: newMarks } }
-                        });
+                    const contentId = payload.contentId;
+                    const { contentId: _, ...mark } = payload;
+                    const newSlots = { ...state.slots };
+                    let changed = false;
+                    for (const [slotId, slot] of Object.entries(newSlots)) {
+                        if (slot && slot.contentId === contentId) {
+                            const newMarks = new Map(slot.marks);
+                            newMarks.set(mark.id, mark);
+                            newSlots[slotId] = { ...slot, marks: newMarks };
+                            changed = true;
+                        }
+                    }
+                    if (changed) {
+                        store.setState({ slots: newSlots });
                     }
                 }),
                 outputAPI.subscribe('MARK_DELETED', (payload: any) => {
                     const state = store.getState();
-                    const activeSlot = state.activeSlot;
-                    if (state.slots[activeSlot]) {
-                        const newMarks = new Map(state.slots[activeSlot].marks);
-                        newMarks.delete(payload.markId);
-                        
-                        let newSelectedId = state.slots[activeSlot].selectedMarkId;
-                        if (newSelectedId === payload.markId) {
-                            newSelectedId = null;
+                    const contentId = payload.contentId;
+                    const newSlots = { ...state.slots };
+                    let changed = false;
+                    for (const [slotId, slot] of Object.entries(newSlots)) {
+                        if (slot && slot.contentId === contentId) {
+                            const newMarks = new Map(slot.marks);
+                            newMarks.delete(payload.markId);
+                            
+                            let newSelectedId = slot.selectedMarkId;
+                            if (newSelectedId === payload.markId) {
+                                newSelectedId = null;
+                            }
+                            newSlots[slotId] = { ...slot, marks: newMarks, selectedMarkId: newSelectedId };
+                            changed = true;
                         }
-
-                        store.setState({
-                            slots: { ...state.slots, [activeSlot]: { ...state.slots[activeSlot], marks: newMarks, selectedMarkId: newSelectedId } }
-                        });
+                    }
+                    if (changed) {
+                        store.setState({ slots: newSlots });
                     }
                 })
             ];
