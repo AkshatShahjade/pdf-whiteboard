@@ -191,10 +191,10 @@ export function createUIController(store: UIStateStore): UIController {
         connect: () => {
             const subs = [
                 outputAPI.subscribe('SESSION_LOADED', (session: any) => {
-                    const newSlots: Record<string, any> = {};
+                    const mergedSlots = { ...store.getState().slots };
                     for (const [slotId, slotSession] of Object.entries(session.slots)) {
                         const defaults = createDefaultSlotState((slotSession as any).contentId, (slotSession as any).contentType, (slotSession as any).slotType ?? 'verticalPane', 'ui');
-                        newSlots[slotId] = {
+                        mergedSlots[slotId] = {
                             ...defaults,
                             ...slotSession,
                             marks: new Map((slotSession as any).marks.map((m: any) => [m.id, m])),
@@ -203,7 +203,7 @@ export function createUIController(store: UIStateStore): UIController {
 
                     store.setState({
                         leftPct: session.leftPct,
-                        slots: newSlots
+                        slots: mergedSlots
                     });
                 }),
                 outputAPI.subscribe('APPSTATE_MUTATED', (patch: any) => {

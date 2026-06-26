@@ -8,12 +8,14 @@ import { rectTool } from "../registry_implementations/pdf/vertical_pane/tools/ma
 import { sectionTool } from "../registry_implementations/pdf/vertical_pane/tools/marking/spatial/spatial_section_mark_tool";
 import { removeTool } from "../registry_implementations/pdf/vertical_pane/tools/system/remove_mark_tool";
 import { selectionTool } from "../registry_implementations/pdf/vertical_pane/tools/system/selection_tool";
+import { contentSelectorTool } from "../registry_implementations/pdf/vertical_pane/tools/system/content_selector_tool";
 import { markRendererRegistry, registerMarkRendererType } from "./pdf/vertical_pane/mark_renderer_registry";
 import { registerToolRendererType, toolRendererRegistry } from "./pdf/vertical_pane/tool_renderer_registry";
 import { contentRendererRegistry, registerContentRendererType } from "./content_renderer_registry";
 import { setupAllRegistries as setupAtmaRegistries } from "../../atma/capabilities_registry/setup";
 import { pdfContentRenderer } from "../registry_implementations/pdf/pdf_content_renderer";
 import { whiteboardContentRenderer } from "../registry_implementations/whiteboard/whiteboard_content_renderer";
+import { contentSelectorContentRenderer } from "../registry_implementations/content_selector/content_selector_content_renderer";
 import { setupSlotRegistry } from "../../roopa/renderer_registry/setup";
 
 export function setupMarkRegistry() {
@@ -50,6 +52,9 @@ export function setupToolRegistry() {
     if (!toolRendererRegistry.has(removeTool.id.id)) {
         registerToolRendererType(removeTool);
     }
+    if (!toolRendererRegistry.has(contentSelectorTool.id.id)) {
+        registerToolRendererType(contentSelectorTool);
+    }
 }
 
 export function setupContentRendererRegistry() {
@@ -58,6 +63,9 @@ export function setupContentRendererRegistry() {
     }
     if (!contentRendererRegistry.has(whiteboardContentRenderer.id)) {
         registerContentRendererType(whiteboardContentRenderer);
+    }
+    if (!contentRendererRegistry.has(contentSelectorContentRenderer.id)) {
+        registerContentRendererType(contentSelectorContentRenderer);
     }
 }
 

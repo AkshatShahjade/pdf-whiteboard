@@ -3,6 +3,9 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { RecentCard } from '../roopa/elements/RecentCard';
+import { DropZone } from '../roopa/elements/DropZone';
+import { LibraryExplorer } from '../roopa/elements/LibraryExplorer';
 import { LastUIStateRepository } from '../atma/storage/repositories/LastUIStateRepository.ts';
 import { MarkRepository } from '../atma/storage/repositories/MarkRepository';
 import { WhiteboardRepository } from '../atma/storage/repositories/WhiteboardRepository';
@@ -87,71 +90,6 @@ function CornerMark({ pos }) {
       {pos === 'bl' && <><line x1="0" y1="20" x2="14" y2="20" stroke="#60A5FA" strokeWidth="1.5"/><line x1="0" y1="20" x2="0" y2="6" stroke="#60A5FA" strokeWidth="1.5"/></>}
       {pos === 'br' && <><line x1="20" y1="20" x2="6"  y2="20" stroke="#60A5FA" strokeWidth="1.5"/><line x1="20" y1="20" x2="20" y2="6" stroke="#60A5FA" strokeWidth="1.5"/></>}
     </svg>
-  );
-}
-
-function DropZone({ onBrowseClick, onFileDrop, disabled, showToast }) {
-  const [dragging, setDragging] = useState(false);
-  const handleDrop = useCallback((e) => {
-    e.preventDefault(); setDragging(false);
-    if (disabled) return showToast("Please set a Library Folder first!", "error");
-    const file = [...e.dataTransfer.files].find(f => f.type === 'application/pdf');
-    if (file && onFileDrop) onFileDrop(file);
-  }, [onFileDrop, disabled, showToast]);
-
-  return (
-    <div
-      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={handleDrop}
-      onClick={disabled ? () => showToast("Please set a Library Folder first!", "error") : onBrowseClick}
-      style={{
-        position: 'relative', border: `1.5px ${dragging ? 'solid' : 'dashed'} ${dragging ? '#3B82F6' : '#374151'}`, borderRadius: '10px', padding: '48px 32px', textAlign: 'center', cursor: 'pointer', background: dragging ? 'rgba(59,130,246,0.06)' : 'rgba(255,255,255,0.02)', transition: 'all 0.2s', backdropFilter: 'blur(4px)', opacity: disabled ? 0.4 : 1
-      }}
-    >
-      {dragging && <div style={{ position: 'absolute', inset: -1, borderRadius: '10px', border: '1.5px solid #3B82F6', animation: 'pulse-ring 1s ease-out infinite', pointerEvents: 'none' }} />}
-      <div style={{ fontSize: '32px', marginBottom: '14px', opacity: dragging ? 1 : 0.6 }}>{dragging ? '⬇' : '📄'}</div>
-      <div style={{ fontSize: '13px', fontWeight: '600', letterSpacing: '0.08em', color: dragging ? '#60A5FA' : '#d1d5db', textTransform: 'uppercase', marginBottom: '6px' }}>{dragging ? 'Drop to copy to library' : 'Import New PDF'}</div>
-      <div style={{ fontSize: '11px', color: '#9ca3af' }}>drag & drop · or click to browse</div>
-    </div>
-  );
-}
-
-function RecentCard({ entry, onOpen, onRemove }) {
-  const [hovered, setHovered] = useState(false);
-  const [marksCount, setMarksCount] = useState(0);
-  const [session, setSession] = useState(null);
-  const name = entry.name || entry.path.split('/').pop();
-
-  useEffect(() => {
-    if (!entry.path || entry.path.startsWith('whiteboard:')) return;
-    MarkRepository.loadMarksByContentId(entry.path).then(m => setMarksCount(m?.length || 0)).catch(() => {});
-    LastUIStateRepository.loadSessionState(entry.path).then(s => setSession(s)).catch(() => {});
-  }, [entry.path]);
-
-  return (
-    <div
-      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-      style={{
-        position: 'relative', border: `1px solid ${hovered ? '#3B82F6' : '#2a2e39'}`, borderRadius: '8px', padding: '16px 18px', cursor: 'pointer', background: hovered ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.03)', transition: 'all 0.15s', display: 'flex', flexDirection: 'column', gap: '6px',
-      }}
-      onClick={() => onOpen(entry)}
-    >
-      <button
-        onClick={(e) => { e.stopPropagation(); onRemove(entry.path); }}
-        style={{ position: 'absolute', top: '10px', right: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '13px', padding: '2px 5px', opacity: hovered ? 1 : 0, transition: 'opacity 0.15s', borderRadius: '4px' }}
-        title="Remove from recents"
-      >✕</button>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <span style={{ fontSize: '18px', opacity: 0.8 }}>📄</span>
-        <span style={{ fontSize: '12px', fontWeight: '600', color: '#f3f4f6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>{name}</span>
-      </div>
-      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-        <span style={{ fontSize: '10px', color: '#9ca3af' }}>{timeAgo(entry.openedAt)}</span>
-        {marksCount > 0 && <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '10px', background: 'rgba(59,130,246,0.15)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.3)' }}>{marksCount} mark{marksCount !== 1 ? 's' : ''}</span>}
-        {session?.scrollTop > 0 && <span style={{ fontSize: '9px', color: '#6b7280' }}>p.{Math.ceil(session.scrollTop / 1100) + 1}</span>}
-      </div>
-    </div>
   );
 }
 
@@ -691,84 +629,19 @@ export default function HomeScreen({ onOpen }) {
             )}
           </div>
           <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid #374151', borderRadius: '10px', padding: '24px', display: 'flex', flexDirection: 'column' }}>
-            {!libraryPath ? (
-               <div style={{ margin: 'auto', textAlign: 'center', color: '#9ca3af', fontSize: '12px' }}>No Library Folder selected.<br/>Setup a library to organize PDFs.</div>
-            ) : (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <span style={{ fontSize: '10px', color: '#9ca3af', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Library Explorer</span>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button onClick={() => refreshDir(currentDir)} title="Refresh folder" style={{ background: 'none', border: '1px solid #4b5563', borderRadius: '4px', color: '#d1d5db', cursor: 'pointer', fontSize: '12px', padding: '4px 8px', lineHeight: 1 }}>↻</button>
-                    <button onClick={handleNewFolder} style={{ background: 'none', border: '1px solid #4b5563', borderRadius: '4px', color: '#d1d5db', cursor: 'pointer', fontSize: '10px', padding: '4px 8px' }}>+ New Folder</button>
-                    <button onClick={handleNewWhiteboard} style={{ background: 'none', border: '1px solid #3B82F6', borderRadius: '4px', color: '#93C5FD', cursor: 'pointer', fontSize: '10px', padding: '4px 8px' }}>+ Whiteboard</button>
-                  </div>
-                </div>
-                <div style={{ fontSize: '11px', color: '#d1d5db', marginBottom: '12px', background: '#252932', padding: '6px 10px', borderRadius: '6px', border: '1px solid #374151', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {currentDir !== libraryPath && <button onClick={handleUpDir} style={{ background: 'none', border: 'none', color: '#60A5FA', cursor: 'pointer', padding: 0 }}>↑ Back</button>}
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentDir.replace(libraryPath, 'Library')}</span>
-                </div>
-                <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '500px' }}>
-                  {entries.length === 0 ? (
-                    <span style={{ fontSize: '12px', color: '#9ca3af', textAlign: 'center', padding: '20px' }}>Folder is empty.</span>
-                  ) : (
-                    entries.map(entry => (
-                      <div key={`${entry.name}-fs`} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <button onClick={() => handleEntryClick(entry)} style={{ flex: 1, textAlign: 'left', padding: '12px', borderRadius: '6px', background: '#262a33', border: '1px solid #374151', color: '#e5e7eb', cursor: 'pointer', fontSize: '13px', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: '8px' }} onMouseEnter={e => { e.currentTarget.style.borderColor = '#3B82F6'; e.currentTarget.style.background = 'rgba(59,130,246,0.1)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = '#374151'; e.currentTarget.style.background = '#262a33'; }}>
-                          <span style={{ fontSize: '16px', opacity: 0.9 }}>{entry.isDirectory ? '📁' : entry.name.toLowerCase().endsWith('.tldr') ? '🧠' : '📄'}</span>
-                          <span>{entry.name.toLowerCase().endsWith('.tldr') ? entry.name.replace(/\.tldr$/i, '') : entry.name}</span>
-                        </button>
-                        <button
-                          title="Delete"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            const fullPath = await joinPath(currentDir, entry.name);
-                            const yes = await confirmDialog(`Delete ${entry.isDirectory ? 'folder' : 'file'} "${entry.name}"?`, 'Confirm Delete');
-                            if (!yes) return;
-                            await remove(fullPath, entry.isDirectory ? { recursive: true } : undefined);
-                            refreshDir(currentDir);
-                          }}
-                          style={{ width: '34px', height: '34px', borderRadius: '6px', border: '1px solid rgba(248,113,113,0.4)', background: 'rgba(248,113,113,0.08)', color: '#F87171', cursor: 'pointer' }}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </>
-            )}
+            <LibraryExplorer
+              libraryPath={libraryPath}
+              currentDir={currentDir}
+              setCurrentDir={setCurrentDir}
+              onEntryClick={handleEntryClick}
+              showToast={showToast}
+            />
           </div>
         </div>
       </div>
 
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} onChange={handleSettingsChange} backupPath={backupPath} onSetBackupPath={handleSetBackupPath} showToast={showToast} onClearRecents={clearRecents} />
       <AboutPanel open={aboutOpen} onClose={() => setAboutOpen(false)} />
-
-      {isFolderModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
-          <div style={{ background: '#262a33', border: '1px solid #374151', borderRadius: '8px', padding: '24px', width: '320px', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', fontFamily: "'IBM Plex Mono', monospace" }}>
-            <h3 style={{ margin: 0, fontSize: '14px', color: '#f3f4f6' }}>Create New Folder</h3>
-            <input autoFocus type="text" placeholder="Folder name..." value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && confirmNewFolder()} style={{ background: '#1c1f26', border: '1px solid #4b5563', color: '#e5e7eb', padding: '10px 12px', borderRadius: '6px', outline: 'none', fontFamily: 'inherit', fontSize: '13px' }} />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
-              <button onClick={() => setIsFolderModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#d1d5db', cursor: 'pointer', padding: '6px 12px', fontSize: '12px' }}>Cancel</button>
-              <button onClick={confirmNewFolder} style={{ background: '#3B82F6', border: 'none', color: '#fff', cursor: 'pointer', padding: '6px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}>Create</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isWhiteboardModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
-          <div style={{ background: '#262a33', border: '1px solid #374151', borderRadius: '8px', padding: '24px', width: '320px', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', fontFamily: "'IBM Plex Mono', monospace" }}>
-            <h3 style={{ margin: 0, fontSize: '14px', color: '#f3f4f6' }}>Create Whiteboard</h3>
-            <input autoFocus type="text" placeholder="Whiteboard name..." value={newWhiteboardName} onChange={(e) => setNewWhiteboardName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && confirmNewWhiteboard()} style={{ background: '#1c1f26', border: '1px solid #4b5563', color: '#e5e7eb', padding: '10px 12px', borderRadius: '6px', outline: 'none', fontFamily: 'inherit', fontSize: '13px' }} />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
-              <button onClick={() => setIsWhiteboardModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#d1d5db', cursor: 'pointer', padding: '6px 12px', fontSize: '12px' }}>Cancel</button>
-              <button onClick={confirmNewWhiteboard} style={{ background: '#3B82F6', border: 'none', color: '#fff', cursor: 'pointer', padding: '6px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}>Create</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

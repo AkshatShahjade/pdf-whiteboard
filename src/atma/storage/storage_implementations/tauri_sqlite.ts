@@ -74,6 +74,14 @@ async function getDb(): Promise<Database> {
             try {
                 const db = await Database.load(DB_URL);
                 
+                // Enable WAL (Write-Ahead Logging) mode on database startup.
+                // This is persistent on the SQLite database file and allows concurrent reads/writes.
+                try {
+                    await db.execute('PRAGMA journal_mode = WAL;');
+                } catch (e) {
+                    console.warn('[tauri_sqlite] Failed to enable WAL mode:', e);
+                }
+                
                 // Set the synchronous instance immediately to prevent deadlocks 
                 // when initializeDatabaseIfEmpty makes recursive queries.
                 dbInstance = db;

@@ -78,21 +78,30 @@ export const stateSyncService = {
       }
     }, 600);
 
-    const persistSlotVar = debounce(async (slotId: string, key: string, val: any, contentId: string) => {
-        const type = keyTypes[key];
+    const pendingSlotUpdates = new Map<string, { contentId: string; key: string; val: any }>();
+
+    const persistSlotUpdates = debounce(async () => {
+      if (pendingSlotUpdates.size === 0) return;
+
+      const updates = Array.from(pendingSlotUpdates.values());
+      pendingSlotUpdates.clear();
+
+      for (const update of updates) {
+        const type = keyTypes[update.key];
         if (type === 'personalizable') {
           try {
-             const scope = ['doc:' + contentId, 'global'];
-             await StateInitialValuesRepository.setSpecificValue(key, scope, val);
+             const scope = ['doc:' + update.contentId, 'global'];
+             await StateInitialValuesRepository.setSpecificValue(update.key, scope, update.val);
           } catch (err) {
-             console.error(`[StateSyncService] Failed to persist slot ${slotId} key ${key}:`, err);
+             console.error(`[StateSyncService] Failed to persist slot key ${update.key}:`, err);
           }
         }
+      }
     }, 600);
 
     this._flushPersist = () => {
       persistFlat.flush();
-      persistSlotVar.flush();
+      persistSlotUpdates.flush();
     };
 
     store.subscribe(() => {
@@ -130,7 +139,12 @@ export const stateSyncService = {
           if ((slot as any)[key] !== prevSlot[key]) {
              slotsChanged = true;
              slotDelta[key] = (slot as any)[key];
-             persistSlotVar(slotId, key, (slot as any)[key], slot.contentId);
+             pendingSlotUpdates.set(`${slot.contentId}:${key}`, {
+               contentId: slot.contentId,
+               key,
+               val: (slot as any)[key]
+             });
+             persistSlotUpdates();
           }
         }
         if (Object.keys(slotDelta).length > 0) {
@@ -166,7 +180,7 @@ export const stateSyncService = {
   /**
    * Hydrates the store with the resolved session state from the 4-layer architecture.
    */
-  async loadSession(store: AppStateStore, output: OutputAPIInterface, pdfPath: string) {
+  async loadSession(store: AppStateStore, output: OutputAPIInterface, pdfPath: string, slotId: string = 'main') {
     try {
       // Ensure the content is registered in the DB before we do any relational writing (like marks)
       await ContentRepository.ensureContentExists(pdfPath, 'core.pdf', pdfPath);
@@ -187,28 +201,30 @@ export const stateSyncService = {
       // Mutate store (Subscriber will automatically pick this up, but we'll ignore initial load diffing or just let it re-persist safely)
       store.setState(draft => {
         draft.leftPct = leftPct;
-        draft.slots['main'] = {
+        draft.slots[slotId] = {
           contentId: pdfPath,
           contentType: 'pdf',
           zoom,
           tool,
           selectedMarkId,
           scrollTop,
-          marks: marksMap
+          marks: marksMap,
+          slotType: slotId === 'main' ? 'verticalPane' : 'verticalPane' // maintain structure
         };
       });
 
       const sessionDTO: SessionDTO = {
         leftPct,
         slots: {
-          'main': {
+          [slotId]: {
             contentId: pdfPath,
             contentType: 'pdf',
             zoom,
             tool,
             selectedMarkId,
             scrollTop,
-            marks: parsedMarks
+            marks: parsedMarks,
+            slotType: 'verticalPane'
           }
         }
       };

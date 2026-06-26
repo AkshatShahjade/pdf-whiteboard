@@ -1,4 +1,5 @@
-export type content_type = derived_content_type | source_content_type
+export type content_type = derived_content_type | source_content_type | system_content_type
+export type system_content_type = "content_selector"
 export type derived_content_type = 'whiteboard' // CodeEditor | BlockText | Image | Video | Spreadsheet | KeyboardMindMap | ObsidianCanvas
 export type source_content_type = 'whiteboard' | 'pdf' // CodeEditor | BlockText | Image | Video | PPT | Spreadsheet | KeyboardMindMap | ObsidianCanvas
 

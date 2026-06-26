@@ -7,7 +7,7 @@ import { whiteboardService } from '../services/tldraw_service';
 import { StateInitialValuesRepository } from '../storage/repositories/StateInitialValuesRepository';
 
 export interface InputAPIInterface {
-  loadSession(pdfPath: string): Promise<void>;
+  loadSession(pdfPath: string, slotId?: string): Promise<void>;
   flushSession(): void;
   updateSplitter(leftPct: number): void;
   selectMark(slotId: string, markId: string | null): void;
@@ -33,8 +33,8 @@ export function createInputAPI(
   output: OutputAPIInterface
 ): InputAPIInterface {
   return {
-    loadSession(pdfPath: string): Promise<void> {
-      return stateSyncService.loadSession(store, output, pdfPath);
+    loadSession(pdfPath: string, slotId?: string): Promise<void> {
+      return stateSyncService.loadSession(store, output, pdfPath, slotId);
     },
 
     flushSession(): void {

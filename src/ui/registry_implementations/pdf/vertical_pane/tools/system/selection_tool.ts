@@ -1,6 +1,7 @@
 import type {
     ToolActivateContext,
     ToolBorderClickContext,
+    ToolPointerDownContext,
     PDFToolRendererType,
 } from "../../../../../renderer_registry/pdf/vertical_pane/tool_renderer_registry"
 import { selectCursor } from "../../../tool_cursors"
@@ -13,6 +14,9 @@ export const selectionTool: PDFToolRendererType = {
     },
     isDrawable: false,
     createsSelections : false,
+    label: 'Select',
+    icon: '↖',
+    order: 1,
     hotkey: 'v',
     activationMode: 'set',
 

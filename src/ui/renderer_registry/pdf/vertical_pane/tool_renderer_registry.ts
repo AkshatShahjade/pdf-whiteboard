@@ -92,6 +92,8 @@ export interface ToolActivateContext {
         setEditingSectionId: (next: string | null) => void
         setEditingShapeId: (next: string | null) => void
         setShapeBackup: (next: any) => void
+        setTool: (next: string) => void
+        setSlotStates: (slotId: string, patch: Record<string, any>) => void
     }
 }
 
@@ -134,6 +136,9 @@ export interface PDFToolRendererType extends ToolRendererType {
     isDrawable: boolean
     createsSelections: boolean
 
+    label?: string
+    icon?: string
+    order?: number
     hotkey?: string
     activationMode?: ToolActivationMode
     cursor?: ToolCursor

@@ -7,6 +7,7 @@ import { markDomainRegistry, registerMarkDomainType } from "./pdf/mark_domain_re
 import { contentDomainRegistry, registerContentDomainType } from "./content_domain_registry";
 import { pdfContentDomain } from "../registry_implementations/pdf/pdf_domain_content";
 import { whiteboardContentDomain } from "../registry_implementations/whiteboard/whiteboard_domain_content";
+import { contentSelectorDomainContent } from "../registry_implementations/content_selector/content_selector_domain_content";
 
 export function setupMarkDomainRegistry() {
     if (!markDomainRegistry.has(lassoMark.id)) {
@@ -29,6 +30,9 @@ export function setupContentDomainRegistry() {
     }
     if (!contentDomainRegistry.has(whiteboardContentDomain.id)) {
         registerContentDomainType(whiteboardContentDomain);
+    }
+    if (!contentDomainRegistry.has(contentSelectorDomainContent.id)) {
+        registerContentDomainType(contentSelectorDomainContent);
     }
 }
 

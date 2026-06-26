@@ -191,23 +191,29 @@ function PDFContentComponent({
         setEditingSectionId: (id) => uiController.setSlotState(slotId, 'editingSectionId', id),
         setEditingShapeId: (shapeId) => uiController.setSlotState(slotId, 'editingShapeId', shapeId),
         setShapeBackup: (backup) => uiController.setSlotState(slotId, 'shapeBackup', backup),
+        setTool: (tool) => uiController.setSlotState(slotId, 'tool', tool),
+        setSlotStates: (targetSlotId, patch) => uiController.setSlotStates(targetSlotId, patch),
       },
     });
   }, [slotState?.tool]);
 
+  const currentSideType = uiState?.slots?.['side']?.contentType;
   const currentSideId = uiState?.slots?.['side']?.contentId || '';
   const resolvedSideId = slotState?.selectedMarkId || shortcutManager.getLinkedWhiteboardId() || '';
 
   // Synchronize active whiteboard id to the side slot state
   useEffect(() => {
-    if (currentSideId !== resolvedSideId) {
-      if (resolvedSideId) {
+    if (resolvedSideId) {
+      if (currentSideId !== resolvedSideId || currentSideType !== 'whiteboard') {
         uiController.setSlotStates('side', { contentId: resolvedSideId, contentType: 'whiteboard', slotType: 'verticalPane' });
-      } else {
+      }
+    } else {
+      // Clear whiteboard if active, but do not override or close content_selector
+      if (currentSideType === 'whiteboard' && currentSideId !== '') {
         uiController.setSlotStates('side', { contentId: '', contentType: 'whiteboard', slotType: 'verticalPane' });
       }
     }
-  }, [resolvedSideId, currentSideId, uiController]);
+  }, [resolvedSideId, currentSideId, currentSideType, uiController]);
 
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pdfReady, setPdfReady] = useState(false);
@@ -718,52 +724,53 @@ function PDFContentComponent({
       {/* ── TOOLBOX (Vertical, Bottom Right Overlay) ── */}
       <div style={{ position: 'absolute', bottom: '24px', right: '24px', zIndex: 50, display: 'flex', flexDirection: 'column', gap: '8px', pointerEvents: 'auto' }}>
         <div style={{ background: 'rgba(38,42,51,0.65)', backdropFilter: 'blur(10px)', borderRadius: '8px', padding: '6px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '6px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
-          {[
-            { id: 'select', label: 'Select', key: 'V', icon: '↖' },
-            { id: 'rect',   label: 'Freeform', key: 'R', icon: '▭' },
-            { id: 'lasso',  label: 'Lasso', key: 'C', icon: '∿' },
-            { id: 'pin',    label: 'Pin',    key: 'P', icon: '📍' },
-            { id: 'section',label: 'Section', key: 'S', icon: '⬍' },
-            { id: 'remove', label: 'Remove', key: 'X', icon: '✕' },
-          ].map(({ id, label, key, icon }) => (
-            <div key={id} style={{ position: 'relative' }}>
-              <button
-                onClick={() => {
-                  if (shortcutManager) shortcutManager.clearUi();
-                  const buttonToolType = getToolType(id);
-                  const nextTool = buttonToolType.activationMode === 'toggle' && slotState?.tool === id ? 'select' : id;
-                  uiController.setSlotState(slotId, 'tool', nextTool);
-                }}
-                title={`${label} [${key}]`}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '6px', border: `1px solid ${slotState?.tool === id ? '#3B82F6' : 'transparent'}`, background: slotState?.tool === id ? 'rgba(59,130,246,0.2)' : 'transparent', color: slotState?.tool === id ? '#93C5FD' : '#d1d5db', cursor: 'pointer', fontSize: '18px', transition: 'all 0.15s' }}
-                onMouseEnter={e => { if (slotState?.tool !== id) { e.currentTarget.style.color='#fff'; e.currentTarget.style.background='rgba(255,255,255,0.1)'; } }}
-                onMouseLeave={e => { if (slotState?.tool !== id) { e.currentTarget.style.color='#d1d5db'; e.currentTarget.style.background='transparent'; } }}
-              >
-                {icon}
-              </button>
-              {getToolType(id).renderToolbarExtras?.({
-                toolId: id,
-                tool: slotState?.tool,
-                sectionTarget: slotState?.sectionTarget,
-                sectionSelection,
-                editingShapeId: slotState?.editingShapeId,
-                editingSectionId: slotState?.editingSectionId,
-                shapeBackup: slotState?.shapeBackup,
-                actions: {
-                  setTool: (tool) => uiController.setSlotState(slotId, 'tool', tool),
-                  setSectionTarget: (target) => uiController.setSlotState(slotId, 'sectionTarget', target),
-                  setEditingSectionId: (id) => uiController.setSlotState(slotId, 'editingSectionId', id),
-                  setCurrentSelection,
-                  setMarksWithSectionWidths,
-                  setSelectedMarkId: (markId) => uiController.setSlotState(slotId, 'selectedMarkId', markId),
-                  setSelectedShortcutIdx: (idx) => shortcutManager?.setSelectedIdx(idx),
-                  setShapeBackup: (backup) => uiController.setSlotState(slotId, 'shapeBackup', backup),
-                  setEditingShapeId: (shapeId) => uiController.setSlotState(slotId, 'editingShapeId', shapeId),
-                  setSelectPanelIdx: (idx) => shortcutManager?.setSelectPanelIdx(idx),
-                },
-              })}
-            </div>
-          ))}
+          {Array.from(toolRendererRegistry.values())
+            .filter((t) => t.id.scope === 'pdf')
+            .sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
+            .map((tool) => {
+              const id = tool.id.id;
+              const label = tool.label || id;
+              const key = tool.hotkey ? tool.hotkey.toUpperCase() : '';
+              const icon = tool.icon || '?';
+              return (
+                <div key={id} style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => {
+                      if (shortcutManager) shortcutManager.clearUi();
+                      const nextTool = tool.activationMode === 'toggle' && slotState?.tool === id ? 'select' : id;
+                      uiController.setSlotState(slotId, 'tool', nextTool);
+                    }}
+                    title={key ? `${label} [${key}]` : label}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '6px', border: `1px solid ${slotState?.tool === id ? '#3B82F6' : 'transparent'}`, background: slotState?.tool === id ? 'rgba(59,130,246,0.2)' : 'transparent', color: slotState?.tool === id ? '#93C5FD' : '#d1d5db', cursor: 'pointer', fontSize: '18px', transition: 'all 0.15s' }}
+                    onMouseEnter={e => { if (slotState?.tool !== id) { e.currentTarget.style.color='#fff'; e.currentTarget.style.background='rgba(255,255,255,0.1)'; } }}
+                    onMouseLeave={e => { if (slotState?.tool !== id) { e.currentTarget.style.color='#d1d5db'; e.currentTarget.style.background='transparent'; } }}
+                  >
+                    {icon}
+                  </button>
+                  {tool.renderToolbarExtras?.({
+                    toolId: id,
+                    tool: slotState?.tool,
+                    sectionTarget: slotState?.sectionTarget,
+                    sectionSelection,
+                    editingShapeId: slotState?.editingShapeId,
+                    editingSectionId: slotState?.editingSectionId,
+                    shapeBackup: slotState?.shapeBackup,
+                    actions: {
+                      setTool: (t) => uiController.setSlotState(slotId, 'tool', t),
+                      setSectionTarget: (target) => uiController.setSlotState(slotId, 'sectionTarget', target),
+                      setEditingSectionId: (id) => uiController.setSlotState(slotId, 'editingSectionId', id),
+                      setCurrentSelection,
+                      setMarksWithSectionWidths,
+                      setSelectedMarkId: (markId) => uiController.setSlotState(slotId, 'selectedMarkId', markId),
+                      setSelectedShortcutIdx: (idx) => shortcutManager?.setSelectedIdx(idx),
+                      setShapeBackup: (backup) => uiController.setSlotState(slotId, 'shapeBackup', backup),
+                      setEditingShapeId: (shapeId) => uiController.setSlotState(slotId, 'editingShapeId', shapeId),
+                      setSelectPanelIdx: (idx) => shortcutManager?.setSelectPanelIdx(idx),
+                    },
+                  })}
+                </div>
+              );
+            })}
         </div>
 
         {shortcutState && shortcutManager && (

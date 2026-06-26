@@ -54,7 +54,7 @@ function commitSectionSelection(ctx: {
     return true
 }
 
-export const sectionTool: ToolRendererType = {
+export const sectionTool: PDFToolRendererType = {
     id: {
         id: "section",
         scope: "pdf",
@@ -62,6 +62,9 @@ export const sectionTool: ToolRendererType = {
     },
     isDrawable: false,
     createsSelections : true,
+    label: 'Section',
+    icon: '⬍',
+    order: 5,
     hotkey: 's',
     activationMode: 'toggle',
     cursor: ({ sectionTarget }) => getSectionCursor(sectionTarget ?? 'start'),

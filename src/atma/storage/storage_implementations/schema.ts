@@ -128,6 +128,7 @@ export const SEED_SQL = `
 -- Seed built-in content types
 INSERT OR IGNORE INTO JODO_CONTENT_TYPES (id, name, is_prebuilt, is_enabled) VALUES ('core.pdf', 'PDF Document', 1, 1);
 INSERT OR IGNORE INTO JODO_CONTENT_TYPES (id, name, is_prebuilt, is_enabled) VALUES ('core.whiteboard', 'Whiteboard', 1, 1);
+INSERT OR IGNORE INTO JODO_CONTENT_TYPES (id, name, is_prebuilt, is_enabled) VALUES ('core.content_selector', 'Content Selector', 1, 1);
 
 -- Seed built-in mark types
 INSERT OR IGNORE INTO JODO_MARK_TYPES (id, name, is_prebuilt, is_enabled) VALUES ('rect', 'Rectangle', 1, 1);

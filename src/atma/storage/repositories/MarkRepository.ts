@@ -16,14 +16,22 @@ export const MarkRepository = {
             await tauriSqlAdapter.execute(`DELETE FROM MARKS WHERE content_id = ?`, [contentId]);
         }
         
-        for (const mark of marks) {
-            const payload = JSON.stringify(mark);
-
-            const markType = (mark as any).type;
-            await tauriSqlAdapter.execute(
-                `INSERT OR REPLACE INTO MARKS (id, content_id, jodo_mark_type, payload) VALUES (?, ?, ?, ?)`,
-                [mark.id, contentId, markType, payload]
-            );
+        if (marks.length > 0) {
+            const batchSize = 100; // Well below SQLite parameter limit of 999
+            for (let i = 0; i < marks.length; i += batchSize) {
+                const chunk = marks.slice(i, i + batchSize);
+                const valuesPlaceholders = chunk.map(() => '(?, ?, ?, ?)').join(', ');
+                const bindValues: unknown[] = [];
+                for (const mark of chunk) {
+                    const payload = JSON.stringify(mark);
+                    const markType = (mark as any).type;
+                    bindValues.push(mark.id, contentId, markType, payload);
+                }
+                await tauriSqlAdapter.execute(
+                    `INSERT OR REPLACE INTO MARKS (id, content_id, jodo_mark_type, payload) VALUES ${valuesPlaceholders}`,
+                    bindValues
+                );
+            }
         }
     },
 
