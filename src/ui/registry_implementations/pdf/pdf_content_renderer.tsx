@@ -494,30 +494,6 @@ function PDFContentComponent({
     });
   }, [slotState, selectMark, setMarksWithSectionWidths]);
 
-  useEffect(() => {
-    if (!slotState?.tool) return;
-    const activationReason = pendingToolActivationReasonRef.current;
-    pendingToolActivationReasonRef.current = 'normal';
-    if (activationReason === 'border-edit') return;
-
-    getToolType(slotState.tool).onActivate?.({
-      state: {
-        currentSelection,
-        editingShapeId: slotState.editingShapeId,
-        editingSectionId: slotState.editingSectionId,
-        sectionTarget: slotState.sectionTarget,
-        tool: slotState.tool,
-      },
-      actions: {
-        setCurrentSelection,
-        setSectionTarget: (target) => uiController.setSlotState(slotId, 'sectionTarget', target),
-        setEditingSectionId: (id) => uiController.setSlotState(slotId, 'editingSectionId', id),
-        setEditingShapeId: (id) => uiController.setSlotState(slotId, 'editingShapeId', id),
-        setShapeBackup: (backup) => uiController.setSlotState(slotId, 'shapeBackup', backup),
-      },
-    });
-  }, [slotState?.tool]);
-
   const sectionSelection = currentSelection?.type === 'section'
     ? currentSelection
     : { start: null, end: null };
