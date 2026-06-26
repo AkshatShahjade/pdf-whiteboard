@@ -26,8 +26,14 @@ async function scanDirectory(dir: string): Promise<Array<{ name: string; path: s
 }
 
 // --- Capability Hook ---
-export function useLibrarySearch(libraryPath: string | null) {
-  const [query, setQuery] = useState('');
+export function useLibrarySearch(
+  libraryPath: string | null,
+  externalQuery?: string,
+  externalSetQuery?: (q: string) => void
+) {
+  const [localQuery, setLocalQuery] = useState('');
+  const query = externalQuery !== undefined ? externalQuery : localQuery;
+  const setQuery = externalSetQuery !== undefined ? externalSetQuery : setLocalQuery;
   const [allFiles, setAllFiles] = useState<Array<{ name: string; path: string }>>([]);
   const [results, setResults] = useState<Array<{ name: string; path: string }>>([]);
   const [scanning, setScanning] = useState(false);
@@ -74,10 +80,12 @@ export function useLibrarySearch(libraryPath: string | null) {
 interface LibrarySearchProps {
   libraryPath: string | null;
   onSelectFile: (filePath: string, name: string) => void;
+  query?: string;
+  setQuery?: (q: string) => void;
 }
 
-export function LibrarySearch({ libraryPath, onSelectFile }: LibrarySearchProps) {
-  const { query, setQuery, results, scanning } = useLibrarySearch(libraryPath);
+export function LibrarySearch({ libraryPath, onSelectFile, query, setQuery }: LibrarySearchProps) {
+  const { query: activeQuery, setQuery: activeSetQuery, results, scanning } = useLibrarySearch(libraryPath, query, setQuery);
 
   if (!libraryPath) return null;
 
@@ -87,8 +95,8 @@ export function LibrarySearch({ libraryPath, onSelectFile }: LibrarySearchProps)
         <input
           type="text"
           placeholder="Search library..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          value={activeQuery}
+          onChange={(e) => activeSetQuery(e.target.value)}
           style={{
             width: '100%',
             background: '#1c1f26',

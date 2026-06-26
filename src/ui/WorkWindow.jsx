@@ -72,6 +72,14 @@ export default function Root() {
   const uiController = useMemo(() => uiStore ? createUIController(uiStore) : null, [uiStore]);
   
   useEffect(() => {
+    if (uiStore) {
+      queryAPI.getLibraryPath().then(path => {
+        uiStore.setState({ libraryPath: path });
+      }).catch(console.error);
+    }
+  }, [uiStore]);
+
+  useEffect(() => {
     if (uiController) {
       return uiController.connect();
     }

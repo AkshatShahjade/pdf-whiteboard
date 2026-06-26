@@ -2,8 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { ContentRendererType, ContentRendererProps } from '../../renderer_registry/content_renderer_registry';
 import { RecentCard } from '../../../roopa/elements/RecentCard';
 import { LibrarySearch } from '../../../roopa/elements/LibrarySearch';
+import { DropZone } from '../../../roopa/elements/DropZone';
+import { LibraryExplorer } from '../../../roopa/elements/LibraryExplorer';
 import { queryAPI, inputAPI } from '../../../atma/singletons';
 import { ContentRepository } from '../../../atma/storage/repositories/ContentRepository';
+import { basename, joinPath, pickFiles } from '../../../atma/platform_adapter/switch';
+import { copyFile, exists, writeFile } from '../../../atma/storage/storage_adapter/switch';
 
 function ContentSelectorComponent({
   slotId,
@@ -11,7 +15,19 @@ function ContentSelectorComponent({
   uiController
 }: ContentRendererProps) {
   const [recents, setRecents] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const libraryPath = uiState?.libraryPath;
+  const [currentDir, setCurrentDir] = useState<string | null>(null);
+  const [explorerTrigger, setExplorerTrigger] = useState(0);
+
+  // Sync currentDir with libraryPath on load / change
+  useEffect(() => {
+    if (libraryPath) {
+      setCurrentDir(libraryPath);
+    } else {
+      setCurrentDir(null);
+    }
+  }, [libraryPath]);
 
   const loadRecents = async () => {
     try {
@@ -25,6 +41,10 @@ function ContentSelectorComponent({
   useEffect(() => {
     loadRecents();
   }, []);
+
+  const showToast = (msg: string, type?: 'info' | 'success' | 'error') => {
+    uiController?.showToast?.(msg, type);
+  };
 
   const handleSelectFile = async (filePath: string, name: string) => {
     const isPdf = filePath.toLowerCase().endsWith('.pdf');
@@ -75,6 +95,55 @@ function ContentSelectorComponent({
     const nextRecents = currentRecents.filter((r: any) => r.path !== path);
     await inputAPI.saveRecents(nextRecents);
     loadRecents();
+  };
+
+  const handleImportBrowse = async () => {
+    try {
+      const file = await pickFiles('PDF', ['pdf'], true);
+      if (file && currentDir) {
+        const name = await basename(file);
+        const dest = await joinPath(currentDir, name);
+        if (await exists(dest)) {
+          return showToast("File already exists in this folder.", "error");
+        }
+        await copyFile(file, dest);
+        showToast("File imported successfully.", "success");
+        setExplorerTrigger(prev => prev + 1);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleImportDrop = async (file: File) => {
+    try {
+      if (!currentDir) return;
+      const dest = await joinPath(currentDir, file.name);
+      if (await exists(dest)) {
+        return showToast("File already exists in this folder.", "error");
+      }
+      const buffer = await file.arrayBuffer();
+      await writeFile(dest, new Uint8Array(buffer));
+      showToast("File imported successfully.", "success");
+      setExplorerTrigger(prev => prev + 1);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleEntryClick = async (entry: any) => {
+    try {
+      if (!currentDir) return;
+      if (entry.isDirectory) {
+        const nextDir = await joinPath(currentDir, entry.name);
+        setCurrentDir(nextDir);
+      } else {
+        const fullPath = await joinPath(currentDir, entry.name);
+        await handleSelectFile(fullPath, entry.name);
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleClose = () => {
@@ -139,28 +208,62 @@ function ContentSelectorComponent({
 
       {/* Library Search */}
       <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <LibrarySearch libraryPath={libraryPath} onSelectFile={handleSelectFile} />
+        <LibrarySearch
+          libraryPath={libraryPath}
+          onSelectFile={handleSelectFile}
+          query={searchQuery}
+          setQuery={setSearchQuery}
+        />
       </div>
 
-      {/* Recents list */}
-      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <div style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          Recent Documents
-        </div>
-        {recents.length === 0 ? (
-          <span style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center', padding: '16px' }}>
-            No recent items.
-          </span>
-        ) : (
-          recents.map(entry => (
-            <RecentCard
-              key={entry.path}
-              entry={entry}
-              onOpen={handleRecentOpen}
-              onRemove={handleRecentRemove}
-            />
-          ))
-        )}
+      {/* Scrolling Content Container */}
+      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px', paddingRight: '4px' }}>
+        {!searchQuery.trim() ? (
+          <>
+            {/* Explorer */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid #374151', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <LibraryExplorer
+                key={explorerTrigger}
+                libraryPath={libraryPath}
+                currentDir={currentDir}
+                setCurrentDir={setCurrentDir}
+                onEntryClick={handleEntryClick}
+                showToast={showToast}
+              />
+            </div>
+
+            {/* Drop Zone */}
+            <div style={{ transform: 'scale(0.95)', transformOrigin: 'top center' }}>
+              <DropZone
+                onBrowseClick={handleImportBrowse}
+                onFileDrop={handleImportDrop}
+                disabled={!libraryPath}
+                showToast={showToast}
+              />
+            </div>
+
+            {/* Recents list */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                Recent Documents
+              </div>
+              {recents.length === 0 ? (
+                <span style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center', padding: '16px' }}>
+                  No recent items.
+                </span>
+              ) : (
+                recents.map(entry => (
+                  <RecentCard
+                    key={entry.path}
+                    entry={entry}
+                    onOpen={handleRecentOpen}
+                    onRemove={handleRecentRemove}
+                  />
+                ))
+              )}
+            </div>
+          </>
+        ) : null}
       </div>
     </div>
   );
