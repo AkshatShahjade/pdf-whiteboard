@@ -1,9 +1,9 @@
 import { LassoSel, Mark, Point, RenderMarkContext, Selection, SelectionContext, STROKE_HIT_WIDTH } from "../../../../../shared_doman_models_and_dtos/mark_domain_model";
 import { distToSegmentSquared } from "../../../../helper";
 import { generateMarkId as createMarkId } from "../../../../../shared_doman_models_and_dtos/factories";
-import { MarkRendererType } from "../../../../renderer_registry/pdf/vertical_pane/mark_renderer_registry";
+import { PDFMarkRendererType } from "../../../../renderer_registry/pdf/vertical_pane/mark_renderer_registry";
 
-export const lassoMark: MarkRendererType = {
+export const lassoMark: PDFMarkRendererType = {
     id : 'lasso',
     isDrawable: true,
 

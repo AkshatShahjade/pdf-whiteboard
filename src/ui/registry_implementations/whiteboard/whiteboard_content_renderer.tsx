@@ -108,7 +108,6 @@ function WhiteboardContentComponent({ slotId, contentId, settings, uiController 
 export const whiteboardContentRenderer: ContentRendererType = {
   id: 'whiteboard',
   Component: WhiteboardContentComponent,
-  slotRendererRegistry: new Map(),
 }
 
 // Re-export WhiteboardPane for use in the split-pane PDF view

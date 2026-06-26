@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { ContentRendererType, ContentRendererProps } from '../../renderer_registry/content_renderer_registry';
-import { slotRendererRegistry } from '../../renderer_registry/pdf/slot_renderer_registry';
+import { markRendererRegistry } from '../../renderer_registry/pdf/vertical_pane/mark_renderer_registry';
+import { toolRendererRegistry } from '../../renderer_registry/pdf/vertical_pane/tool_renderer_registry';
 import { getMarkDomainType } from '../../../atma/capabilities_registry/pdf/mark_domain_registry';
 import { getMarkRendererType } from '../../renderer_registry/pdf/vertical_pane/mark_renderer_registry';
 import { getToolRendererType as getToolType, getToolRendererByHotkey as getToolByHotkey } from '../../renderer_registry/pdf/vertical_pane/tool_renderer_registry';
@@ -201,9 +202,9 @@ function PDFContentComponent({
   useEffect(() => {
     if (currentSideId !== resolvedSideId) {
       if (resolvedSideId) {
-        uiController.setSlotStates('side', { contentId: resolvedSideId, contentType: 'whiteboard' });
+        uiController.setSlotStates('side', { contentId: resolvedSideId, contentType: 'whiteboard', slotType: 'verticalPane' });
       } else {
-        uiController.setSlotStates('side', { contentId: '', contentType: 'whiteboard' });
+        uiController.setSlotStates('side', { contentId: '', contentType: 'whiteboard', slotType: 'verticalPane' });
       }
     }
   }, [resolvedSideId, currentSideId, uiController]);
@@ -853,5 +854,6 @@ function PDFContentComponent({
 export const pdfContentRenderer: ContentRendererType = {
   id: 'pdf',
   Component: PDFContentComponent,
-  slotRendererRegistry: slotRendererRegistry,
+  markRendererRegistry,
+  toolRendererRegistry,
 }

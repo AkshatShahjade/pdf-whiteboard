@@ -4,10 +4,26 @@ import type {
     ToolPointerDownContext,
     ToolPointerMoveContext,
     ToolPointerUpContext,
-    ToolRendererType,
+    PDFToolRendererType,
 } from "../../../../../../renderer_registry/pdf/vertical_pane/tool_renderer_registry"
+import { getMarkRendererType } from "../../../../../../renderer_registry/pdf/vertical_pane/mark_renderer_registry"
+import { rectCursor } from "../../../../tool_cursors"
 import { rectangleMark } from "../../../marks/rectangle_mark"
 import { renderDrawableToolbarExtras } from "../../../../tool_toolbar_extras"
+
+function handleDrawingMove(e: React.MouseEvent, state: ToolPointerMoveContext['state'], actions: ToolPointerMoveContext['actions']) {
+    const coords = { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY }
+    const markRenderer = getMarkRendererType('rect')
+    if (state.currentSelection && markRenderer.updateSelection) {
+        actions.setCurrentSelection(markRenderer.updateSelection(state.currentSelection, coords, { zoom: state.zoom }))
+    }
+}
+
+function handleDrawingEnd(state: ToolPointerUpContext, actions: ToolPointerUpContext['actions']) {
+    actions.setCurrentSelection(null)
+    actions.setEditingShapeId(null)
+    actions.setShapeBackup(null)
+}
 
 function resetDrawableToolState(actions: {
     setCurrentSelection: (next: any) => void
@@ -23,7 +39,7 @@ function resetDrawableToolState(actions: {
     actions.setShapeBackup(null)
 }
 
-export const rectTool: ToolRendererType = {
+export const rectTool: PDFToolRendererType = {
     id: {
         id: "rect",
         scope: "pdf",

@@ -1,9 +1,10 @@
 import type {
     ToolActivateContext,
-    ToolRendererType,
+    PDFToolRendererType,
 } from "../../../../../renderer_registry/pdf/vertical_pane/tool_renderer_registry"
+import { shortcutCursor } from "../../../tool_cursors"
 
-export const shortcutTool: ToolRendererType = {
+export const shortcutTool: PDFToolRendererType = {
     id: {
         id: "shortcut",
         scope: "pdf",

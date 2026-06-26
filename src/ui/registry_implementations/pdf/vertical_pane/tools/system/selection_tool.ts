@@ -1,11 +1,11 @@
 import type {
     ToolActivateContext,
     ToolBorderClickContext,
-    ToolRendererType,
-    ToolPointerDownContext,
+    PDFToolRendererType,
 } from "../../../../../renderer_registry/pdf/vertical_pane/tool_renderer_registry"
+import { selectCursor } from "../../../tool_cursors"
 
-export const selectionTool: ToolRendererType = {
+export const selectionTool: PDFToolRendererType = {
     id: {
         id: "select",
         scope: "pdf",

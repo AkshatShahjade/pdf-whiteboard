@@ -4,7 +4,7 @@ import type {
     ToolPointerDownContext,
     ToolPointerMoveContext,
     ToolPointerUpContext,
-    ToolRendererType,
+    PDFToolRendererType,
 } from "../../../../../../renderer_registry/pdf/vertical_pane/tool_renderer_registry"
 import { lassoMark } from "../../../marks/lasso_mark"
 import { lassoCursor } from "../../../../tool_cursors"
@@ -24,7 +24,7 @@ function resetDrawableToolState(actions: {
     actions.setShapeBackup(null)
 }
 
-export const lassoTool: ToolRendererType = {
+export const lassoTool: PDFToolRendererType = {
     id: {
         id: "lasso",
         scope: "pdf",

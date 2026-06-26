@@ -1,7 +1,11 @@
 import { Selection, Point, Mark, SelectionContext, RenderMarkContext } from "../../../../shared_doman_models_and_dtos/mark_domain_model";
+import { MarkRendererType } from "../../mark_tool_renderer_types";
 
-export interface MarkRendererType {
-    id: string
+/**
+ * PDFMarkRendererType — extends the base MarkRendererType with PDF-specific
+ * spatial selection and border-editing lifecycle hooks.
+ */
+export interface PDFMarkRendererType extends MarkRendererType {
     isDrawable: boolean
 
     onBorderEditStart?: (ctx: {
@@ -19,36 +23,32 @@ export interface MarkRendererType {
     }) => boolean | void
 
     initiateShape?: (coords: Point) => Selection
-    
+
     updateSelection?: (prev: Selection, coords: Point, ctx: SelectionContext) => Selection
-    
+
     renderSelectionPreview: (selection: Selection, ctx: SelectionContext) => any
-    
+
     returnDrawableMarkWithoutId?: (selection: Selection) => any
 
-    returnNewDrawableMark?:(selection: Selection) => Mark
+    returnNewDrawableMark?: (selection: Selection) => Mark
 
-    // updateMark: (selection:Selection) => Mark
-    
     render: (r: Mark, ctx: RenderMarkContext) => any
-
 }
 
+export const markRendererRegistry = new Map<string, PDFMarkRendererType>();
 
-export const markRendererRegistry = new Map<string, MarkRendererType>();
-
-export function registerMarkRendererType(impl: MarkRendererType): void {
+export function registerMarkRendererType(impl: PDFMarkRendererType): void {
     if (markRendererRegistry.has(impl.id)) {
         throw new Error(`Duplicate mark implementation: ${impl.id}`)
     }
     markRendererRegistry.set(impl.id, impl)
 }
 
-export function getMarkRendererType (id: string): MarkRendererType {
+export function getMarkRendererType(id: string): PDFMarkRendererType {
     const imp = markRendererRegistry.get(id)
 
-    if(!imp){
+    if (!imp) {
         throw new Error(`No mark implementation of id: ${id}`)
     }
-    return imp 
+    return imp
 }

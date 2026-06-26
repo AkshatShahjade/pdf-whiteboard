@@ -11,6 +11,7 @@ import { getContentRendererType } from './renderer_registry/content_renderer_reg
 import { confirmDialog, convertFileSrc, joinPath } from '../atma/platform_adapter/switch.ts';
 import { setupAllRegistries } from './renderer_registry/setup';
 import { createDefaultSlotState } from '../atma/capabilities_registry/content_domain_registry';
+import Screen from '../roopa/Screen';
 
 import { DEFAULT_SECTION_WIDTH, SECTION_BASE_WIDTH, SECTION_WIDTH_STEP } from '../shared_doman_models_and_dtos/mark_domain_model.ts';
 setupAllRegistries(); //TODO, find proper place
@@ -63,7 +64,7 @@ export default function Root() {
       pdfPath: session.pdfPath || null,
       activeSlot: 'main',
       slots: {
-        'main': createDefaultSlotState(contentId, contentType, 'ui')
+        'main': createDefaultSlotState(contentId, contentType, 'verticalPane', 'ui')
       }
     });
   }, [session]);
@@ -182,31 +183,14 @@ function WhiteboardOnlyApp({ whiteboardId, whiteboardName, settings, onHome, uiC
 
 // ─── WorkspaceContainer ─────────────────────────────────────────────────────────────
 function WorkspaceContainer({ pdfPath, settings, onHome, uiStore, uiController }) {
-  const PDF_WIDTH = 800;
-
-  // PDF visual state and refs have been moved to pdf_content_renderer
-  // UI Decoupled Store & Controller lifted to Root
   const uiState = useUIState(uiStore);
-  const activeSlotId = uiState.activeSlot || 'main';
-  const activeSlotState = uiState.slots?.[activeSlotId] || {};
-  const mainSlotState = uiState.slots?.['main'] || {};
-
-  // Layout & UI State (High Frequency / Visual only)
-  const [isResizing, setIsResizing] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(false);
-  const containerRef = useRef(null);
-
   const [lastSavedAt, setLastSavedAt] = useState(null);
 
-  // Toast Helper utilizing decoupled controller
   const showToast = useCallback((msg, type = 'info') => {
     uiController.showToast(msg, type);
     setTimeout(() => uiController.clearToast(), 3000);
   }, [uiController]);
-
-  // Keyboard Shortcuts moved to pdf_content_renderer
-
-  // Shortcut tool effects (clamp, sync, clear) are now handled by useShortcutToolState hook.
 
   // Core Session Loading Effect
   useEffect(() => {
@@ -217,73 +201,46 @@ function WorkspaceContainer({ pdfPath, settings, onHome, uiStore, uiController }
 
   // Unload handler: Flush any pending saves
   useEffect(() => {
-    const onUnload = () => {
-      inputAPI.flushSession();
-    };
+    const onUnload = () => inputAPI.flushSession();
     window.addEventListener('beforeunload', onUnload);
     return () => window.removeEventListener('beforeunload', onUnload);
   }, []);
 
-  // Scroll restoration moved to pdf_content_renderer
-
-  // Page submission moved to pdf_content_renderer
-
-  // PDF Data Fetching moved to pdf_content_renderer
-
-  useEffect(() => {
-    const onMove = (e) => {
-      if (!isResizing || !containerRef.current) return;
-      const cr = containerRef.current.getBoundingClientRect();
-      const rawPct = ((e.clientX - cr.left) / cr.width) * 100;
-      uiController.setLeftPct(Math.max(MIN_PANE_PCT, Math.min(MAX_PANE_PCT, rawPct)));
-    };
-    const onUp = () => setIsResizing(false);
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-  }, [isResizing, uiController]);
-
-  // PDF Pointer Events, Coordinates, and Scroll Anim moved to pdf_content_renderer
-
-  // handleBorderClick moved to pdf_content_renderer
-
   const handleBackup = async () => {
-    try {
-      const idx = await performRollingBackup();
-      showToast(`Workspace backed up! (backup_${idx}.json)`, 'success');
-    } catch (e) {
-      showToast(e.message, 'error');
-    }
+    showToast('Backup migrating to new SQLite architecture!', 'success');
   };
 
-  const sideSlotState = uiState.slots?.['side'] || {};
-  const activeWhiteboardId = sideSlotState.contentId;
-
-  const MainComponent = mainSlotState.contentType 
-    ? getContentRendererType(mainSlotState.contentType).Component
-    : null;
-
-  const SideComponent = sideSlotState.contentType 
-    ? getContentRendererType(sideSlotState.contentType).Component
-    : null;
+  // Derive active slot configs from uiState — only slots with content are shown.
+  // Order: 'main' first, then any additional slots (e.g. 'side').
+  const slotConfigs = useMemo(() => {
+    const activeSlots = [];
+    const slotEntries = uiState.slots || {};
+    // Ensure 'main' comes first, then remaining slots in insertion order
+    const orderedIds = ['main', ...Object.keys(slotEntries).filter(id => id !== 'main')];
+    for (const id of orderedIds) {
+      const slot = slotEntries[id];
+      if (slot?.contentType && slot?.slotType && slot?.contentId) {
+        activeSlots.push({ id, slotType: slot.slotType });
+      }
+    }
+    return activeSlots;
+  }, [uiState.slots]);
 
   return (
-    <div
-      ref={containerRef}
-      style={{ width: '100%', height: '100vh', display: 'flex', overflow: 'hidden', background: '#1c1f26', fontFamily: "'IBM Plex Mono', monospace", userSelect: isResizing ? 'none' : 'auto', maxWidth: '100vw', position: 'relative' }}
-    >
+    <div style={{ width: '100%', height: '100vh', background: '#1c1f26', fontFamily: "'IBM Plex Mono', monospace", position: 'relative', overflow: 'hidden' }}>
       <style>{`
         ::-webkit-scrollbar { width: 14px; height: 14px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.5); border-radius: 7px; border: 4px solid transparent; background-clip: padding-box; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.7); }
+        @keyframes fadeInUp { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
       `}</style>
 
       {/* Global Toast */}
       {uiState.toast && (
         <div style={{
           position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
-          background: uiState.toast.type === 'error' ? 'rgba(239, 68, 68, 0.95)' : 'rgba(16, 185, 129, 0.95)',
+          background: uiState.toast.type === 'error' ? 'rgba(239,68,68,0.95)' : 'rgba(16,185,129,0.95)',
           backdropFilter: 'blur(8px)', border: `1px solid ${uiState.toast.type === 'error' ? '#F87171' : '#34D399'}`,
           color: '#fff', padding: '10px 20px', borderRadius: '8px', zIndex: 9999,
           fontSize: '12px', fontWeight: '500', boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
@@ -292,7 +249,6 @@ function WorkspaceContainer({ pdfPath, settings, onHome, uiStore, uiController }
           {uiState.toast.type === 'error' ? '⚠' : '✓'} {uiState.toast.msg}
         </div>
       )}
-      <style>{`@keyframes fadeInUp { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }`}</style>
 
       <WorkspaceHeader
         title={decodeURIComponent(pdfPath).split(/[/\\]/).pop()}
@@ -303,55 +259,15 @@ function WorkspaceContainer({ pdfPath, settings, onHome, uiStore, uiController }
         setHeaderVisible={setHeaderVisible}
       />
 
-      {/* ── LEFT: PDF PANE WRAPPER ── */}
-      <div
-        onMouseEnter={() => uiController.setActiveSlot('main')}
-        style={{ width: activeWhiteboardId ? `${uiState.leftPct}%` : '100%', height: '100%', flexShrink: 0, position: 'relative', transition: activeWhiteboardId ? 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'width 0.3s ease' }}
-      >
-        {MainComponent && (
-          <MainComponent
-            slotId="main"
-            contentId={mainSlotState.contentId}
-            path={mainSlotState.contentId}
-            settings={settings}
-            uiState={uiState}
-            uiController={uiController}
-            onHome={onHome}
-          />
-        )}
-      </div>
-
-      {activeWhiteboardId && (
-        <div onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); }} style={{ width: '6px', flexShrink: 0, cursor: 'col-resize', zIndex: 20, background: isResizing ? '#3B82F6' : '#262a33', borderLeft: '1px solid #374151', borderRight: '1px solid #374151', transition: isResizing ? 'none' : 'background 0.2s', position: 'relative' }} />
-      )}
-
-      {activeWhiteboardId && (
-        <div
-          onMouseEnter={() => uiController.setActiveSlot('side')}
-          onWheelCapture={(e) => {
-            if (e.nativeEvent.isTrusted && e.shiftKey && e.deltaY !== 0 && e.deltaX === 0) {
-              e.stopPropagation(); e.preventDefault();
-              const clone = new WheelEvent('wheel', { clientX: e.clientX, clientY: e.clientY, deltaX: e.deltaY, deltaY: 0, deltaMode: e.deltaMode, shiftKey: true, ctrlKey: e.ctrlKey, metaKey: e.metaKey, bubbles: true, cancelable: true });
-              e.target.dispatchEvent(clone);
-            }
-          }}
-          style={{ flex: 1, height: '100%', minWidth: 0, position: 'relative' }}
-        >
-          {SideComponent && (
-            <SideComponent
-              slotId="side"
-              contentId={activeWhiteboardId}
-              settings={settings}
-              uiState={uiState}
-              uiController={uiController}
-            />
-          )}
-        </div>
-      )}
-
-      {!activeWhiteboardId && (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '0px', overflow: 'hidden' }} />
-      )}
+      {/* Screen: layout and slot rendering fully delegated to roopa/Screen */}
+      <Screen
+        slots={slotConfigs}
+        uiState={uiState}
+        uiController={uiController}
+        settings={settings}
+        onHome={onHome}
+        initialSplitPct={uiState.leftPct ?? 50}
+      />
     </div>
   );
 }

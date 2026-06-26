@@ -143,7 +143,7 @@ export function createUIController(store: UIStateStore): UIController {
             if (!baseState) {
                 if (contentType) {
                     try {
-                        baseState = createDefaultSlotState(contentId, contentType, 'ui');
+                        baseState = createDefaultSlotState(contentId, contentType, patch.slotType ?? slot?.slotType ?? 'verticalPane', 'ui');
                     } catch (err) {
                         baseState = { contentId, contentType, marks: new Map() };
                     }
@@ -193,7 +193,7 @@ export function createUIController(store: UIStateStore): UIController {
                 outputAPI.subscribe('SESSION_LOADED', (session: any) => {
                     const newSlots: Record<string, any> = {};
                     for (const [slotId, slotSession] of Object.entries(session.slots)) {
-                        const defaults = createDefaultSlotState((slotSession as any).contentId, (slotSession as any).contentType, 'ui');
+                        const defaults = createDefaultSlotState((slotSession as any).contentId, (slotSession as any).contentType, (slotSession as any).slotType ?? 'verticalPane', 'ui');
                         newSlots[slotId] = {
                             ...defaults,
                             ...slotSession,

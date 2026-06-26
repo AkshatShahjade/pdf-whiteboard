@@ -3,6 +3,7 @@ import { MarkDTO } from '../shared_doman_models_and_dtos/dtos';
 export interface SlotAppState {
   contentId: string;
   contentType: string; // 'pdf' | 'whiteboard'
+  slotType: string;   // 'verticalPane' | future slot types
   zoom: number;
   tool: string;
   scrollTop: number;
@@ -25,7 +26,7 @@ export const DEFAULT_APP_STATE: Omit<AppState, 'slots'> = {
   leftPct: 50,
 };
 
-export const DEFAULT_SLOT_APP_STATE: Omit<SlotAppState, 'contentId' | 'contentType' | 'marks'> = {
+export const DEFAULT_SLOT_APP_STATE: Omit<SlotAppState, 'contentId' | 'contentType' | 'slotType' | 'marks'> = {
   zoom: 1.0,
   tool: 'select',
   selectedMarkId: null,

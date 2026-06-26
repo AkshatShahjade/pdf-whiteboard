@@ -41,9 +41,9 @@ export function getContentDomainType(id: string): ContentDomainType {
     return impl
 }
 
-export function createDefaultSlotState(contentId: string, contentType: string, scope: 'app' | 'ui'): any {
+export function createDefaultSlotState(contentId: string, contentType: string, slotType: string, scope: 'app' | 'ui'): any {
     const domain = getContentDomainType(contentType);
-    const state: Record<string, any> = { contentId, contentType, marks: new Map() };
+    const state: Record<string, any> = { contentId, contentType, slotType, marks: new Map() };
     if (domain.stateVariables) {
         for (const v of domain.stateVariables) {
             if (scope === 'ui' || v.scope === 'app') {

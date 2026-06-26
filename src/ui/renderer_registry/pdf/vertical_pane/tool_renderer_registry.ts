@@ -1,4 +1,5 @@
 import { ToolDomainType } from "../../../../shared_doman_models_and_dtos/tool_domain_models"
+import { ToolRendererType } from "../../mark_tool_renderer_types"
 
 export type ToolCursor = string | ((ctx: ToolCursorContext) => string)
 export type ToolActivationMode = "set" | "toggle"
@@ -128,7 +129,7 @@ export interface ToolToolbarExtrasContext {
     }
 }
 
-export interface ToolRendererType {
+export interface PDFToolRendererType extends ToolRendererType {
     id: ToolDomainType
     isDrawable: boolean
     createsSelections: boolean
@@ -148,9 +149,9 @@ export interface ToolRendererType {
 }
 
 
-export const toolRendererRegistry = new Map<string, ToolRendererType>
+export const toolRendererRegistry = new Map<string, PDFToolRendererType>()
 
-export function registerToolRendererType(tool: ToolRendererType): void {
+export function registerToolRendererType(tool: PDFToolRendererType): void {
     if (toolRendererRegistry.has(tool.id.id)) {
         throw new Error(`Duplicate tool implementation: ${tool.id}`)
     }
@@ -160,7 +161,7 @@ export function registerToolRendererType(tool: ToolRendererType): void {
     }
 }
 
-export function getToolRendererType (name: string): ToolRendererType {
+export function getToolRendererType (name: string): PDFToolRendererType {
     const imp = toolRendererRegistry.get(name)   
     
     if(!imp){
@@ -170,8 +171,8 @@ export function getToolRendererType (name: string): ToolRendererType {
 }
 
 
-const toolHotkeyRegistry = new Map<string, ToolRendererType>()
+const toolHotkeyRegistry = new Map<string, PDFToolRendererType>()
 
-export function getToolRendererByHotkey(key: string): ToolRendererType | undefined {
+export function getToolRendererByHotkey(key: string): PDFToolRendererType | undefined {
     return toolHotkeyRegistry.get(key.toLowerCase())
 }
