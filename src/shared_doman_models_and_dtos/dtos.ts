@@ -30,7 +30,14 @@ export interface SectionMarkDTO {
   w: number;
 }
 
-export type MarkDTO = RectMarkDTO | LassoMarkDTO | SectionMarkDTO;
+export interface PinMarkDTO {
+  id: string;
+  type: 'pin';
+  x: number;
+  y: number;
+}
+
+export type MarkDTO = RectMarkDTO | LassoMarkDTO | SectionMarkDTO | PinMarkDTO;
 
 export interface SlotSessionDTO {
   contentId: string;

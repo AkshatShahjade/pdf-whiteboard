@@ -6,6 +6,7 @@ export interface MarkDomainType {
     hasSelectedBorder: (pt: Point, r: Mark, ctx: SelectionContext) => boolean   
 
     validate?: (mark: any) => { isValid: boolean; error?: string };
+    parseRaw: (raw: any) => any;
 }
 
 

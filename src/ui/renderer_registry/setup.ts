@@ -1,7 +1,9 @@
 import { lassoMark } from "../registry_implementations/pdf/vertical_pane/marks/lasso_mark";
+import { pinMark } from "../registry_implementations/pdf/vertical_pane/marks/pin_mark";
 import { rectangleMark } from "../registry_implementations/pdf/vertical_pane/marks/rectangle_mark";
 import { sectionMark } from "../registry_implementations/pdf/vertical_pane/marks/section_mark";
 import { lassoTool } from "../registry_implementations/pdf/vertical_pane/tools/marking/spatial/lasso_mark_tool";
+import { pinTool } from "../registry_implementations/pdf/vertical_pane/tools/marking/spatial/pin_mark_tool";
 import { rectTool } from "../registry_implementations/pdf/vertical_pane/tools/marking/spatial/rectangle_mark_tool";
 import { sectionTool } from "../registry_implementations/pdf/vertical_pane/tools/marking/spatial/spatial_section_mark_tool";
 import { removeTool } from "../registry_implementations/pdf/vertical_pane/tools/system/remove_mark_tool";
@@ -24,6 +26,9 @@ export function setupMarkRegistry() {
     if (!markRendererRegistry.has(sectionMark.id)) {
         registerMarkRendererType(sectionMark);
     }
+    if (!markRendererRegistry.has(pinMark.id)) {
+        registerMarkRendererType(pinMark);
+    }
 }
 
 export function setupToolRegistry() {
@@ -35,6 +40,9 @@ export function setupToolRegistry() {
     }
     if (!toolRendererRegistry.has(sectionTool.id.id)) {
         registerToolRendererType(sectionTool);
+    }
+    if (!toolRendererRegistry.has(pinTool.id.id)) {
+        registerToolRendererType(pinTool);
     }
     if (!toolRendererRegistry.has(selectionTool.id.id)) {
         registerToolRendererType(selectionTool);

@@ -722,6 +722,7 @@ function PDFContentComponent({
             { id: 'select', label: 'Select', key: 'V', icon: '↖' },
             { id: 'rect',   label: 'Freeform', key: 'R', icon: '▭' },
             { id: 'lasso',  label: 'Lasso', key: 'C', icon: '∿' },
+            { id: 'pin',    label: 'Pin',    key: 'P', icon: '📍' },
             { id: 'section',label: 'Section', key: 'S', icon: '⬍' },
             { id: 'remove', label: 'Remove', key: 'X', icon: '✕' },
           ].map(({ id, label, key, icon }) => (

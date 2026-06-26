@@ -121,7 +121,10 @@ CREATE TABLE IF NOT EXISTS SPECIFIC_INITIAL_VALUES (
     based_on_default_hash TEXT,
     PRIMARY KEY (key, scope)
 );
+);
+`;
 
+export const SEED_SQL = `
 -- Seed built-in content types
 INSERT OR IGNORE INTO JODO_CONTENT_TYPES (id, name, is_prebuilt, is_enabled) VALUES ('core.pdf', 'PDF Document', 1, 1);
 INSERT OR IGNORE INTO JODO_CONTENT_TYPES (id, name, is_prebuilt, is_enabled) VALUES ('core.whiteboard', 'Whiteboard', 1, 1);
@@ -130,4 +133,5 @@ INSERT OR IGNORE INTO JODO_CONTENT_TYPES (id, name, is_prebuilt, is_enabled) VAL
 INSERT OR IGNORE INTO JODO_MARK_TYPES (id, name, is_prebuilt, is_enabled) VALUES ('rect', 'Rectangle', 1, 1);
 INSERT OR IGNORE INTO JODO_MARK_TYPES (id, name, is_prebuilt, is_enabled) VALUES ('lasso', 'Lasso', 1, 1);
 INSERT OR IGNORE INTO JODO_MARK_TYPES (id, name, is_prebuilt, is_enabled) VALUES ('section', 'Section', 1, 1);
+INSERT OR IGNORE INTO JODO_MARK_TYPES (id, name, is_prebuilt, is_enabled) VALUES ('pin', 'Pin', 1, 1);
 `;

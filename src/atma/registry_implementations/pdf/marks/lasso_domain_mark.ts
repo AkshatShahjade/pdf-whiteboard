@@ -34,6 +34,23 @@ export const lassoMark: MarkDomainType = {
             }
         }
         return { isValid: true };
+    },
+
+    parseRaw(raw: any) {
+        const rawPoints = Array.isArray(raw.points) ? raw.points : [];
+        const points = rawPoints.map((pt: any) => ({
+            x: typeof pt?.x === 'number' ? pt.x : 0,
+            y: typeof pt?.y === 'number' ? pt.y : 0,
+        }));
+        return {
+            id: raw.id || createMarkId(),
+            type: 'lasso',
+            x: typeof raw.x === 'number' ? raw.x : 0,
+            y: typeof raw.y === 'number' ? raw.y : 0,
+            w: typeof raw.w === 'number' ? raw.w : 10,
+            h: typeof raw.h === 'number' ? raw.h : 10,
+            points,
+        };
     }
 }
 

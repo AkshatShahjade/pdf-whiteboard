@@ -31,14 +31,21 @@ export interface SectionMark {
     w: number
 }
 
-export type Mark = RectMark | LassoMark | SectionMark
+export interface PinMark {
+    id: UUID;
+    type: 'pin'
+    x: number;
+    y: number;
+}
+
+export type Mark = RectMark | LassoMark | SectionMark | PinMark
 
 // export interface Mark {
 //     const newId = `reg_${Date.now()}`;
 //     { id: newId, type: 'lasso', ...shape }
 // }
 
-export type Selection = RectSel | LassoSel | SectionSel
+export type Selection = RectSel | LassoSel | SectionSel | PinSel
 
 export interface RectSel {
     type: 'rect'
@@ -57,6 +64,12 @@ export interface SectionSel {
     type: 'section'
     start: number | null
     end: number | null
+}
+
+export interface PinSel {
+    type: 'pin'
+    x: number | null
+    y: number | null
 }
 
 export interface SelectionContext {

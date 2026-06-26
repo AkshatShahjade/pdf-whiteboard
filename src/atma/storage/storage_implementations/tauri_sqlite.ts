@@ -1,6 +1,6 @@
 import Database from '@tauri-apps/plugin-sql';
 import { DatabaseAdapter } from '../storage_adapter/database_interface';
-import { SCHEMA_SQL } from './schema';
+import { SCHEMA_SQL, SEED_SQL } from './schema';
 import { initializeStateDefaults } from '../state_initializer';
 
 // Default SQLite connection string for Tauri plugin
@@ -37,11 +37,31 @@ async function initializeDatabaseIfEmpty(db: Database) {
         }
         console.log('[tauri_sqlite] Database schema initialization complete!');
         
+        await runSeeds(db);
+
         // Seed the default state variables
         await initializeStateDefaults(true);
     } else {
         console.log('[tauri_sqlite] Database already initialized. Ensuring missing defaults are seeded...');
+        
+        await runSeeds(db);
+        
         await initializeStateDefaults(false);
+    }
+}
+
+async function runSeeds(db: Database) {
+    console.log('[tauri_sqlite] Running database seeds...');
+    const cleanSeed = SEED_SQL.replace(/--.*$/gm, '');
+    const statements = cleanSeed.split(';')
+        .map(s => s.replace(/\s+/g, ' ').trim())
+        .filter(s => s.length > 0)
+        .map(s => s+';')
+        
+    for (let i = 0; i < statements.length; i++) {
+        const stmt = statements[i];
+        console.log(`[tauri_sqlite] Executing seed ${i + 1}/${statements.length}:`, stmt.substring(0, 40) + '...');
+        await db.execute(stmt);
     }
 }
 

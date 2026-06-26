@@ -23,6 +23,17 @@ export const rectangleMark: MarkDomainType = {
         return { isValid: false, error: `Rect bounds exceed the page width: ${x + w} > 800` };
       }
       return { isValid: true };
+    },
+
+    parseRaw(raw: any) {
+      return {
+        id: raw.id || createMarkId(),
+        type: 'rect',
+        x: typeof raw.x === 'number' ? raw.x : 0,
+        y: typeof raw.y === 'number' ? raw.y : 0,
+        w: typeof raw.w === 'number' ? raw.w : 10,
+        h: typeof raw.h === 'number' ? raw.h : 10,
+      };
     }
 }
 
