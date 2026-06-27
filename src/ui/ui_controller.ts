@@ -2,7 +2,7 @@ import { UIStateStore, ToastState } from './ui_state_store';
 import { inputAPI, outputAPI } from '../atma/singletons';
 import { getContentDomainType, createDefaultSlotState } from '../atma/capabilities_registry/content_domain_registry';
 import { KramEngine } from '../kram/kram_engine';
-
+import { ContentRepository } from '../atma/storage/repositories/ContentRepository';
 /**
  * UIController - Interface encapsulating all low-frequency UI state mutations and command delegations.
  */
@@ -27,7 +27,7 @@ export interface UIController {
     connect: () => () => void;
 
     // ─── Domain / Data Commands Delegations (Refactored from InputAPI) ────────
-    loadSession: (pdfPath: string, slotId?: string) => Promise<void>;
+    onContentChange: (slotId: string, contentId: string, contentType: string) => Promise<void>;
     deleteMark: (slotId: string, markId: string) => Promise<void>;
     addMark: (slotId: string, mark: any) => Promise<string>;
     updateMark: (slotId: string, mark: any) => Promise<void>;
@@ -218,8 +218,22 @@ export function createUIController(store: UIStateStore, onHomeCallback?: () => v
         },
 
         // ─── Domain Commands Delegations ──────────────────────────────────────────
-        loadSession: (pdfPath, slotId) => {
-            return inputAPI.loadSession(pdfPath, slotId);
+        onContentChange: async (slotId, contentId, contentType) => {
+            if (contentType === 'pdf') {
+                await inputAPI.loadSession(contentId, slotId);
+            } else if (contentType === 'whiteboard') {
+                rawController.setSlotStates(slotId, {
+                    contentId,
+                    contentType,
+                    slotType: 'verticalPane'
+                });
+            } else {
+                rawController.setSlotStates(slotId, {
+                    contentId,
+                    contentType,
+                    slotType: 'verticalPane'
+                });
+            }
         },
         deleteMark: (slotId, markId) => {
             return inputAPI.deleteMark(slotId, markId);

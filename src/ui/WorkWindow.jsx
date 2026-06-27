@@ -202,7 +202,7 @@ function WorkspaceContainer({ pdfPath, settings, onHome, uiStore, uiController }
   // Core Session Loading Effect
   useEffect(() => {
     if (pdfPath && uiController) {
-      uiController.loadSession(pdfPath);
+      uiController.onContentChange('left', pdfPath, 'pdf');
     }
   }, [pdfPath, uiController]);
 

@@ -1,4 +1,4 @@
-export type KramTrigger = 'onCloseSlot' | 'onMarkActivate' | 'onSlotOpen' | 'onToolSelected';
+export type KramTrigger = 'onCloseSlot' | 'onMarkActivate' | 'onContentChange' | 'onToolSelected';
 
 export interface SlotHistoryEntry {
     contentId: string;
@@ -17,9 +17,9 @@ export interface KramEvent {
 }
 
 export type KramAction =
-    | { type: 'openContentInSlot'; payload: { slotId: string; contentType: string; contentId: string } }
+    | { type: 'openContentInSlot'; payload: { slotId: string; contentType: string; contentId: string; suppressHistory?: boolean } }
     | { type: 'clearSelection'; payload: { slotId: string } }
     | { type: 'clearContent'; payload: { slotId: string } }
     | { type: 'showHomescreen' }
     | { type: 'setTool'; payload: { slotId: string; tool: string } }
-    | { type: 'popHistory'; payload: { slotId: string } };
+    | { type: 'truncateHistory'; payload: { slotId: string; toIndex: number } };

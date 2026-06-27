@@ -41,12 +41,23 @@ export class KramEngine {
         for (const action of actions) {
             switch (action.type) {
                 case 'openContentInSlot': {
-                    const { slotId, contentType, contentId } = action.payload;
-                    this.rawController.setSlotStates(slotId, {
-                        contentId,
-                        contentType,
-                        slotType: 'verticalPane'
-                    });
+                    const { slotId, contentType, contentId, suppressHistory } = action.payload;
+                    const state = this.store.getState();
+                    const slot = state.slots[slotId];
+                    if (!suppressHistory && slot && slot.contentId && slot.contentType) {
+                        if (slot.contentId !== contentId || slot.contentType !== contentType) {
+                            this.pushHistory(slotId, {
+                                contentId: slot.contentId,
+                                contentType: slot.contentType,
+                                slotType: slot.slotType ?? 'verticalPane',
+                                zoom: slot.zoom,
+                                tool: slot.tool,
+                                scrollTop: slot.scrollTop,
+                                selectedMarkId: slot.selectedMarkId
+                            });
+                        }
+                    }
+                    this.rawController.onContentChange(slotId, contentId, contentType);
                     break;
                 }
                 case 'clearSelection': {
@@ -83,9 +94,9 @@ export class KramEngine {
                     this.rawController.setTool(tool, slotId);
                     break;
                 }
-                case 'popHistory': {
-                    const { slotId } = action.payload;
-                    this.popHistory(slotId);
+                case 'truncateHistory': {
+                    const { slotId, toIndex } = action.payload;
+                    this.truncateHistory(slotId, toIndex);
                     break;
                 }
             }
@@ -118,19 +129,6 @@ export class KramEngine {
 
                         if (actions) {
                             self.executeActions(actions);
-                            const stack = self.history[slotId] || [];
-                            let targetIdx = -1;
-                            for (let i = stack.length - 1; i >= 0; i--) {
-                                if (stack[i].contentType !== 'content_selector') {
-                                    targetIdx = i;
-                                    break;
-                                }
-                            }
-                            if (targetIdx >= 0) {
-                                self.truncateHistory(slotId, targetIdx);
-                            } else {
-                                self.history[slotId] = [];
-                            }
                         } else {
                             target.closeSlot(slotId);
                         }
@@ -166,26 +164,22 @@ export class KramEngine {
                     };
                 }
 
-                if (prop === 'setSlotStates') {
-                    return (slotId: string, patch: Record<string, any>) => {
+                if (prop === 'onContentChange') {
+                    return async (slotId: string, contentId: string, contentType: string) => {
                         const state = self.store.getState();
                         const slot = state.slots[slotId];
                         
-                        if (slot && (patch.contentId !== undefined || patch.contentType !== undefined)) {
-                            const nextContentId = patch.contentId ?? slot.contentId;
-                            const nextContentType = patch.contentType ?? slot.contentType;
-                            if (nextContentId !== slot.contentId || nextContentType !== slot.contentType) {
-                                if (slot.contentId && slot.contentType) {
-                                    self.pushHistory(slotId, {
-                                        contentId: slot.contentId,
-                                        contentType: slot.contentType,
-                                        slotType: slot.slotType ?? 'verticalPane',
-                                        zoom: slot.zoom,
-                                        tool: slot.tool,
-                                        scrollTop: slot.scrollTop,
-                                        selectedMarkId: slot.selectedMarkId
-                                    });
-                                }
+                        if (slot && slot.contentId && slot.contentType) {
+                            if (slot.contentId !== contentId || slot.contentType !== contentType) {
+                                self.pushHistory(slotId, {
+                                    contentId: slot.contentId,
+                                    contentType: slot.contentType,
+                                    slotType: slot.slotType ?? 'verticalPane',
+                                    zoom: slot.zoom,
+                                    tool: slot.tool,
+                                    scrollTop: slot.scrollTop,
+                                    selectedMarkId: slot.selectedMarkId
+                                });
                             }
                         }
 
@@ -199,9 +193,9 @@ export class KramEngine {
                             };
                         }
 
-                        const actions = kramRules.evaluate('onSlotOpen', {
+                        const actions = kramRules.evaluate('onContentChange', {
                             slotId,
-                            args: [patch],
+                            args: [contentId, contentType],
                             slotsState,
                             history: self.history
                         });
@@ -210,7 +204,7 @@ export class KramEngine {
                             self.executeActions(actions);
                         }
 
-                        target.setSlotStates(slotId, patch);
+                        return target.onContentChange(slotId, contentId, contentType);
                     };
                 }
 
@@ -240,6 +234,14 @@ export class KramEngine {
                         } else {
                             target.setTool(tool, targetSlot);
                         }
+                    };
+                }
+                if (prop === 'setSlotState') {
+                    return (slotId: string, key: string, value: any) => {
+                        if (key === 'tool') {
+                            return receiver.setTool(value, slotId);
+                        }
+                        return target.setSlotState(slotId, key, value);
                     };
                 }
 

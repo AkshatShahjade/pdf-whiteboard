@@ -166,7 +166,7 @@ function PDFContentComponent({
 
   const selectMark = useCallback((markId: string | null) => {
     shortcutManager.clearUi();
-    uiController.setSlotState(slotId, 'selectedMarkId', markId);
+    uiController.setSelectedMarkId(markId, slotId);
   }, [uiController, slotId, shortcutManager]);
 
   // Effect to handle tool activation

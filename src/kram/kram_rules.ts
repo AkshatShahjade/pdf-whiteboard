@@ -28,16 +28,21 @@ export const kramRules = {
                     const otherSlot = slotsState[otherSlotId];
                     // If other slot is showing a whiteboard that matches the mark we just deselected, close/clear it
                     if (otherSlot?.contentType === 'whiteboard' && slotState.selectedMarkId === otherSlot.contentId) {
+                        const closeActions = kramRules.evaluate('onCloseSlot', {
+                            slotId: otherSlotId,
+                            args: [],
+                            slotsState,
+                            history
+                        });
                         return [
                             { type: 'clearSelection', payload: { slotId } },
-                            { type: 'popHistory', payload: { slotId: otherSlotId } }
+                            ...(closeActions || [])
                         ];
                     }
                     return null;
                 }
 
                 // Case B: Activated a mark
-                // Find the mark object
                 let mark: any = null;
                 if (slotState.marks instanceof Map) {
                     mark = slotState.marks.get(markId);
@@ -45,7 +50,7 @@ export const kramRules = {
                     mark = slotState.marks.find((m: any) => m.id === markId);
                 }
 
-                if (mark && mark.type === 'whiteboard_link') {
+                if (mark) {
                     return [
                         { type: 'openContentInSlot', payload: { slotId: otherSlotId, contentType: 'whiteboard', contentId: markId } }
                     ];
@@ -67,12 +72,14 @@ export const kramRules = {
                 // 2. Resolve what content to transition to based on history stack
                 const stack = history[slotId] || [];
                 let restoredEntry: SlotHistoryEntry | null = null;
+                let restoredIdx = -1;
                 
                 // Traverse stack backward to find the first non-system content
                 for (let i = stack.length - 1; i >= 0; i--) {
                     const entry = stack[i];
                     if (entry.contentType !== 'content_selector') {
                         restoredEntry = entry;
+                        restoredIdx = i;
                         // Truncate history to this point
                         break;
                     }
@@ -84,8 +91,13 @@ export const kramRules = {
                         payload: {
                             slotId,
                             contentType: restoredEntry.contentType,
-                            contentId: restoredEntry.contentId
+                            contentId: restoredEntry.contentId,
+                            suppressHistory: true
                         }
+                    });
+                    actions.push({
+                        type: 'truncateHistory',
+                        payload: { slotId, toIndex: restoredIdx }
                     });
                     // Restore saveable attributes
                     if (restoredEntry.tool) {
@@ -93,6 +105,7 @@ export const kramRules = {
                     }
                 } else {
                     actions.push({ type: 'clearContent', payload: { slotId } });
+                    actions.push({ type: 'truncateHistory', payload: { slotId, toIndex: 0 } });
                 }
 
                 // 3. If this was the last active slot, returning home is required
@@ -109,8 +122,8 @@ export const kramRules = {
                 return actions;
             }
 
-            case 'onSlotOpen': {
-                // When we open content selector or other tools on slot, we don't block
+            case 'onContentChange': {
+                // Return null by default, as the content change triggers are handled by the controller/history layers.
                 return null;
             }
 

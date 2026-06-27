@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { ContentRepository } from '../../atma/storage/repositories/ContentRepository';
 
 interface FilePathViewerProps {
   slotId: string;
@@ -25,15 +24,10 @@ export function FilePathViewer({ slotId, uiState, uiController }: FilePathViewer
     try {
       const isPdf = trimmed.toLowerCase().endsWith('.pdf');
       if (isPdf) {
-        await uiController.loadSession(trimmed, slotId);
+        await uiController.onContentChange(slotId, trimmed, 'pdf');
       } else {
         const id = trimmed.split(/[/\\]/).pop()?.replace(/\.tldr$/i, '') || trimmed;
-        await ContentRepository.ensureContentExists(id, 'core.whiteboard', trimmed);
-        uiController.setSlotStates(slotId, {
-          contentId: id,
-          contentType: 'whiteboard',
-          slotType: 'verticalPane'
-        });
+        await uiController.onContentChange(slotId, id, 'whiteboard');
       }
     } catch (err) {
       console.error("Failed to load path:", err);

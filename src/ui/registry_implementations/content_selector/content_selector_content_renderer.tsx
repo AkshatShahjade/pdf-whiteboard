@@ -5,7 +5,6 @@ import { LibrarySearch } from '../../../roopa/elements/LibrarySearch';
 import { DropZone } from '../../../roopa/elements/DropZone';
 import { LibraryExplorer } from '../../../roopa/elements/LibraryExplorer';
 import { queryAPI } from '../../../atma/singletons';
-import { ContentRepository } from '../../../atma/storage/repositories/ContentRepository';
 import { basename, joinPath, pickFiles } from '../../../atma/platform_adapter/switch';
 import { copyFile, exists, writeFile } from '../../../atma/storage/storage_adapter/switch';
 
@@ -58,19 +57,10 @@ function ContentSelectorComponent({
     loadRecents();
 
     if (isPdf) {
-      // Load PDF session variables in the current slot
-      await uiController.loadSession(filePath, slotId);
+      await uiController.onContentChange(slotId, filePath, 'pdf');
     } else {
-      // Ensure whiteboard content exists in DB
       const id = name.replace(/\.tldr$/i, '');
-      await ContentRepository.ensureContentExists(id, 'core.whiteboard', filePath);
-      
-      // Update slot state to render the whiteboard in the current slot
-      uiController.setSlotStates(slotId, {
-        contentId: id,
-        contentType: 'whiteboard',
-        slotType: 'verticalPane'
-      });
+      await uiController.onContentChange(slotId, id, 'whiteboard');
     }
   };
 
