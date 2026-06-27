@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { inputAPI } from '../../atma/singletons';
 import { ContentRepository } from '../../atma/storage/repositories/ContentRepository';
 
 interface FilePathViewerProps {
@@ -26,7 +25,7 @@ export function FilePathViewer({ slotId, uiState, uiController }: FilePathViewer
     try {
       const isPdf = trimmed.toLowerCase().endsWith('.pdf');
       if (isPdf) {
-        await inputAPI.loadSession(trimmed, slotId);
+        await uiController.loadSession(trimmed, slotId);
       } else {
         const id = trimmed.split(/[/\\]/).pop()?.replace(/\.tldr$/i, '') || trimmed;
         await ContentRepository.ensureContentExists(id, 'core.whiteboard', trimmed);

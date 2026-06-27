@@ -1,11 +1,13 @@
 import { UIStateStore, ToastState } from './ui_state_store';
 import { inputAPI, outputAPI } from '../atma/singletons';
 import { getContentDomainType, createDefaultSlotState } from '../atma/capabilities_registry/content_domain_registry';
+import { KramEngine } from '../kram/kram_engine';
 
 /**
- * UIController - Interface encapsulating all low-frequency UI state mutations.
+ * UIController - Interface encapsulating all low-frequency UI state mutations and command delegations.
  */
 export interface UIController {
+    // ─── Transient UI / Layout Mutations ──────────────────────────────────────
     setZoom: (zoom: number, slotId?: string) => void;
     setLeftPct: (pct: number) => void;
     setCurrentPage: (currentPage: number, slotId?: string) => void;
@@ -19,18 +21,30 @@ export interface UIController {
     setSectionTarget: (sectionTarget: 'start' | 'end', slotId?: string) => void;
     showToast: (msg: string, type?: ToastState['type']) => void;
     clearToast: () => void;
-    saveWhiteboardSnapshot: (markId: string, snapshot: any, slotId?: string) => void;
     setSlotState: (slotId: string, key: string, val: any) => void;
     setSlotStates: (slotId: string, patch: Record<string, any>) => void;
     closeSlot: (slotId: string) => void;
     connect: () => () => void;
+
+    // ─── Domain / Data Commands Delegations (Refactored from InputAPI) ────────
+    loadSession: (pdfPath: string, slotId?: string) => Promise<void>;
+    deleteMark: (slotId: string, markId: string) => Promise<void>;
+    addMark: (slotId: string, mark: any) => Promise<string>;
+    updateMark: (slotId: string, mark: any) => Promise<void>;
+    updateScrollTop: (slotId: string, scrollTop: number) => void;
+    saveSettings: (settings: any) => Promise<void>;
+    saveRecents: (recents: any[]) => Promise<void>;
+    saveLibraryPath: (libraryPath: string | null) => Promise<void>;
+    saveBackupPath: (backupPath: string | null) => Promise<void>;
+    saveWhiteboardSnapshot: (markId: string, snapshot: any, slotId?: string) => void;
+    flushSession: () => void;
 }
 
 /**
  * Factory function to create a new UIController instance operating on a UIStateStore.
  */
-export function createUIController(store: UIStateStore): UIController {
-    return {
+export function createUIController(store: UIStateStore, onHomeCallback?: () => void): UIController {
+    const rawController: UIController = {
         // ─── UI Actions (Write/Command Path Delegates) ────────────────────────────
         setZoom: (zoom, slotId) => {
             inputAPI.updateZoom(slotId || store.getState().activeSlot, zoom);
@@ -99,9 +113,6 @@ export function createUIController(store: UIStateStore): UIController {
         clearToast: () => {
             store.setState({ toast: null });
         },
-        saveWhiteboardSnapshot: (markId, snapshot, slotId) => {
-            inputAPI.saveWhiteboardSnapshot(slotId || store.getState().activeSlot, markId, snapshot);
-        },
         setSlotState: (slotId, key, val) => {
             const slot = store.getState().slots[slotId];
             if (!slot) return;
@@ -153,19 +164,6 @@ export function createUIController(store: UIStateStore): UIController {
                 }
             }
 
-            // Push old slot state to history if content changes to a new valid content
-            let history = slot?.history || [];
-            if (slot && (patch.contentId !== undefined || patch.contentType !== undefined)) {
-                const nextContentId = patch.contentId ?? slot.contentId;
-                const nextContentType = patch.contentType ?? slot.contentType;
-                if (nextContentId !== slot.contentId || nextContentType !== slot.contentType) {
-                    if (slot.contentId && slot.contentType) {
-                        const { history: _, ...snapshot } = slot;
-                        history = [...history, snapshot];
-                    }
-                }
-            }
-
             const appPatch: Record<string, any> = {};
             const uiPatch: Record<string, any> = {};
 
@@ -194,8 +192,7 @@ export function createUIController(store: UIStateStore): UIController {
                         ...state.slots,
                         [slotId]: {
                             ...baseState,
-                            ...uiPatch,
-                            history
+                            ...uiPatch
                         }
                     }
                 });
@@ -207,49 +204,52 @@ export function createUIController(store: UIStateStore): UIController {
             const slot = state.slots[slotId];
             if (!slot) return;
 
-            // Deselect active mark on the other slot if it matches the content being closed
-            const otherSlotId = slotId === 'left' ? 'right' : 'left';
-            const otherSlot = state.slots[otherSlotId];
-            
-            let otherSlotPatch = {};
-            if (slot.contentType === 'whiteboard' && otherSlot?.selectedMarkId === slot.contentId) {
-                inputAPI.selectMark(otherSlotId, null);
-                otherSlotPatch = {
-                    [otherSlotId]: {
-                        ...otherSlot,
-                        selectedMarkId: null
+            // Reset slot to empty (Kram overrides this, but this is the raw fallback)
+            store.setState({
+                slots: {
+                    ...state.slots,
+                    [slotId]: {
+                        ...slot,
+                        contentId: '',
+                        contentType: '',
                     }
-                };
-            }
+                }
+            });
+        },
 
-            if (slot.history && slot.history.length > 0) {
-                const history = [...slot.history];
-                const prevState = history.pop()!;
-                store.setState({
-                    slots: {
-                        ...state.slots,
-                        ...otherSlotPatch,
-                        [slotId]: {
-                            ...prevState,
-                            history
-                        }
-                    }
-                });
-            } else {
-                // No history, clear slot to hide/close it
-                store.setState({
-                    slots: {
-                        ...state.slots,
-                        ...otherSlotPatch,
-                        [slotId]: {
-                            ...slot,
-                            contentId: '',
-                            contentType: '',
-                            history: []
-                        }
-                    }
-                });
-            }
+        // ─── Domain Commands Delegations ──────────────────────────────────────────
+        loadSession: (pdfPath, slotId) => {
+            return inputAPI.loadSession(pdfPath, slotId);
+        },
+        deleteMark: (slotId, markId) => {
+            return inputAPI.deleteMark(slotId, markId);
+        },
+        addMark: (slotId, mark) => {
+            return inputAPI.addMark(slotId, mark);
+        },
+        updateMark: (slotId, mark) => {
+            return inputAPI.updateMark(slotId, mark);
+        },
+        updateScrollTop: (slotId, scrollTop) => {
+            inputAPI.updateScrollTop(slotId, scrollTop);
+        },
+        saveSettings: (settings) => {
+            return inputAPI.saveSettings(settings);
+        },
+        saveRecents: (recents) => {
+            return inputAPI.saveRecents(recents);
+        },
+        saveLibraryPath: (libraryPath) => {
+            return inputAPI.saveLibraryPath(libraryPath);
+        },
+        saveBackupPath: (backupPath) => {
+            return inputAPI.saveBackupPath(backupPath);
+        },
+        saveWhiteboardSnapshot: (markId, snapshot, slotId) => {
+            inputAPI.saveWhiteboardSnapshot(slotId || null, markId, snapshot);
+        },
+        flushSession: () => {
+            inputAPI.flushSession();
         },
 
         // ─── OutputAPI Event Subscriptions (Read/Event Path) ──────────────────────
@@ -348,4 +348,7 @@ export function createUIController(store: UIStateStore): UIController {
             };
         }
     };
+
+    const kramEngine = new KramEngine(rawController, store, onHomeCallback);
+    return kramEngine.createProxy();
 }

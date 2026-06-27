@@ -4,7 +4,7 @@ import { RecentCard } from '../../../roopa/elements/RecentCard';
 import { LibrarySearch } from '../../../roopa/elements/LibrarySearch';
 import { DropZone } from '../../../roopa/elements/DropZone';
 import { LibraryExplorer } from '../../../roopa/elements/LibraryExplorer';
-import { queryAPI, inputAPI } from '../../../atma/singletons';
+import { queryAPI } from '../../../atma/singletons';
 import { ContentRepository } from '../../../atma/storage/repositories/ContentRepository';
 import { basename, joinPath, pickFiles } from '../../../atma/platform_adapter/switch';
 import { copyFile, exists, writeFile } from '../../../atma/storage/storage_adapter/switch';
@@ -54,12 +54,12 @@ function ContentSelectorComponent({
     const currentRecents = await queryAPI.getRecents() || [];
     const nextRecents = currentRecents.filter((r: any) => r.path !== filePath).slice(0, 7);
     nextRecents.unshift({ path: filePath, name, openedAt: Date.now(), isLocal: true });
-    await inputAPI.saveRecents(nextRecents);
+    await uiController.saveRecents(nextRecents);
     loadRecents();
 
     if (isPdf) {
       // Load PDF session variables in the current slot
-      await inputAPI.loadSession(filePath, slotId);
+      await uiController.loadSession(filePath, slotId);
     } else {
       // Ensure whiteboard content exists in DB
       const id = name.replace(/\.tldr$/i, '');
@@ -93,7 +93,7 @@ function ContentSelectorComponent({
   const handleRecentRemove = async (path: string) => {
     const currentRecents = await queryAPI.getRecents() || [];
     const nextRecents = currentRecents.filter((r: any) => r.path !== path);
-    await inputAPI.saveRecents(nextRecents);
+    await uiController.saveRecents(nextRecents);
     loadRecents();
   };
 

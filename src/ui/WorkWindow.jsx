@@ -4,7 +4,7 @@ import HomeScreen from './HomeScreen.jsx';
 import { createUIStateStore } from './ui_state_store';
 import { createUIController } from './ui_controller';
 import { useUIState } from './useUIState';
-import { inputAPI, queryAPI } from '../atma/singletons';
+import { queryAPI } from '../atma/singletons';
 import { DEFAULT_APP_STATE } from '../atma/app_state_store';
 import { getContentRendererType } from './renderer_registry/content_renderer_registry';
 import { setupAllRegistries } from './renderer_registry/setup';
@@ -52,22 +52,17 @@ export default function Root() {
   const [session, setSession] = useState(null);
 
   const uiStore = useMemo(() => {
-    if (!session) return null;
-    const contentId = session.mode === 'whiteboard' ? session.whiteboardId : (session.pdfPath || '');
-    const contentType = session.mode === 'whiteboard' ? 'whiteboard' : 'pdf';
     return createUIStateStore({
       ...DEFAULT_APP_STATE,
-      leftPct: session.settings?.defaultSplit ?? DEFAULT_APP_STATE.leftPct,
-      marks: [],
-      pdfPath: session.pdfPath || null,
       activeSlot: 'left',
-      slots: {
-        'left': createDefaultSlotState(contentId, contentType, 'verticalPane', 'ui')
-      }
+      slots: {}
     });
-  }, [session]);
+  }, []);
 
-  const uiController = useMemo(() => uiStore ? createUIController(uiStore) : null, [uiStore]);
+  const uiController = useMemo(() => createUIController(uiStore, () => {
+    uiStore.setState({ slots: {} });
+    setSession(null);
+  }), [uiStore]);
   
   useEffect(() => {
     if (uiStore) {
@@ -86,6 +81,7 @@ export default function Root() {
   if (!session) {
     return (
       <HomeScreen
+        uiController={uiController}
         onOpen={(pdfPath, whiteboard, settings) => {
           if (whiteboard?.id) {
             setSession({ mode: 'whiteboard', whiteboardId: whiteboard.id, whiteboardName: whiteboard.name, settings });
@@ -97,18 +93,23 @@ export default function Root() {
     );
   }
 
+  const handleHome = () => {
+    uiStore.setState({ slots: {} });
+    setSession(null);
+  };
+
   if (session.mode === 'whiteboard') {
     return (
       <WhiteboardOnlyApp
         whiteboardId={session.whiteboardId}
         whiteboardName={session.whiteboardName}
         settings={session.settings}
-        onHome={() => setSession(null)}
+        onHome={handleHome}
         uiController={uiController}
       />
     );
   }
-  return <WorkspaceContainer pdfPath={session.pdfPath} settings={session.settings} onHome={() => setSession(null)} uiStore={uiStore} uiController={uiController} />;
+  return <WorkspaceContainer pdfPath={session.pdfPath} settings={session.settings} onHome={handleHome} uiStore={uiStore} uiController={uiController} />;
 }
 
 function WorkspaceHeader({ title, onHome, onBackup, savedAt, headerVisible, setHeaderVisible }) {
@@ -200,17 +201,17 @@ function WorkspaceContainer({ pdfPath, settings, onHome, uiStore, uiController }
 
   // Core Session Loading Effect
   useEffect(() => {
-    if (pdfPath) {
-      inputAPI.loadSession(pdfPath);
+    if (pdfPath && uiController) {
+      uiController.loadSession(pdfPath);
     }
-  }, [pdfPath]);
+  }, [pdfPath, uiController]);
 
   // Unload handler: Flush any pending saves
   useEffect(() => {
-    const onUnload = () => inputAPI.flushSession();
+    const onUnload = () => uiController && uiController.flushSession();
     window.addEventListener('beforeunload', onUnload);
     return () => window.removeEventListener('beforeunload', onUnload);
-  }, []);
+  }, [uiController]);
 
   const handleBackup = async () => {
     showToast('Backup migrating to new SQLite architecture!', 'success');

@@ -7,7 +7,6 @@ import { getMarkDomainType } from '../../../atma/capabilities_registry/pdf/mark_
 import { getMarkRendererType } from '../../renderer_registry/pdf/vertical_pane/mark_renderer_registry';
 import { getToolRendererType as getToolType, getToolRendererByHotkey as getToolByHotkey } from '../../renderer_registry/pdf/vertical_pane/tool_renderer_registry';
 import { convertFileSrc, confirmDialog, joinPath } from '../../../atma/platform_adapter/switch';
-import { inputAPI } from '../../../atma/singletons';
 import { toRoman } from '../../helper';
 import { WhiteboardRepository } from '../../../atma/storage/repositories/WhiteboardRepository';
 import { ContentRepository } from '../../../atma/storage/repositories/ContentRepository';
@@ -136,7 +135,7 @@ function PDFContentComponent({
     // 1. Detect deletions
     for (const m of prevMarksArray) {
       if (!nextMap.has(m.id)) {
-        inputAPI.deleteMark(slotId, m.id);
+        uiController.deleteMark(slotId, m.id);
       }
     }
 
@@ -148,12 +147,12 @@ function PDFContentComponent({
     for (const m of uniqueNextMarks) {
       const prev = prevMap.get(m.id);
       if (!prev) {
-        inputAPI.addMark(slotId, m);
+        uiController.addMark(slotId, m);
       } else if (JSON.stringify(prev) !== JSON.stringify(m)) {
-        inputAPI.updateMark(slotId, m);
+        uiController.updateMark(slotId, m);
       }
     }
-  }, [slotState?.marks, slotId]);
+  }, [slotState?.marks, slotId, uiController]);
 
   // Shortcut tool state adapter
   const { manager: shortcutManager, state: shortcutState, refreshAvailableWhiteboards } = useShortcutToolState({
@@ -198,44 +197,7 @@ function PDFContentComponent({
     });
   }, [slotState?.tool]);
 
-  const otherSlotId = slotId === 'left' ? 'right' : 'left';
-  const currentOtherType = uiState?.slots?.[otherSlotId]?.contentType;
-  const currentOtherId = uiState?.slots?.[otherSlotId]?.contentId || '';
-  const resolvedOtherId = slotState?.selectedMarkId || shortcutManager.getLinkedWhiteboardId() || '';
-
-  // Synchronize active whiteboard id to the other slot state
-  const lastSyncedIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (resolvedOtherId) {
-      if (currentOtherId === resolvedOtherId && currentOtherType === 'whiteboard') {
-        lastSyncedIdRef.current = resolvedOtherId;
-      } else {
-        if (lastSyncedIdRef.current === resolvedOtherId) {
-          // The target slot has been closed or changed by the user. Clear the local selection in the source slot.
-          lastSyncedIdRef.current = null;
-          if (slotState?.selectedMarkId) {
-            selectMark(null);
-          } else if (shortcutManager.getLinkedWhiteboardId()) {
-            shortcutManager.clearUi();
-          }
-        } else {
-          // Open the whiteboard in the target slot
-          lastSyncedIdRef.current = resolvedOtherId;
-          uiController.setSlotStates(otherSlotId, {
-            contentId: resolvedOtherId,
-            contentType: 'whiteboard',
-            slotType: 'verticalPane',
-          });
-        }
-      }
-    } else {
-      if (lastSyncedIdRef.current && currentOtherId === lastSyncedIdRef.current && currentOtherType === 'whiteboard') {
-        uiController.closeSlot(otherSlotId);
-      }
-      lastSyncedIdRef.current = null;
-    }
-  }, [resolvedOtherId, currentOtherId, currentOtherType, uiController, otherSlotId, slotState?.selectedMarkId, selectMark, shortcutManager]);
+  // Whiteboard sync logic removed (handled by Kram sequencing in uiController proxy)
 
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pdfReady, setPdfReady] = useState(false);
@@ -308,7 +270,7 @@ function PDFContentComponent({
 
   const handleScroll = useCallback(() => {
     if (pdfScrollRef.current && pdfPath && slotState && uiController) {
-      inputAPI.updateScrollTop(slotId, pdfScrollRef.current.scrollTop);
+      uiController.updateScrollTop(slotId, pdfScrollRef.current.scrollTop);
       const pageHeight = PDF_WIDTH * slotState.zoom * 1.414;
       const newPage = Math.floor(pdfScrollRef.current.scrollTop / pageHeight) + 1;
       uiController.setCurrentPage(newPage, slotId);

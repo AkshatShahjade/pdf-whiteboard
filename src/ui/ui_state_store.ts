@@ -19,7 +19,6 @@ export interface SlotUIState extends SlotAppState {
     shapeBackup: any | null;
     editingSectionId: string | null;
     sectionTarget: 'start' | 'end';
-    history?: Omit<SlotUIState, 'history'>[];
 }
 
 export type UIState = Omit<AppState, 'slots'> & {

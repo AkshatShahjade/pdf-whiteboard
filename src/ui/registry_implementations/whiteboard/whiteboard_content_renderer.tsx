@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Tldraw, DefaultToolbar, DefaultToolbarContent, TldrawUiMenuItem, useTools, useIsToolSelected } from 'tldraw'
 import 'tldraw/tldraw.css'
 import { debounce } from '../../../atma/services/state_sync_service.js'
-import { inputAPI, queryAPI } from '../../../atma/singletons.js'
+import { queryAPI } from '../../../atma/singletons.js'
 import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './tools/editing/handwriting_whiteboard_editing_tool.jsx'
 import { ContentRendererType, ContentRendererProps } from '../../renderer_registry/content_renderer_registry.js'
 import { UIController } from '../../ui_controller.js'
@@ -41,11 +41,7 @@ function WhiteboardPane({ slotId, markId, settings, uiController }: { slotId: st
 
 function TldrawWithPersistence({ slotId, markId, initialSnapshot, settings, uiController }: { slotId: string; markId: string; initialSnapshot?: any; settings?: any; uiController?: UIController }) {
   const debouncedSave = useMemo(() => debounce((snap: any) => {
-    if (uiController) {
-      uiController.saveWhiteboardSnapshot(markId, snap, slotId) 
-    } else {
-      inputAPI.saveWhiteboardSnapshot(slotId, markId, snap) // fallback if no controller is provided
-    }
+    uiController?.saveWhiteboardSnapshot(markId, snap, slotId)
   }, 800), [slotId, markId, uiController])
 
   const handleMount = useCallback((editor: any) => {

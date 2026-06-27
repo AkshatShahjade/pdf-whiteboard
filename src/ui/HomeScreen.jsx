@@ -10,7 +10,7 @@ import { LastUIStateRepository } from '../atma/storage/repositories/LastUIStateR
 import { MarkRepository } from '../atma/storage/repositories/MarkRepository';
 import { WhiteboardRepository } from '../atma/storage/repositories/WhiteboardRepository';
 import { ContentRepository } from '../atma/storage/repositories/ContentRepository';
-import { queryAPI, inputAPI } from '../atma/singletons';
+import { queryAPI } from '../atma/singletons';
 import {
   basename,
   confirmDialog,
@@ -319,7 +319,7 @@ function AboutPanel({ open: isOpen, onClose }) {
   );
 }
 
-export default function HomeScreen({ onOpen }) {
+export default function HomeScreen({ onOpen, uiController }) {
   const [recents, setRecents]         = useState([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aboutOpen, setAboutOpen]     = useState(false);
@@ -382,26 +382,26 @@ export default function HomeScreen({ onOpen }) {
 
   const handleSettingsChange = useCallback((s) => {
     setSettings(s);
-    inputAPI.saveSettings(s);
-  }, []);
+    uiController?.saveSettings(s);
+  }, [uiController]);
 
   const clearRecents = useCallback(() => {
     setRecents([]);
-    inputAPI.saveRecents([]);
-  }, []);
+    uiController?.saveRecents([]);
+  }, [uiController]);
 
   const pushRecent = useCallback(async (entry) => {
     const nextRecents = recents.filter(r => r.path !== entry.path).slice(0, 7);
     nextRecents.unshift({ ...entry, openedAt: Date.now() });
     setRecents(nextRecents);
-    await inputAPI.saveRecents(nextRecents);
-  }, [recents]);
+    await uiController?.saveRecents(nextRecents);
+  }, [recents, uiController]);
 
   const handleRemoveRecent = useCallback(async (path) => {
     const nextRecents = recents.filter(r => r.path !== path);
     setRecents(nextRecents);
-    await inputAPI.saveRecents(nextRecents);
-  }, [recents]);
+    await uiController?.saveRecents(nextRecents);
+  }, [recents, uiController]);
 
   const refreshDir = useCallback(async (dir) => {
     if (!dir) return;
@@ -430,7 +430,7 @@ export default function HomeScreen({ onOpen }) {
           clearRecents();
         }
         setLibraryPath(nextLibraryPath); setCurrentDir(nextLibraryPath);
-        await inputAPI.saveLibraryPath(nextLibraryPath);
+        await uiController?.saveLibraryPath(nextLibraryPath);
       }
     } catch (err) { console.error(err); }
   };
@@ -440,7 +440,7 @@ export default function HomeScreen({ onOpen }) {
       const selected = await pickFolder(true);
       if (selected) {
         setBackupPath(selected);
-        await inputAPI.saveBackupPath(selected);
+        await uiController?.saveBackupPath(selected);
       }
     } catch (err) { console.error(err); }
   };
