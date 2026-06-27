@@ -51,12 +51,7 @@ export function createQueryAPI(store: AppStateStore): QueryAPIInterface {
     },
 
     getWhiteboardSnapshot(slotId: string | null, markId: string): Promise<any | null> {
-      let contentId: string | undefined;
-      if (slotId) {
-        const state = store.getState();
-        contentId = state.slots[slotId]?.contentId;
-      }
-      return WhiteboardRepository.loadWhiteboard(markId, contentId);
+      return WhiteboardRepository.loadWhiteboard(markId);
     },
 
     getSettings(): Promise<any> {

@@ -37,7 +37,15 @@ export interface PinMarkDTO {
   y: number;
 }
 
-export type MarkDTO = RectMarkDTO | LassoMarkDTO | SectionMarkDTO | PinMarkDTO;
+export interface TldrawMarkDTO {
+  id: string;
+  type: 'tldraw';
+  shapeId: string;
+  x: number;
+  y: number;
+}
+
+export type MarkDTO = RectMarkDTO | LassoMarkDTO | SectionMarkDTO | PinMarkDTO | TldrawMarkDTO;
 
 export interface SlotSessionDTO {
   contentId: string;

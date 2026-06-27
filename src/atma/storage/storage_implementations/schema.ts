@@ -121,7 +121,6 @@ CREATE TABLE IF NOT EXISTS SPECIFIC_INITIAL_VALUES (
     based_on_default_hash TEXT,
     PRIMARY KEY (key, scope)
 );
-);
 `;
 
 export const SEED_SQL = `
@@ -135,4 +134,5 @@ INSERT OR IGNORE INTO JODO_MARK_TYPES (id, name, is_prebuilt, is_enabled) VALUES
 INSERT OR IGNORE INTO JODO_MARK_TYPES (id, name, is_prebuilt, is_enabled) VALUES ('lasso', 'Lasso', 1, 1);
 INSERT OR IGNORE INTO JODO_MARK_TYPES (id, name, is_prebuilt, is_enabled) VALUES ('section', 'Section', 1, 1);
 INSERT OR IGNORE INTO JODO_MARK_TYPES (id, name, is_prebuilt, is_enabled) VALUES ('pin', 'Pin', 1, 1);
+INSERT OR IGNORE INTO JODO_MARK_TYPES (id, name, is_prebuilt, is_enabled) VALUES ('tldraw', 'Tldraw', 1, 1);
 `;

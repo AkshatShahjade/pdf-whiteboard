@@ -1,4 +1,5 @@
 import { tauriSqlAdapter } from '../storage_implementations/tauri_sqlite';
+import { DatabaseAdapter } from '../storage_adapter/database_interface';
 
 export type StateInitialValueType = 'volatile' | 'defaulted' | 'personalized';
 
@@ -94,11 +95,17 @@ export const StateInitialValuesRepository = {
      * Updates the default value. If it changes, the hash updates, automatically
      * invalidating any specific values that were based on the old default.
      */
-    async setDefaultValue<T>(key: string, scope: string, value: T, type: 'personalizable' | 'defaulted'): Promise<void> {
+    async setDefaultValue<T>(
+        key: string,
+        scope: string,
+        value: T,
+        type: 'personalizable' | 'defaulted',
+        adapter: DatabaseAdapter = tauriSqlAdapter
+    ): Promise<void> {
         const valueJson = JSON.stringify(value);
         const valueHash = fnv1aHash(valueJson);
 
-        await tauriSqlAdapter.execute(
+        await adapter.execute(
             `INSERT INTO DEFAULT_INITIAL_VALUES (key, scope, value_json, value_hash, type) 
              VALUES (?, ?, ?, ?, ?)
              ON CONFLICT(key, scope) DO UPDATE SET 

@@ -40,7 +40,6 @@ export class PinShapeUtil extends ShapeUtil<any> {
 // 2. Define the Pin Tool State Node
 export class PinTool extends StateNode {
     static id = 'pin';
-    static initial = 'idle';
 
     onEnter() {
         this.editor.setCursor({ type: 'cross', rotation: 0 });

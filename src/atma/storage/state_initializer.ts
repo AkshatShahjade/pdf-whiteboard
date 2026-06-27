@@ -1,6 +1,7 @@
-import { StateInitialValuesRepository } from './repositories/StateInitialValuesRepository';
-import { tauriSqlAdapter } from './storage_implementations/tauri_sqlite';
-import { DEFAULT_APP_STATE } from '../app_state_store';
+import { StateInitialValuesRepository } from './repositories/StateInitialValuesRepository.js';
+import { tauriSqlAdapter } from './storage_implementations/tauri_sqlite.js';
+import { DEFAULT_APP_STATE, DEFAULT_SLOT_APP_STATE } from '../app_state_store.js';
+import { DatabaseAdapter } from './storage_adapter/database_interface.js';
 
 /**
  * Developer Seed Data.
@@ -10,18 +11,18 @@ import { DEFAULT_APP_STATE } from '../app_state_store';
  */
 const SEED_DEFAULTS = [
     // Defaulted
-    { key: 'tool', scope: 'global', value: DEFAULT_APP_STATE.tool, type: 'defaulted' },
+    { key: 'tool', scope: 'global', value: DEFAULT_SLOT_APP_STATE.tool, type: 'defaulted' },
     { key: 'currentDir', scope: 'global', value: null, type: 'defaulted' }, // Falls back to libraryPath's specific value dynamically
     
     // Personalized
-    { key: 'zoom', scope: 'global', value: DEFAULT_APP_STATE.zoom, type: 'personalizable' },
+    { key: 'zoom', scope: 'global', value: DEFAULT_SLOT_APP_STATE.zoom, type: 'personalizable' },
     { key: 'libraryPath', scope: 'global', value: DEFAULT_APP_STATE.libraryPath, type: 'personalizable' },
-    { key: 'backupPath', scope: 'global', value: DEFAULT_APP_STATE.backupPath, type: 'personalizable' },
+    { key: 'backupPath', scope: 'global', value: null, type: 'personalizable' },
     
     // Personalized (Document Scoped UI)
     { key: 'leftPct', scope: 'global', value: DEFAULT_APP_STATE.leftPct, type: 'personalizable' },
-    { key: 'scrollTop', scope: 'global', value: DEFAULT_APP_STATE.scrollTop, type: 'personalizable' },
-    { key: 'selectedMarkId', scope: 'global', value: DEFAULT_APP_STATE.selectedMarkId, type: 'personalizable' },
+    { key: 'scrollTop', scope: 'global', value: DEFAULT_SLOT_APP_STATE.scrollTop, type: 'personalizable' },
+    { key: 'selectedMarkId', scope: 'global', value: DEFAULT_SLOT_APP_STATE.selectedMarkId, type: 'personalizable' },
     
     // Personalized (Document Scoped Content)
     { key: 'marks', scope: 'global', value: [], type: 'personalizable' },
@@ -39,14 +40,14 @@ const SEED_DEFAULTS = [
  * Executed during database creation or application startup to ensure all defaults exist.
  * @param forceReset - If true, overwrites existing defaults with these hardcoded ones.
  */
-export async function initializeStateDefaults(forceReset: boolean) {
+export async function initializeStateDefaults(forceReset: boolean, adapter: DatabaseAdapter = tauriSqlAdapter) {
     console.log(`[StateInitializer] Checking/seeding default initial values (forceReset: ${forceReset})...`);
     
     try {
         for (const preset of SEED_DEFAULTS) {
             let shouldSet = forceReset;
             if (!shouldSet) {
-                const results = await tauriSqlAdapter.select<any>(
+                const results = await adapter.select<any>(
                     `SELECT 1 FROM DEFAULT_INITIAL_VALUES WHERE key = ? AND scope = ?`,
                     [preset.key, preset.scope]
                 );
@@ -54,7 +55,7 @@ export async function initializeStateDefaults(forceReset: boolean) {
             }
             if (shouldSet) {
                 console.log(`[StateInitializer] Seeding default for key="${preset.key}", scope="${preset.scope}"`);
-                await StateInitialValuesRepository.setDefaultValue(preset.key, preset.scope, preset.value, preset.type as any);
+                await StateInitialValuesRepository.setDefaultValue(preset.key, preset.scope, preset.value, preset.type as any, adapter);
             }
         }
         console.log('[StateInitializer] Seeding check complete.');
@@ -62,4 +63,3 @@ export async function initializeStateDefaults(forceReset: boolean) {
         console.error('[StateInitializer] Failed to seed default initial values:', err);
     }
 }
-

@@ -5,17 +5,45 @@ Critique all the recent changes that were made to the codebase from 2 commits ba
 
 \
 
-
 so why can't it be that you create a pin shaped tldraw shape, and treat that as a mark. In fact this is the direction I want to go towards. That any tldraw native shape (like rectangle) or drawing or text box can be considered a mark. So then we can link marks from 2 panes with each other. and that is when the link tool will work. The current system where on creating a mark, a new whiteboard immediately opens is a stepping stone, and this would eventually be removed. In the future, the rect / lasso / section / pin tools in pdf would just make the mark ui - like the rectangle tool in whiteboard right now. And then we would select mark and press the link tool to link it with another mark in same or different document. Then clikcing the mark would take us to that document place.  But for now we keep the open a new whiteboard logic. so my interest is that the pin tool in whiteabord, creates a pin shaped tldraw native shape, and then we develop a system that allows us to mark any tldraw shape as a lemmamap mark later on.
 
 \
-well then how do you save the whiteboard marks if the schema didn't change? 
-Note that the Mark domain type nbeeds to be modified. Add TldrawMark as a type. Then link all the marks (from pin tool or mark tool iN THE WHITEBOARD to the tldraw mark type)
-Also, why is the mark tool not working at all.
-DO an extensive codebase search, and find the root cause. I suspect not enough generalization and modificaiton of codebase for a whiteboard type. 
-Create survery report.
+why is it that when I create a mark in a whiteboard on the right slot it opens in the elft slot, but then If I create a mark in the elft slot no whiteboard opens.
+Also, ther is no indication that a tldraw shape has been marked in the ui. There should be a linked symbol next to the shape.
+research the reasons for why this is happening and propse fixes.
+It should be that on right clicking a shape in the whiteboard, a new option in the options pane is added 'Open Link' opens the linked mark, or on clicking the link symbol next to the shape it also opens the linked mark.
+\
+Slot level toolbar vs screen level toolbars. Slot level toolbars hold tools that are to be used within the slot, but the second we have tools that are inter-slot, we need to but the tool ui in a screen level toolbar.
+
+How the link tool works:
+there is a source content. the link tool is situated in a screenlevel toolbar. we select the link tool ((and it opens a horizontal drawer of buttons: "Destination Mark", "Source Mark", "Cancel", "Confirm", "2-way" <-> "src->dest" <-> "dest->src") - similar to the section tool). This is very similar to the section tool, where wedecide on st point, then end point, then we confirm the selection before it turns into a section mark. Similarly, in the link tool, first phase is we select source mark. Second phase is that we select destination mark (can be in any content...) or a destination content itself and then we confirm the link. There is one different button, which is more like a 3-state toggle. Clicking on it changes its vlaue, click thrice to return to the same value. This decides the type of link - 2-way, from src to dest or from dest to src (if the user ever needs to reverse by accident).
+The destination mark / content is decided using destination_selector system content, which is similar to content_selector, but it has an additional button next to each content card - "dest==content". If that button is clicked, the destination is set to be the content itself, however if the card is clicked elsewhere, then that content itself will open (however kram configures it to open), and then we can select marks within the content to link to. 
+Also at this point it is clear that the current functioning of the mark tools (to immediately create a new whiteboard and open it) is to be modified. Infact the current functioning is one mode of the mark tool family called "instant link to new whiteboard". The default mode however is when the mark tools just create the unlinked marks. Then we can link those marks to other marks or contents using the link tool. in the ui of the mark tools, there will be an option to change the tool mode and that would be persisted as a personalizable state for each mark tool. it will later also be possible to add multiple rectangle tools into your toolbar, operating with different modes - some autolink to code editors, others to whiteboards, some are default...
+its when you double click any tool that you can change its modes and other properties. single clicking just activates the tool. But if the tool has modes and other configerations, then double clicking opens a mini pane (similar to the shortcut tool pane) that allows you to edit the config and modes. In this pane, if the tool is tied to a personalizable state, then there will be a scope selector. It is also an n-state toggle between options like "content, content type, slot, slot type, global" for content related tools, or "slot, slot type, screen, global" for slot related tools, "screen, global" for screen level tools. this is so the user can decide the scope of the tool preset that is made.
+
+\
+all the toolbars should have 2 states: minimized and expanded. In minimized, the whole toolbar is just one maximize button. on clikcing the full toolbar shows and there is one minimize button. Click that and it minimzes.
+These buttons are similar to the tools in appearance in the toolbar (at least for now.)
+
+The workspace header shouldn't need to show the name of the content. as there is already a path shower bar for each slot.
 \
 
+\
+One of the big goals with the ui design is that it should be invisible until it is needed - and there is a strong push for users to learn and configure their keyboard shortcuts so they don't need the ui. This is to maximize screen space for content and not ui. 
+Acheived by:
+    1. hidden ui that appears when mouse enters a certain region (highlight the activation region in a faint primary colour glow). eg- for workspace header or screen level toolbar
+    2. minimize / maximize buttons. eg - for toolbars
+    3. Roopa Screens are absolute slot placements (will add sliders later), and then we can create multiple screen views for any specific screen like 25%-75, 50-50 or others, and then toggling between those should be very easy - keybrd shortcut or something else. Repeatedly dragging a slider is slow. And then kram is for shifting between screens (not views)
+        changing slider ratios, some presets can be that the left slot fills the whole screen and right slot is a tiny in picture view, and vice versa....
+\
+
+\
+There is an issue with the library folder selection. it isn't setting.
+\
+
+\
+Specific values once made must also be updated if changes happen. in the 4-level system.
+\
 
 - Session .mode -> .screen
 - toasts are handled inside the slot components. It should be screen level.

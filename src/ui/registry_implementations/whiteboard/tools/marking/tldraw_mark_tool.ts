@@ -3,17 +3,14 @@ import { WhiteboardToolRendererType } from '../../../../renderer_registry/whiteb
 
 export class TldrawMarkTool extends StateNode {
     static id = 'lemmamap_mark';
-    static initial = 'idle';
 
     onEnter() {
         this.editor.setCursor({ type: 'pointer', rotation: 0 });
     }
 
     onPointerDown(info: any) {
-        // Find the shape that was clicked
-        const point = this.editor.inputs.currentPagePoint;
-        const shapesAtPoint = this.editor.getShapesAtPoint(point);
-        const shape = shapesAtPoint[0];
+        // Use the shape provided by Tldraw's hit testing, or fallback to current pointer position
+        const shape = info.shape || this.editor.getShapeAtPoint(this.editor.inputs.currentPagePoint);
 
         if (shape) {
             // Register it as a lemmamap mark
@@ -43,7 +40,7 @@ export const tldrawMarkUiOverrides = {
             lemmamap_mark: {
                 id: 'lemmamap_mark',
                 label: 'tool.lemmamap_mark',
-                icon: 'tool-pointer', // Standard Tldraw icon
+                icon: 'select', // Standard Tldraw select pointer icon
                 kbd: 'm',
                 onSelect() {
                     editor.setCurrentTool('lemmamap_mark');

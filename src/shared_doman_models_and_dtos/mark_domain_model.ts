@@ -38,7 +38,15 @@ export interface PinMark {
     y: number;
 }
 
-export type Mark = RectMark | LassoMark | SectionMark | PinMark
+export interface TldrawMark {
+    id: UUID;
+    type: 'tldraw'
+    shapeId: string;
+    x: number;
+    y: number;
+}
+
+export type Mark = RectMark | LassoMark | SectionMark | PinMark | TldrawMark
 
 // export interface Mark {
 //     const newId = `reg_${Date.now()}`;

@@ -11,14 +11,22 @@ let dbInitPromise: Promise<Database> | null = null;
 
 async function initializeDatabaseIfEmpty(db: Database) {
     console.log('[tauri_sqlite] Checking if database needs initialization...');
+    const initAdapter: DatabaseAdapter = {
+        async execute(sql: string, bindValues?: unknown[]): Promise<void> {
+            await db.execute(sql, bindValues);
+        },
+        async select<T>(sql: string, bindValues?: unknown[]): Promise<T[]> {
+            return await db.select<T[]>(sql, bindValues);
+        },
+    };
     
-    // Check if the SETTINGS table exists by querying the SQLite master table
+    // Check if the DEFAULT_INITIAL_VALUES table exists by querying the SQLite master table
     const result = await db.select<{name: string}[]>(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='SETTINGS';"
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='DEFAULT_INITIAL_VALUES';"
     );
     
     if (result.length === 0) {
-        console.log('[tauri_sqlite] Database is empty. Executing schema commands...');
+        console.log('[tauri_sqlite] Database is empty or missing core tables. Executing schema commands...');
         
         // Remove SQL comments (anything starting with -- until the end of the line)
         const cleanSchema = SCHEMA_SQL.replace(/--.*$/gm, '');
@@ -40,13 +48,13 @@ async function initializeDatabaseIfEmpty(db: Database) {
         await runSeeds(db);
 
         // Seed the default state variables
-        await initializeStateDefaults(true);
+        await initializeStateDefaults(true, initAdapter);
     } else {
         console.log('[tauri_sqlite] Database already initialized. Ensuring missing defaults are seeded...');
         
         await runSeeds(db);
         
-        await initializeStateDefaults(false);
+        await initializeStateDefaults(false, initAdapter);
     }
 }
 
@@ -82,12 +90,11 @@ async function getDb(): Promise<Database> {
                     console.warn('[tauri_sqlite] Failed to enable WAL mode:', e);
                 }
                 
-                // Set the synchronous instance immediately to prevent deadlocks 
-                // when initializeDatabaseIfEmpty makes recursive queries.
-                dbInstance = db;
-                
                 // Call the initialization function exactly once when the connection is established.
                 await initializeDatabaseIfEmpty(db);
+
+                // Publish the shared instance only after schema and seed data are ready.
+                dbInstance = db;
                 
                 return db;
             } catch (err) {

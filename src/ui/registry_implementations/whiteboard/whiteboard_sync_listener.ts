@@ -1,6 +1,6 @@
 import { Editor } from 'tldraw';
 import { generateMarkId } from '../../../shared_doman_models_and_dtos/factories.js';
-import { PinDomainMark } from '../marks/pin_domain_mark.js';
+import { TldrawMarkDTO } from '../../../shared_doman_models_and_dtos/dtos.js';
 import type { UIController } from '../../ui_controller.js';
 
 export function setupWhiteboardSync(editor: Editor, slotId: string, parentContentId: string, uiController: UIController) {
@@ -21,11 +21,12 @@ export function setupWhiteboardSync(editor: Editor, slotId: string, parentConten
                     });
 
                     // Register it with Kram / uiController
-                    const newMark: PinDomainMark = {
+                    const newMark: TldrawMarkDTO = {
                         id: markId,
-                        type: 'pin', // For now, we assume all Tldraw marks act as pins for Kram bridging
-                        parent_content_id: parentContentId,
-                        geometry: { x: shape.x, y: shape.y }
+                        type: 'tldraw',
+                        shapeId: shape.id,
+                        x: shape.x || 0,
+                        y: shape.y || 0
                     };
                     
                     uiController.addMark(slotId, newMark);
@@ -50,11 +51,12 @@ export function setupWhiteboardSync(editor: Editor, slotId: string, parentConten
                         meta: { ...after.meta, markId }
                     });
 
-                    const newMark: PinDomainMark = {
+                    const newMark: TldrawMarkDTO = {
                         id: markId,
-                        type: 'pin',
-                        parent_content_id: parentContentId,
-                        geometry: { x: after.x, y: after.y }
+                        type: 'tldraw',
+                        shapeId: after.id,
+                        x: after.x || 0,
+                        y: after.y || 0
                     };
                     
                     uiController.addMark(slotId, newMark);

@@ -13,9 +13,7 @@ export const whiteboardService = {
     markId: string,
     snapshot: any
   ): Promise<void> {
-    const contentId = slotId ? store.getState().slots[slotId]?.contentId : null;
-    // For global whiteboards contentId is null. WhiteboardRepository handles falling back to library folder
-    await WhiteboardRepository.saveWhiteboard(markId, snapshot, contentId || undefined);
+    await WhiteboardRepository.saveWhiteboard(markId, snapshot);
     output.publish('WHITEBOARD_UPDATED', { markId });
   }
 };
