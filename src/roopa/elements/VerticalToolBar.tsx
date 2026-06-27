@@ -23,6 +23,63 @@ interface VerticalToolBarProps {
   };
 }
 
+// --- Capability Hook ---
+export function useVerticalToolBar({
+  slotState,
+  shortcutManager,
+  setCurrentSelection,
+  setMarksWithSectionWidths,
+  actions,
+}: Pick<VerticalToolBarProps, 'slotState' | 'shortcutManager' | 'setCurrentSelection' | 'setMarksWithSectionWidths' | 'actions'>) {
+  const activeTool = slotState?.tool;
+  const zoom = slotState?.zoom || 1.0;
+
+  const activateTool = (tool: any) => {
+    const id = tool.id.id;
+    shortcutManager?.clearUi();
+    const nextTool = tool.activationMode === 'toggle' && activeTool === id ? 'select' : id;
+    actions.setTool(nextTool);
+  };
+
+  const deleteShortcutTool = async (idx: number) => {
+    const yes = await confirmDialog('Delete this shortcut tool?', 'Delete Tool');
+    if (!yes) return;
+    shortcutManager.deleteSlot(idx);
+  };
+
+  const cancelShortcutSelection = () => {
+    shortcutManager.setSelectPanelIdx(null);
+    shortcutManager.setNewWhiteboardName('');
+  };
+
+  const zoomIn = () => actions.setZoom(Math.min(zoom + 0.25, 3.0));
+  const zoomOut = () => actions.setZoom(Math.max(zoom - 0.25, 0.5));
+
+  const toolbarExtrasActions = {
+    setTool: actions.setTool,
+    setSectionTarget: actions.setSectionTarget,
+    setEditingSectionId: actions.setEditingSectionId,
+    setCurrentSelection,
+    setMarksWithSectionWidths,
+    setSelectedMarkId: actions.setSelectedMarkId,
+    setSelectedShortcutIdx: (idx: any) => shortcutManager?.setSelectedIdx(idx),
+    setShapeBackup: actions.setShapeBackup,
+    setEditingShapeId: actions.setEditingShapeId,
+    setSelectPanelIdx: (idx: any) => shortcutManager?.setSelectPanelIdx(idx),
+  };
+
+  return {
+    activeTool,
+    zoom,
+    activateTool,
+    deleteShortcutTool,
+    cancelShortcutSelection,
+    zoomIn,
+    zoomOut,
+    toolbarExtrasActions,
+  };
+}
+
 export function VerticalToolBar({
   settings,
   slotState,
@@ -35,8 +92,22 @@ export function VerticalToolBar({
   handleCreateFromPanel,
   actions,
 }: VerticalToolBarProps) {
-  const activeTool = slotState?.tool;
-  const zoom = slotState?.zoom || 1.0;
+  const {
+    activeTool,
+    zoom,
+    activateTool,
+    deleteShortcutTool,
+    cancelShortcutSelection,
+    zoomIn,
+    zoomOut,
+    toolbarExtrasActions,
+  } = useVerticalToolBar({
+    slotState,
+    shortcutManager,
+    setCurrentSelection,
+    setMarksWithSectionWidths,
+    actions,
+  });
 
   return (
     <div style={{ position: 'absolute', bottom: '24px', right: '24px', zIndex: 50, display: 'flex', flexDirection: 'column', gap: '8px', pointerEvents: 'auto' }}>
@@ -49,11 +120,7 @@ export function VerticalToolBar({
           return (
             <div key={id} style={{ position: 'relative' }}>
               <button
-                onClick={() => {
-                  if (shortcutManager) shortcutManager.clearUi();
-                  const nextTool = tool.activationMode === 'toggle' && activeTool === id ? 'select' : id;
-                  actions.setTool(nextTool);
-                }}
+                onClick={() => activateTool(tool)}
                 title={key ? `${label} [${key}]` : label}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '6px', border: `1px solid ${activeTool === id ? '#3B82F6' : 'transparent'}`, background: activeTool === id ? 'rgba(59,130,246,0.2)' : 'transparent', color: activeTool === id ? '#93C5FD' : '#d1d5db', cursor: 'pointer', fontSize: '18px', transition: 'all 0.15s' }}
                 onMouseEnter={e => { if (activeTool !== id) { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; } }}
@@ -69,18 +136,7 @@ export function VerticalToolBar({
                 editingShapeId: slotState?.editingShapeId,
                 editingSectionId: slotState?.editingSectionId,
                 shapeBackup: slotState?.shapeBackup,
-                actions: {
-                  setTool: actions.setTool,
-                  setSectionTarget: actions.setSectionTarget,
-                  setEditingSectionId: actions.setEditingSectionId,
-                  setCurrentSelection,
-                  setMarksWithSectionWidths,
-                  setSelectedMarkId: actions.setSelectedMarkId,
-                  setSelectedShortcutIdx: (idx: any) => shortcutManager?.setSelectedIdx(idx),
-                  setShapeBackup: actions.setShapeBackup,
-                  setEditingShapeId: actions.setEditingShapeId,
-                  setSelectPanelIdx: (idx: any) => shortcutManager?.setSelectPanelIdx(idx),
-                },
+                actions: toolbarExtrasActions,
               })}
             </div>
           );
@@ -108,11 +164,7 @@ export function VerticalToolBar({
                     <button onClick={() => shortcutManager.showUpdatePanel(idx)} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #3B82F6', background: 'rgba(59,130,246,0.2)', color: '#93C5FD', cursor: 'pointer' }}>Update</button>
                     <button onClick={() => shortcutManager.closeSlot()} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #4b5563', background: 'transparent', color: '#d1d5db', cursor: 'pointer' }}>Close</button>
                     {shortcutState.slotCount > 1 && (
-                      <button onClick={async () => {
-                        const yes = await confirmDialog('Delete this shortcut tool?', 'Delete Tool');
-                        if (!yes) return;
-                        shortcutManager.deleteSlot(idx);
-                      }} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #F87171', background: 'transparent', color: '#F87171', cursor: 'pointer' }}>Delete Tool</button>
+                      <button onClick={() => deleteShortcutTool(idx)} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #F87171', background: 'transparent', color: '#F87171', cursor: 'pointer' }}>Delete Tool</button>
                     )}
                   </div>
                 )}
@@ -123,14 +175,10 @@ export function VerticalToolBar({
                       <div style={{ fontSize: '10px', color: '#9ca3af', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Session Tool {toRoman(idx + 1)}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <button onClick={handleCreateFromPanel} style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid #3B82F6', background: 'rgba(59,130,246,0.2)', color: '#93C5FD', cursor: 'pointer', fontSize: '11px' }}>Create</button>
-                        <button onClick={() => { shortcutManager.setSelectPanelIdx(null); shortcutManager.setNewWhiteboardName(''); }} style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid #F87171', background: 'transparent', color: '#F87171', cursor: 'pointer', fontSize: '11px' }}>Cancel</button>
+                        <button onClick={cancelShortcutSelection} style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid #F87171', background: 'transparent', color: '#F87171', cursor: 'pointer', fontSize: '11px' }}>Cancel</button>
                         {shortcutState.slotCount > 1 && (
                           <button
-                            onClick={async () => {
-                              const yes = await confirmDialog('Delete this shortcut tool?', 'Delete Tool');
-                              if (!yes) return;
-                              shortcutManager.deleteSlot(idx);
-                            }}
+                            onClick={() => deleteShortcutTool(idx)}
                             style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid #F87171', background: 'transparent', color: '#F87171', cursor: 'pointer', fontSize: '11px' }}
                           >
                             Delete
@@ -163,9 +211,9 @@ export function VerticalToolBar({
       )}
 
       <div style={{ background: 'rgba(38,42,51,0.65)', backdropFilter: 'blur(10px)', borderRadius: '8px', padding: '6px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
-        <button onClick={() => actions.setZoom(Math.min(zoom + 0.25, 3.0))} title="Zoom In" style={{ width: '32px', height: '32px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '18px', borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>+</button>
+        <button onClick={zoomIn} title="Zoom In" style={{ width: '32px', height: '32px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '18px', borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>+</button>
         <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '500', margin: '2px 0' }}>{Math.round(zoom * 100)}%</span>
-        <button onClick={() => actions.setZoom(Math.max(zoom - 0.25, 0.5))} title="Zoom Out" style={{ width: '32px', height: '32px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '18px', borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>-</button>
+        <button onClick={zoomOut} title="Zoom Out" style={{ width: '32px', height: '32px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '18px', borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>-</button>
       </div>
     </div>
   );

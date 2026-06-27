@@ -219,21 +219,7 @@ export function createUIController(store: UIStateStore, onHomeCallback?: () => v
 
         // ─── Domain Commands Delegations ──────────────────────────────────────────
         onContentChange: async (slotId, contentId, contentType) => {
-            if (contentType === 'pdf') {
-                await inputAPI.loadSession(contentId, slotId);
-            } else if (contentType === 'whiteboard') {
-                rawController.setSlotStates(slotId, {
-                    contentId,
-                    contentType,
-                    slotType: 'verticalPane'
-                });
-            } else {
-                rawController.setSlotStates(slotId, {
-                    contentId,
-                    contentType,
-                    slotType: 'verticalPane'
-                });
-            }
+            await inputAPI.loadSession(contentId, contentType, slotId);
         },
         deleteMark: (slotId, markId) => {
             return inputAPI.deleteMark(slotId, markId);

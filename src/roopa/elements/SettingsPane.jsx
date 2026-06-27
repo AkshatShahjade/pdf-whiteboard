@@ -79,12 +79,16 @@ const Field = ({ label, hint, children }) => (
   </div>
 );
 
-export function SettingsPane({ open: isOpen, onClose, settings, onChange, backupPath, onSetBackupPath, showToast, onClearRecents }) {
+// --- Capability Hook ---
+export function useSettingsPane(showToast, onClearRecents) {
   const [helpOpen, setHelpOpen] = useState(false);
 
   const btnStyle = {
     flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #374151', background: 'transparent', color: '#d1d5db', fontSize: '11px', cursor: 'pointer', fontFamily: "'IBM Plex Mono', monospace",
   };
+
+  const openHelp = () => setHelpOpen(true);
+  const closeHelp = () => setHelpOpen(false);
 
   const handleExport = async () => { showToast('JSON Export is migrating to new DB architecture.', 'info'); };
   const handleImport = async () => { showToast('JSON Import is migrating to new DB architecture.', 'info'); };
@@ -96,6 +100,30 @@ export function SettingsPane({ open: isOpen, onClose, settings, onChange, backup
       await onClearRecents();
     }
   };
+
+  return {
+    helpOpen,
+    openHelp,
+    closeHelp,
+    btnStyle,
+    handleExport,
+    handleImport,
+    handleRollingBackup,
+    handleClearRecents,
+  };
+}
+
+export function SettingsPane({ open: isOpen, onClose, settings, onChange, backupPath, onSetBackupPath, showToast, onClearRecents }) {
+  const {
+    helpOpen,
+    openHelp,
+    closeHelp,
+    btnStyle,
+    handleExport,
+    handleImport,
+    handleRollingBackup,
+    handleClearRecents,
+  } = useSettingsPane(showToast, onClearRecents);
 
   return (
     <>
@@ -157,14 +185,14 @@ export function SettingsPane({ open: isOpen, onClose, settings, onChange, backup
 
           <div style={{ borderTop: '1px solid #374151', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <span style={{ fontSize: '11px', color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Help & Guide</span>
-            <button onClick={() => setHelpOpen(true)} style={{ ...btnStyle, background: 'rgba(16, 185, 129, 0.1)', color: '#34D399', borderColor: '#10B981' }}>
+            <button onClick={openHelp} style={{ ...btnStyle, background: 'rgba(16, 185, 129, 0.1)', color: '#34D399', borderColor: '#10B981' }}>
               📖 View Mechanics & Shortcuts
             </button>
           </div>
         </div>
         <div style={{ padding: '16px 24px', borderTop: '1px solid #374151' }}><span style={{ fontSize: '10px', color: '#6b7280' }}>LemmaMap · local build</span></div>
       </div>
-      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <HelpModal open={helpOpen} onClose={closeHelp} />
     </>
   );
 }

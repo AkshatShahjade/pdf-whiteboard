@@ -6,6 +6,7 @@ import { ContentRepository } from '../storage/repositories/ContentRepository';
 import { parseRawMark } from '../../shared_doman_models_and_dtos/factories';
 import { SessionDTO } from '../../shared_doman_models_and_dtos/dtos';
 import { getContentDomainType, createDefaultSlotState } from '../capabilities_registry/content_domain_registry';
+import { WhiteboardRepository } from '../storage/repositories/WhiteboardRepository';
 
 export function debounce(fn: Function, ms: number) {
   let timer: any = null;
@@ -180,13 +181,25 @@ export const stateSyncService = {
   /**
    * Hydrates the store with the resolved session state from the 4-layer architecture.
    */
-  async loadSession(store: AppStateStore, output: OutputAPIInterface, pdfPath: string, slotId: string = 'left') {
+  async loadSession(store: AppStateStore, output: OutputAPIInterface, contentId: string, contentType: string, slotId: string = 'left') {
     try {
+      // Resolve path from DB if it exists, or dynamically resolve for whiteboard, fallback to contentId
+      let filePath = contentId;
+      try {
+        const content = await ContentRepository.getContentById(contentId);
+        if (content && content.file_path) {
+          filePath = content.file_path;
+        } else if (contentType === 'whiteboard') {
+          // Resolve whiteboard path dynamically (even if not yet saved on disk/db)
+          filePath = await WhiteboardRepository.resolvePath(contentId);
+        }
+      } catch (e) {}
+
       // Ensure the content is registered in the DB before we do any relational writing (like marks)
-      await ContentRepository.ensureContentExists(pdfPath, 'core.pdf', pdfPath);
+      await ContentRepository.ensureContentExists(contentId, 'core.' + contentType, filePath);
 
       // Load individual keys via cascading scopes
-      const docScope = ['doc:' + pdfPath, 'global'];
+      const docScope = ['doc:' + contentId, 'global'];
       const leftPct = await StateInitialValuesRepository.getInitialValue('personalized', 'leftPct', docScope);
       const selectedMarkId = await StateInitialValuesRepository.getInitialValue('personalized', 'selectedMarkId', docScope);
       const scrollTop = await StateInitialValuesRepository.getInitialValue('personalized', 'scrollTop', docScope);
@@ -194,22 +207,22 @@ export const stateSyncService = {
       const tool = await StateInitialValuesRepository.getInitialValue('personalized', 'tool', docScope);
       
       // Marks are still stored in MARKS table as they are relational data, not 4-layer state presets
-      const rawMarks = await MarkRepository.loadMarksByContentId(pdfPath);
+      const rawMarks = await MarkRepository.loadMarksByContentId(contentId);
       const parsedMarks = rawMarks.map(parseRawMark);
       const marksMap = new Map(parsedMarks.map((m: any) => [m.id, m]));
 
       const existingSlot = store.getState().slots[slotId];
-      const baseState = existingSlot && existingSlot.contentType === 'pdf'
+      const baseState = existingSlot && existingSlot.contentType === contentType
         ? existingSlot
-        : createDefaultSlotState(pdfPath, 'pdf', 'verticalPane', 'ui');
+        : createDefaultSlotState(contentId, contentType, 'verticalPane', 'ui');
 
       // Mutate store (Subscriber will automatically pick this up, but we'll ignore initial load diffing or just let it re-persist safely)
       store.setState(draft => {
         draft.leftPct = leftPct;
         draft.slots[slotId] = {
           ...baseState,
-          contentId: pdfPath,
-          contentType: 'pdf',
+          contentId: contentId,
+          contentType: contentType,
           zoom: zoom ?? baseState.zoom ?? 1.0,
           tool: tool ?? baseState.tool ?? 'select',
           selectedMarkId: selectedMarkId ?? baseState.selectedMarkId ?? null,
@@ -223,8 +236,8 @@ export const stateSyncService = {
         leftPct,
         slots: {
           [slotId]: {
-            contentId: pdfPath,
-            contentType: 'pdf',
+            contentId: contentId,
+            contentType: contentType,
             zoom,
             tool,
             selectedMarkId,

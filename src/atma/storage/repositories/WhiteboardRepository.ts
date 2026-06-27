@@ -32,6 +32,11 @@ export const WhiteboardRepository = {
     async saveWhiteboard(id: string, snapshot: any, parentPdfPath?: string, libraryFolder?: string): Promise<void> {
         const filePath = await this.resolvePath(id, parentPdfPath, libraryFolder);
         await writeTextFile(filePath, JSON.stringify(snapshot, null, 2));
+        try {
+            await ContentRepository.ensureContentExists(id, 'core.whiteboard', filePath);
+        } catch (e) {
+            console.error("Failed to register whiteboard in CONTENTS database:", e);
+        }
     },
 
     async loadWhiteboard(id: string, parentPdfPath?: string, libraryFolder?: string): Promise<any | null> {
