@@ -3,8 +3,8 @@ import type {
     ToolBorderClickContext,
     ToolPointerDownContext,
     PDFToolRendererType,
-} from "../../../../../renderer_registry/pdf/vertical_pane/tool_renderer_registry"
-import { selectCursor } from "../../../tool_cursors"
+} from "../../../../renderer_registry/pdf/tool_renderer_registry"
+import { selectCursor } from "../../tool_cursors"
 
 export const selectionTool: PDFToolRendererType = {
     id: {

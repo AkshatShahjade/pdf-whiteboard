@@ -1,4 +1,4 @@
-import type { PDFToolRendererType } from "../../../../../renderer_registry/pdf/vertical_pane/tool_renderer_registry"
+import type { PDFToolRendererType } from "../../../../renderer_registry/pdf/tool_renderer_registry"
 
 export const contentSelectorTool: PDFToolRendererType = {
     id: {

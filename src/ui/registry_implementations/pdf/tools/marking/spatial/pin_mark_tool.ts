@@ -5,10 +5,11 @@ import type {
     ToolPointerMoveContext,
     ToolPointerUpContext,
     PDFToolRendererType,
-} from "../../../../../../renderer_registry/pdf/vertical_pane/tool_renderer_registry"
-import { lassoMark } from "../../../marks/lasso_mark"
-import { lassoCursor } from "../../../../tool_cursors"
-import { renderDrawableToolbarExtras } from "../../../../tool_toolbar_extras"
+} from "../../../../../renderer_registry/pdf/tool_renderer_registry"
+import { getMarkRendererType } from "../../../../../renderer_registry/pdf/mark_renderer_registry"
+import { pinCursor } from "../../../tool_cursors"
+import { pinMark } from "../../../marks/pin_mark"
+import { renderDrawableToolbarExtras } from "../../../tool_toolbar_extras"
 
 function resetDrawableToolState(actions: {
     setCurrentSelection: (next: any) => void
@@ -24,23 +25,23 @@ function resetDrawableToolState(actions: {
     actions.setShapeBackup(null)
 }
 
-export const lassoTool: PDFToolRendererType = {
+export const pinTool: PDFToolRendererType = {
     id: {
-        id: "lasso",
+        id: "pin",
         scope: "pdf",
         category: "mark-spatial"
     },
     isDrawable: true,
-    createsSelections : true,
-    label: 'Lasso',
-    icon: '∿',
-    order: 3,
-    hotkey: 'c',
+    createsSelections: true,
+    label: 'Pin',
+    icon: '📍',
+    order: 4,
+    hotkey: 'p',
     activationMode: 'toggle',
-    cursor: lassoCursor,
+    cursor: pinCursor,
 
     createNullSelection() {
-        return {type:"lasso", points: null}
+        return { type: "pin", x: null, y: null }
     },
 
     onActivate(ctx: ToolActivateContext) {
@@ -50,41 +51,35 @@ export const lassoTool: PDFToolRendererType = {
     onPointerDown(ctx: ToolPointerDownContext) {
         ctx.e.currentTarget.setPointerCapture?.(ctx.e.pointerId)
         ctx.actions.setSelectedMarkId(null)
-        ctx.actions.setCurrentSelection(lassoMark.initiateShape(ctx.coords))
+        ctx.actions.setCurrentSelection(pinMark.initiateShape!(ctx.coords))
         return true
     },
 
     onPointerMove(ctx: ToolPointerMoveContext) {
-        if (!ctx.state.currentSelection || ctx.state.currentSelection.type !== 'lasso') return false
+        if (!ctx.state.currentSelection || ctx.state.currentSelection.type !== 'pin') return false
+        // Pin is just a point, it doesn't really update on move usually, but we allow dragging it while placing
         ctx.actions.setCurrentSelection(
-            lassoMark.updateSelection?.(ctx.state.currentSelection, ctx.coords, {
-                minPointDistance: 2 / ctx.state.zoom,
-            }) ?? ctx.state.currentSelection
+            pinMark.updateSelection?.(ctx.state.currentSelection, ctx.coords, { zoom: ctx.state.zoom }) ?? ctx.state.currentSelection
         )
         return true
     },
 
     onPointerUp(ctx: ToolPointerUpContext) {
-        if (!ctx.currentSelection || ctx.currentSelection.type !== 'lasso') return false
+        if (!ctx.currentSelection || ctx.currentSelection.type !== 'pin') return false
 
-        const shape = lassoMark.returnDrawableMarkWithoutId(ctx.currentSelection)
-        if (shape && shape.w > 10 / ctx.zoom && shape.h > 10 / ctx.zoom) {
+        const shape = pinMark.returnDrawableMarkWithoutId!(ctx.currentSelection)
+        if (shape) {
             if (ctx.editingShapeId && ctx.tool === ctx.currentSelection.type) {
                 const updatedMark = { id: ctx.editingShapeId, ...shape }
-                const validation = lassoMark.validate?.(updatedMark) ?? { isValid: true }
-                if (validation.isValid) {
-                    ctx.actions.setMarksWithSectionWidths((prev: any[]) => prev.map((r) => (
-                        r.id === ctx.editingShapeId ? updatedMark : r
-                    )))
-                }
+                // no validate function for pin currently, assume valid
+                ctx.actions.setMarksWithSectionWidths((prev: any[]) => prev.map((r) => (
+                    r.id === ctx.editingShapeId ? updatedMark : r
+                )))
             } else {
-                const newMark = lassoMark.returnNewDrawableMark(ctx.currentSelection)
+                const newMark = pinMark.returnNewDrawableMark!(ctx.currentSelection)
                 if (newMark) {
-                    const validation = lassoMark.validate?.(newMark) ?? { isValid: true }
-                    if (validation.isValid) {
-                        ctx.actions.setMarksWithSectionWidths((prev: any[]) => [...prev, newMark])
-                        ctx.actions.setSelectedMarkId(newMark.id)
-                    }
+                    ctx.actions.setMarksWithSectionWidths((prev: any[]) => [...prev, newMark])
+                    ctx.actions.setSelectedMarkId(newMark.id)
                 }
             }
         }

@@ -1,4 +1,5 @@
 import { ContentDomainType } from "../../capabilities_registry/content_domain_registry"
+import { markDomainRegistry } from "../../capabilities_registry/whiteboard/mark_domain_registry"
 
 export const whiteboardContentDomain: ContentDomainType = {
     id: 'whiteboard',
@@ -12,6 +13,6 @@ export const whiteboardContentDomain: ContentDomainType = {
             supported_extensions: ['.tldr'],
         }
     },
-    markDomainRegistry: new Map(),
+    markDomainRegistry: markDomainRegistry,
     stateVariables: []
 }

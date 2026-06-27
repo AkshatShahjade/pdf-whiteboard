@@ -10,7 +10,7 @@ import {
     ShortcutToolManager,
     ShortcutToolExternalActions,
     WhiteboardInfo,
-} from '../registry_implementations/pdf/vertical_pane/tools/system/shortcut_tool_state.ts'
+} from '../registry_implementations/pdf/tools/system/shortcut_tool_state.ts'
 import { ContentRepository } from '../../atma/storage/repositories/ContentRepository.ts'
 import { readTextFile, exists } from '@tauri-apps/plugin-fs';
 

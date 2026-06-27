@@ -1,5 +1,5 @@
-import { ToolDomainType } from "../../../../shared_doman_models_and_dtos/tool_domain_models"
-import { ToolRendererType } from "../../mark_tool_renderer_types"
+import { ToolDomainType } from "../../../shared_doman_models_and_dtos/tool_domain_models"
+import { ToolRendererType } from "../mark_tool_renderer_types"
 
 export type ToolCursor = string | ((ctx: ToolCursorContext) => string)
 export type ToolActivationMode = "set" | "toggle"

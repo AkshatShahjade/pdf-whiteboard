@@ -1,5 +1,5 @@
-import { Mark, Point, Selection, SectionSel, SelectionContext, RenderMarkContext } from "../../../../../shared_doman_models_and_dtos/mark_domain_model";
-import { PDFMarkRendererType } from "../../../../renderer_registry/pdf/vertical_pane/mark_renderer_registry";
+import { Mark, Point, Selection, SectionSel, SelectionContext, RenderMarkContext } from "../../../../shared_doman_models_and_dtos/mark_domain_model";
+import { PDFMarkRendererType } from "../../../renderer_registry/pdf/mark_renderer_registry";
 
 export const sectionMark: PDFMarkRendererType = {
     id: 'section',

@@ -5,11 +5,11 @@ import type {
     ToolPointerMoveContext,
     ToolPointerUpContext,
     PDFToolRendererType,
-} from "../../../../../../renderer_registry/pdf/vertical_pane/tool_renderer_registry"
-import { getMarkRendererType } from "../../../../../../renderer_registry/pdf/vertical_pane/mark_renderer_registry"
-import { rectCursor } from "../../../../tool_cursors"
+} from "../../../../../renderer_registry/pdf/tool_renderer_registry"
+import { getMarkRendererType } from "../../../../../renderer_registry/pdf/mark_renderer_registry"
+import { rectCursor } from "../../../tool_cursors"
 import { rectangleMark } from "../../../marks/rectangle_mark"
-import { renderDrawableToolbarExtras } from "../../../../tool_toolbar_extras"
+import { renderDrawableToolbarExtras } from "../../../tool_toolbar_extras"
 
 function handleDrawingMove(e: React.MouseEvent, state: ToolPointerMoveContext['state'], actions: ToolPointerMoveContext['actions']) {
     const coords = { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY }

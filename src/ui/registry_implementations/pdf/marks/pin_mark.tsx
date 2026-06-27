@@ -1,6 +1,6 @@
-import { Mark, PinMark, PinSel, Point, RenderMarkContext, Selection, SelectionContext, STROKE_HIT_WIDTH } from "../../../../../shared_doman_models_and_dtos/mark_domain_model";
-import { generateMarkId as createMarkId } from "../../../../../shared_doman_models_and_dtos/factories";
-import { PDFMarkRendererType } from "../../../../renderer_registry/pdf/vertical_pane/mark_renderer_registry";
+import { Mark, PinMark, PinSel, Point, RenderMarkContext, Selection, SelectionContext, STROKE_HIT_WIDTH } from "../../../../shared_doman_models_and_dtos/mark_domain_model";
+import { generateMarkId as createMarkId } from "../../../../shared_doman_models_and_dtos/factories";
+import { PDFMarkRendererType } from "../../../renderer_registry/pdf/mark_renderer_registry";
 
 export const pinMark: PDFMarkRendererType = {
     id: 'pin',

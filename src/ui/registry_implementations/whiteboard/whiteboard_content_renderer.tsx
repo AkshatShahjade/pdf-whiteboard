@@ -3,9 +3,13 @@ import { Tldraw, DefaultToolbar, DefaultToolbarContent, TldrawUiMenuItem, useToo
 import 'tldraw/tldraw.css'
 import { debounce } from '../../../atma/services/state_sync_service.js'
 import { queryAPI } from '../../../atma/singletons.js'
-import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './tools/editing/handwriting_whiteboard_editing_tool.jsx'
 import { ContentRendererType, ContentRendererProps } from '../../renderer_registry/content_renderer_registry.js'
 import { UIController } from '../../ui_controller.js'
+import { whiteboardToolRendererRegistry } from '../../renderer_registry/whiteboard/tool_renderer_registry.js'
+import { setupWhiteboardSync } from './whiteboard_sync_listener.js'
+
+// Import Handwriting tool since it was previously hardcoded
+import { HandwritingShapeUtil, HandwritingTool, handwritingToolUiOverrides } from './tools/editing/handwriting_whiteboard_editing_tool.jsx'
 
 const handwritingAssetUrls = {
   icons: {
@@ -13,7 +17,17 @@ const handwritingAssetUrls = {
   },
 }
 
-function WhiteboardPane({ slotId, markId, settings, uiController }: { slotId: string; markId: string; settings?: any; uiController?: UIController }) {
+function WhiteboardPane({ 
+  slotId, 
+  markId, 
+  settings, 
+  uiController 
+}: { 
+  slotId: string; 
+  markId: string; 
+  settings?: any; 
+  uiController?: UIController; 
+}) {
   const [snapshot, setSnapshot] = useState<any>(null)
   const [loaded, setLoaded] = useState(false)
 
@@ -39,7 +53,19 @@ function WhiteboardPane({ slotId, markId, settings, uiController }: { slotId: st
   return <TldrawWithPersistence slotId={slotId} markId={markId} initialSnapshot={snapshot} settings={settings} uiController={uiController} />
 }
 
-function TldrawWithPersistence({ slotId, markId, initialSnapshot, settings, uiController }: { slotId: string; markId: string; initialSnapshot?: any; settings?: any; uiController?: UIController }) {
+function TldrawWithPersistence({ 
+  slotId, 
+  markId, 
+  initialSnapshot, 
+  settings, 
+  uiController 
+}: { 
+  slotId: string; 
+  markId: string; 
+  initialSnapshot?: any; 
+  settings?: any; 
+  uiController?: UIController; 
+}) {
   const debouncedSave = useMemo(() => debounce((snap: any) => {
     uiController?.saveWhiteboardSnapshot(markId, snap, slotId)
   }, 800), [slotId, markId, uiController])
@@ -51,20 +77,85 @@ function TldrawWithPersistence({ slotId, markId, initialSnapshot, settings, uiCo
     editor.setCurrentTool(settings?.defaultTool || 'draw')
     editor.updateInstanceState({ exportBackground: false })
 
-    const unsub = editor.store.listen(
+    const unsubSave = editor.store.listen(
       () => { debouncedSave(editor.getSnapshot()) },
       { source: 'user', scope: 'document' }
     )
-    return () => { unsub(); debouncedSave.flush(editor.getSnapshot()) }
-  }, [initialSnapshot, debouncedSave, markId])
 
-  const handwritingComponents = {
+    // Setup Kram bridging listener for marks
+    let unsubSync = () => {}
+    if (uiController) {
+      unsubSync = setupWhiteboardSync(editor, slotId, markId, uiController)
+    }
+
+    return () => { 
+      unsubSave(); 
+      unsubSync();
+      debouncedSave.flush(editor.getSnapshot()) 
+    }
+  }, [initialSnapshot, debouncedSave, markId, slotId])
+
+  // Aggregate Tools, ShapeUtils, and UiOverrides from the registry
+  const customTools: any[] = [HandwritingTool]
+  const customShapeUtils: any[] = [HandwritingShapeUtil]
+  
+  let mergedOverrides: any = {
+      tools: (editor: any, tools: any) => {
+          let t = handwritingToolUiOverrides.tools(editor, tools)
+          for (const tool of Array.from(whiteboardToolRendererRegistry.values())) {
+              if (tool.tldrawUiOverrides?.tools) {
+                  t = tool.tldrawUiOverrides.tools(editor, t)
+              }
+          }
+          return t
+      },
+      toolbar: (editor: any, toolbarItems: any, helpers: any) => {
+          let t = handwritingToolUiOverrides.toolbar(editor, toolbarItems, helpers)
+          for (const tool of Array.from(whiteboardToolRendererRegistry.values())) {
+              if (tool.tldrawUiOverrides?.toolbar) {
+                  t = tool.tldrawUiOverrides.toolbar(editor, t, helpers)
+              }
+          }
+          return t
+      },
+      translations: {
+          en: { ...handwritingToolUiOverrides.translations.en }
+      }
+  }
+
+  for (const tool of Array.from(whiteboardToolRendererRegistry.values())) {
+      if (tool.tldrawTool) customTools.push(tool.tldrawTool)
+      if (tool.tldrawShapeUtil) customShapeUtils.push(tool.tldrawShapeUtil)
+      if (tool.tldrawUiOverrides?.translations?.en) {
+          mergedOverrides.translations.en = {
+              ...mergedOverrides.translations.en,
+              ...tool.tldrawUiOverrides.translations.en
+          }
+      }
+  }
+
+  // Inject a wrapper for the toolbar to include custom tools if needed
+  // Note: Since we are using `overrides.toolbar`, we don't necessarily need the custom `components.Toolbar`
+  // unless we want absolute control. The user's handwriting tool used both `components` and `overrides`.
+  // We'll keep the handwriting components for now to not break it.
+  const RegistryToolMenuItem = ({ toolId }: { toolId: string }) => {
+    const tools = useTools()
+    const isSelected = useIsToolSelected(tools[toolId])
+    if (!tools[toolId]) return null
+    return <TldrawUiMenuItem {...tools[toolId]} isSelected={isSelected} />
+  }
+
+  const customComponents = {
     Toolbar: (props: any) => {
-      const tools = useTools()
-      const isSelected = useIsToolSelected(tools['handwriting'])
       return (
         <DefaultToolbar {...props}>
-          <TldrawUiMenuItem {...tools['handwriting']} isSelected={isSelected} />
+          <RegistryToolMenuItem toolId="handwriting" />
+          {Array.from(whiteboardToolRendererRegistry.values()).map(tool => {
+            if (tool.tldrawTool && tool.tldrawTool.id !== 'handwriting') {
+              return <RegistryToolMenuItem key={tool.tldrawTool.id} toolId={tool.tldrawTool.id} />
+            }
+            return null
+          })}
           <DefaultToolbarContent />
         </DefaultToolbar>
       )
@@ -83,11 +174,11 @@ function TldrawWithPersistence({ slotId, markId, initialSnapshot, settings, uiCo
       `}</style>
       <Tldraw
         onMount={handleMount}
-        tools={[HandwritingTool]}
-        shapeUtils={[HandwritingShapeUtil]}
-        overrides={handwritingToolUiOverrides}
+        tools={customTools}
+        shapeUtils={customShapeUtils}
+        overrides={mergedOverrides}
         assetUrls={handwritingAssetUrls}
-        components={handwritingComponents}
+        components={customComponents}
       />
     </>
   )
@@ -95,8 +186,13 @@ function TldrawWithPersistence({ slotId, markId, initialSnapshot, settings, uiCo
 
 function WhiteboardContentComponent({ slotId, contentId, settings, uiController }: ContentRendererProps) {
   return (
-    <div style={{ width: '100%', height: '100%' }}>
-      <WhiteboardPane slotId={slotId} markId={contentId} settings={settings} uiController={uiController as UIController | undefined} />
+    <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
+      <WhiteboardPane 
+        slotId={slotId} 
+        markId={contentId} 
+        settings={settings} 
+        uiController={uiController as UIController | undefined} 
+      />
     </div>
   )
 }
@@ -106,5 +202,4 @@ export const whiteboardContentRenderer: ContentRendererType = {
   Component: WhiteboardContentComponent,
 }
 
-// Re-export WhiteboardPane for use in the split-pane PDF view
 export { WhiteboardPane }

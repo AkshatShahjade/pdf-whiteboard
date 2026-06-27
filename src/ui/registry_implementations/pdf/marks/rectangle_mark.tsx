@@ -1,6 +1,6 @@
-import { Selection, Point, Mark, STROKE_HIT_WIDTH, RectSel, RectMark, SelectionContext, RenderMarkContext } from "../../../../../shared_doman_models_and_dtos/mark_domain_model";
-import { generateMarkId as createMarkId } from "../../../../../shared_doman_models_and_dtos/factories";
-import { PDFMarkRendererType } from "../../../../renderer_registry/pdf/vertical_pane/mark_renderer_registry";
+import { Selection, Point, Mark, STROKE_HIT_WIDTH, RectSel, RectMark, SelectionContext, RenderMarkContext } from "../../../../shared_doman_models_and_dtos/mark_domain_model";
+import { generateMarkId as createMarkId } from "../../../../shared_doman_models_and_dtos/factories";
+import { PDFMarkRendererType } from "../../../renderer_registry/pdf/mark_renderer_registry";
 
 export const rectangleMark: PDFMarkRendererType = {
     id : 'rect',

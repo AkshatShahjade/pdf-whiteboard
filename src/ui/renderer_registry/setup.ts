@@ -1,16 +1,19 @@
-import { lassoMark } from "../registry_implementations/pdf/vertical_pane/marks/lasso_mark";
-import { pinMark } from "../registry_implementations/pdf/vertical_pane/marks/pin_mark";
-import { rectangleMark } from "../registry_implementations/pdf/vertical_pane/marks/rectangle_mark";
-import { sectionMark } from "../registry_implementations/pdf/vertical_pane/marks/section_mark";
-import { lassoTool } from "../registry_implementations/pdf/vertical_pane/tools/marking/spatial/lasso_mark_tool";
-import { pinTool } from "../registry_implementations/pdf/vertical_pane/tools/marking/spatial/pin_mark_tool";
-import { rectTool } from "../registry_implementations/pdf/vertical_pane/tools/marking/spatial/rectangle_mark_tool";
-import { sectionTool } from "../registry_implementations/pdf/vertical_pane/tools/marking/spatial/spatial_section_mark_tool";
-import { removeTool } from "../registry_implementations/pdf/vertical_pane/tools/system/remove_mark_tool";
-import { selectionTool } from "../registry_implementations/pdf/vertical_pane/tools/system/selection_tool";
-import { contentSelectorTool } from "../registry_implementations/pdf/vertical_pane/tools/system/content_selector_tool";
-import { markRendererRegistry, registerMarkRendererType } from "./pdf/vertical_pane/mark_renderer_registry";
-import { registerToolRendererType, toolRendererRegistry } from "./pdf/vertical_pane/tool_renderer_registry";
+import { lassoMark } from "../registry_implementations/pdf/marks/lasso_mark";
+import { pinMark } from "../registry_implementations/pdf/marks/pin_mark";
+import { rectangleMark } from "../registry_implementations/pdf/marks/rectangle_mark";
+import { sectionMark } from "../registry_implementations/pdf/marks/section_mark";
+import { lassoTool } from "../registry_implementations/pdf/tools/marking/spatial/lasso_mark_tool";
+import { pinTool } from "../registry_implementations/pdf/tools/marking/spatial/pin_mark_tool";
+import { rectTool } from "../registry_implementations/pdf/tools/marking/spatial/rectangle_mark_tool";
+import { sectionTool } from "../registry_implementations/pdf/tools/marking/spatial/spatial_section_mark_tool";
+import { removeTool } from "../registry_implementations/pdf/tools/system/remove_mark_tool";
+import { selectionTool } from "../registry_implementations/pdf/tools/system/selection_tool";
+import { contentSelectorTool } from "../registry_implementations/pdf/tools/system/content_selector_tool";
+import { markRendererRegistry, registerMarkRendererType } from "./pdf/mark_renderer_registry";
+import { registerToolRendererType, toolRendererRegistry } from "./pdf/tool_renderer_registry";
+import { whiteboardToolRendererRegistry, registerWhiteboardToolRendererType } from "./whiteboard/tool_renderer_registry";
+import { pinWhiteboardTool } from "../registry_implementations/whiteboard/tools/marking/pin_whiteboard_tool";
+import { tldrawMarkWhiteboardTool } from "../registry_implementations/whiteboard/tools/marking/tldraw_mark_tool";
 import { contentRendererRegistry, registerContentRendererType } from "./content_renderer_registry";
 import { setupAllRegistries as setupAtmaRegistries } from "../../atma/capabilities_registry/setup";
 import { pdfContentRenderer } from "../registry_implementations/pdf/pdf_content_renderer";
@@ -54,6 +57,12 @@ export function setupToolRegistry() {
     }
     if (!toolRendererRegistry.has(contentSelectorTool.id.id)) {
         registerToolRendererType(contentSelectorTool);
+    }
+    if (!whiteboardToolRendererRegistry.has(pinWhiteboardTool.id.id)) {
+        registerWhiteboardToolRendererType(pinWhiteboardTool);
+    }
+    if (!whiteboardToolRendererRegistry.has(tldrawMarkWhiteboardTool.id.id)) {
+        registerWhiteboardToolRendererType(tldrawMarkWhiteboardTool);
     }
 }
 

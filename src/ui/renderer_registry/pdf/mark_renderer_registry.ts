@@ -1,5 +1,5 @@
-import { Selection, Point, Mark, SelectionContext, RenderMarkContext } from "../../../../shared_doman_models_and_dtos/mark_domain_model";
-import { MarkRendererType } from "../../mark_tool_renderer_types";
+import { Selection, Point, Mark, SelectionContext, RenderMarkContext } from "../../../shared_doman_models_and_dtos/mark_domain_model";
+import { MarkRendererType } from "../mark_tool_renderer_types";
 
 /**
  * PDFMarkRendererType — extends the base MarkRendererType with PDF-specific

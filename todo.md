@@ -6,12 +6,14 @@ Critique all the recent changes that were made to the codebase from 2 commits ba
 \
 
 
-Create roopa elements out of the WorkspaceHeader, (make the backup and save indicator be a separate element used in workspace header) and Settings Pane, vertical tool bar, page indicator. 
+so why can't it be that you create a pin shaped tldraw shape, and treat that as a mark. In fact this is the direction I want to go towards. That any tldraw native shape (like rectangle) or drawing or text box can be considered a mark. So then we can link marks from 2 panes with each other. and that is when the link tool will work. The current system where on creating a mark, a new whiteboard immediately opens is a stepping stone, and this would eventually be removed. In the future, the rect / lasso / section / pin tools in pdf would just make the mark ui - like the rectangle tool in whiteboard right now. And then we would select mark and press the link tool to link it with another mark in same or different document. Then clikcing the mark would take us to that document place.  But for now we keep the open a new whiteboard logic. so my interest is that the pin tool in whiteabord, creates a pin shaped tldraw native shape, and then we develop a system that allows us to mark any tldraw shape as a lemmamap mark later on.
 
 \
-
-now, we must add whiteboard marks. We do this by both creating custom tools for the pin mark, integrated into tldraw - similar to how the handwriting tool was made - and by creating a shape mark type which creates a mark out of any pre-existing shape. 
-
+well then how do you save the whiteboard marks if the schema didn't change? 
+Note that the Mark domain type nbeeds to be modified. Add TldrawMark as a type. Then link all the marks (from pin tool or mark tool iN THE WHITEBOARD to the tldraw mark type)
+Also, why is the mark tool not working at all.
+DO an extensive codebase search, and find the root cause. I suspect not enough generalization and modificaiton of codebase for a whiteboard type. 
+Create survery report.
 \
 
 

@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { ContentRendererType, ContentRendererProps } from '../../renderer_registry/content_renderer_registry';
-import { markRendererRegistry } from '../../renderer_registry/pdf/vertical_pane/mark_renderer_registry';
-import { toolRendererRegistry } from '../../renderer_registry/pdf/vertical_pane/tool_renderer_registry';
+import { markRendererRegistry } from '../../renderer_registry/pdf/mark_renderer_registry';
+import { toolRendererRegistry } from '../../renderer_registry/pdf/tool_renderer_registry';
 import { getMarkDomainType } from '../../../atma/capabilities_registry/pdf/mark_domain_registry';
-import { getMarkRendererType } from '../../renderer_registry/pdf/vertical_pane/mark_renderer_registry';
-import { getToolRendererType as getToolType, getToolRendererByHotkey as getToolByHotkey } from '../../renderer_registry/pdf/vertical_pane/tool_renderer_registry';
+import { getMarkRendererType } from '../../renderer_registry/pdf/mark_renderer_registry';
+import { getToolRendererType as getToolType, getToolRendererByHotkey as getToolByHotkey } from '../../renderer_registry/pdf/tool_renderer_registry';
 import { convertFileSrc, confirmDialog, joinPath } from '../../../atma/platform_adapter/switch';
 import { WhiteboardRepository } from '../../../atma/storage/repositories/WhiteboardRepository';
 import { ContentRepository } from '../../../atma/storage/repositories/ContentRepository';

@@ -2,8 +2,8 @@ import type {
     ToolActivateContext,
     ToolBorderClickContext,
     PDFToolRendererType,
-} from "../../../../../renderer_registry/pdf/vertical_pane/tool_renderer_registry"
-import { deleteCursor } from "../../../tool_cursors"
+} from "../../../../renderer_registry/pdf/tool_renderer_registry"
+import { deleteCursor } from "../../tool_cursors"
 
 export const removeTool: PDFToolRendererType = {
     id: {
