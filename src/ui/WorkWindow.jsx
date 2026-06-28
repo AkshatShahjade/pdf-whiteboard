@@ -10,6 +10,7 @@ import { getContentRendererType } from './renderer_registry/content_renderer_reg
 import { setupAllRegistries } from './renderer_registry/setup';
 import Screen from '../roopa/Screen';
 import { WorkspaceHeader } from '../roopa/elements/WorkspaceHeader';
+import { ScreenToolbar } from '../roopa/elements/ScreenToolbar';
 
 setupAllRegistries(); //TODO, find proper place
 
@@ -81,13 +82,15 @@ export default function Root() {
         settings={session.settings}
         onHome={handleHome}
         uiController={uiController}
+        uiStore={uiStore}
       />
     );
   }
   return <WorkspaceContainer pdfPath={session.pdfPath} settings={session.settings} onHome={handleHome} uiStore={uiStore} uiController={uiController} />;
 }
 
-function WhiteboardOnlyApp({ whiteboardId, whiteboardName, settings, onHome, uiController }) {
+function WhiteboardOnlyApp({ whiteboardId, whiteboardName, settings, onHome, uiController, uiStore }) {
+  const uiState = useUIState(uiStore);
   const [headerVisible, setHeaderVisible] = useState(false);
   const lastSavedAt = null;
   const [toast, setToast] = useState(null);
@@ -121,6 +124,7 @@ function WhiteboardOnlyApp({ whiteboardId, whiteboardName, settings, onHome, uiC
           );
         })()}
       </div>
+      <ScreenToolbar uiState={uiState} uiController={uiController} />
     </div>
   );
 }
@@ -212,6 +216,7 @@ function WorkspaceContainer({ pdfPath, settings, onHome, uiStore, uiController }
         onHome={onHome}
         initialSplitPct={uiState.leftPct ?? 50}
       />
+      <ScreenToolbar uiState={uiState} uiController={uiController} />
     </div>
   );
 }

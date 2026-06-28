@@ -20,6 +20,8 @@ import { pdfContentRenderer } from "../registry_implementations/pdf/pdf_content_
 import { whiteboardContentRenderer } from "../registry_implementations/whiteboard/whiteboard_content_renderer";
 import { contentSelectorContentRenderer } from "../registry_implementations/content_selector/content_selector_content_renderer";
 import { setupSlotRegistry } from "../../roopa/renderer_registry/setup";
+import { linkToolRenderer } from "../registry_implementations/screen_level/tools/link_tool_renderer";
+import { registerScreenToolRendererType, screenToolRendererRegistry } from "./screen_level/tool_renderer_registry";
 
 export function setupMarkRegistry() {
     if (!markRendererRegistry.has(lassoMark.id)) {
@@ -63,6 +65,9 @@ export function setupToolRegistry() {
     }
     if (!whiteboardToolRendererRegistry.has(tldrawMarkWhiteboardTool.id.id)) {
         registerWhiteboardToolRendererType(tldrawMarkWhiteboardTool);
+    }
+    if (!screenToolRendererRegistry.has(linkToolRenderer.id.id)) {
+        registerScreenToolRendererType(linkToolRenderer);
     }
 }
 
