@@ -2,6 +2,7 @@ import { MarkDTO, SessionDTO } from '../../shared_doman_models_and_dtos/dtos';
 import { AppStateStore } from '../app_state_store';
 import { WhiteboardRepository } from '../storage/repositories/WhiteboardRepository';
 import { StateInitialValuesRepository } from '../storage/repositories/StateInitialValuesRepository';
+import { RoopaWorkspaceRepository } from '../storage/repositories/RoopaWorkspaceRepository';
 
 export interface QueryAPIInterface {
   getCurrentSession(): SessionDTO | null;
@@ -12,6 +13,9 @@ export interface QueryAPIInterface {
   getRecents(): Promise<any[]>;
   getLibraryPath(): Promise<string | null>;
   getBackupPath(): Promise<string | null>;
+    getWorkspaceLayout(id: string): Promise<any | null>;
+    getAllWorkspaces(): Promise<{id: string, name: string}[]>;
+    getAllStateDefaults(): Promise<any[]>;
 }
 
 /**
@@ -54,8 +58,22 @@ export function createQueryAPI(store: AppStateStore): QueryAPIInterface {
       return WhiteboardRepository.loadWhiteboard(markId);
     },
 
-    getSettings(): Promise<any> {
-      return StateInitialValuesRepository.getInitialValue('personalized', 'settings', ['global']);
+    async getSettings(): Promise<any> {
+      const defaultSplit = await StateInitialValuesRepository.getInitialValue('personalized', 'defaultSplit', ['global']);
+      const theme = await StateInitialValuesRepository.getInitialValue('personalized', 'theme', ['global']);
+      const autosaveMs = await StateInitialValuesRepository.getInitialValue('personalized', 'autosaveMs', ['global']);
+      const maxGlobalPdfTools = await StateInitialValuesRepository.getInitialValue('personalized', 'maxGlobalPdfTools', ['global']);
+      const defaultTool = await StateInitialValuesRepository.getInitialValue('personalized', 'defaultTool', ['global']);
+      const activeWorkspaceId = await StateInitialValuesRepository.getInitialValue('personalized', 'activeWorkspaceId', ['global']);
+
+      return {
+        defaultSplit,
+        theme,
+        autosaveMs,
+        maxGlobalPdfTools,
+        defaultTool,
+        activeWorkspaceId
+      };
     },
 
     getRecents(): Promise<any[]> {
@@ -68,6 +86,18 @@ export function createQueryAPI(store: AppStateStore): QueryAPIInterface {
 
     getBackupPath(): Promise<string | null> {
       return StateInitialValuesRepository.getInitialValue<string | null>('personalized', 'backupPath', ['global']);
+    },
+
+    getWorkspaceLayout(id: string): Promise<any | null> {
+      return RoopaWorkspaceRepository.getWorkspaceLayout(id);
+    },
+
+    getAllWorkspaces(): Promise<{id: string, name: string}[]> {
+      return RoopaWorkspaceRepository.getAllWorkspaces();
+    },
+
+    getAllStateDefaults(): Promise<any[]> {
+      return StateInitialValuesRepository.getAllDefaults();
     }
   };
 }

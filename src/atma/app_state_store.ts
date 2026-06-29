@@ -19,19 +19,7 @@ export interface AppState {
   slots: Record<string, SlotAppState>;
 }
 
-export const DEFAULT_APP_STATE: Omit<AppState, 'slots'> = {
-  workspace_layout: { screens: [] },
-  tool_config: {},
-  libraryPath: null,
-  leftPct: 50,
-};
 
-export const DEFAULT_SLOT_APP_STATE: Omit<SlotAppState, 'contentId' | 'contentType' | 'slotType' | 'marks'> = {
-  zoom: 1.0,
-  tool: 'select',
-  selectedMarkId: null,
-  scrollTop: 0,
-};
 
 export interface AppStateStore {
   getState(): AppState;
@@ -41,7 +29,10 @@ export interface AppStateStore {
 
 export function createAppStateStore(initialState?: Partial<AppState>): AppStateStore {
   let state: AppState = {
-    ...DEFAULT_APP_STATE,
+    workspace_layout: null,
+    tool_config: null,
+    libraryPath: null,
+    leftPct: 50, // This will be hydrated dynamically later
     slots: {},
     ...initialState
   };

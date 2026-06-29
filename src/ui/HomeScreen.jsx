@@ -467,7 +467,7 @@ export default function HomeScreen({ onOpen, uiController }) {
         </div>
       </div>
 
-      <SettingsPane open={settingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} onChange={handleSettingsChange} backupPath={backupPath} onSetBackupPath={handleSetBackupPath} showToast={showToast} onClearRecents={clearRecents} />
+      <SettingsPane open={settingsOpen} onClose={() => setSettingsOpen(false)} settings={settings} onChange={handleSettingsChange} backupPath={backupPath} onSetBackupPath={handleSetBackupPath} showToast={showToast} onClearRecents={clearRecents} uiController={uiController} />
       <AboutPanel open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </div>
   );

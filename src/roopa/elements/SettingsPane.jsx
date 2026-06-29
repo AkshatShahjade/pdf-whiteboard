@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { confirmDialog } from '../../atma/platform_adapter/switch.ts';
+import { SettingsCard } from './SettingsCard';
+import { ButtonFlat } from '../primitives/ButtonFlat';
 
 function HelpModal({ open, onClose }) {
   if (!open) return null;
@@ -10,7 +12,7 @@ function HelpModal({ open, onClose }) {
 
         <div style={{ padding: '20px 24px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ margin: 0, fontSize: '15px', color: '#f3f4f6', letterSpacing: '0.05em' }}>📘 LemmaMap Mechanics & Guide</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '18px' }}>✕</button>
+          <ButtonFlat label="✕" onClick={onClose} />
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '28px', color: '#d1d5db', fontSize: '12px', lineHeight: '1.6' }}>
@@ -62,7 +64,7 @@ function HelpModal({ open, onClose }) {
 
         </div>
         <div style={{ padding: '16px 24px', borderTop: '1px solid #374151', display: 'flex', justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ background: '#3B82F6', border: 'none', color: '#fff', cursor: 'pointer', padding: '8px 24px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}>Understood</button>
+          <ButtonFlat label="Understood" onClick={onClose} />
         </div>
       </div>
     </div>
@@ -83,10 +85,6 @@ const Field = ({ label, hint, children }) => (
 export function useSettingsPane(showToast, onClearRecents) {
   const [helpOpen, setHelpOpen] = useState(false);
 
-  const btnStyle = {
-    flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #374151', background: 'transparent', color: '#d1d5db', fontSize: '11px', cursor: 'pointer', fontFamily: "'IBM Plex Mono', monospace",
-  };
-
   const openHelp = () => setHelpOpen(true);
   const closeHelp = () => setHelpOpen(false);
 
@@ -105,7 +103,6 @@ export function useSettingsPane(showToast, onClearRecents) {
     helpOpen,
     openHelp,
     closeHelp,
-    btnStyle,
     handleExport,
     handleImport,
     handleRollingBackup,
@@ -113,81 +110,167 @@ export function useSettingsPane(showToast, onClearRecents) {
   };
 }
 
-export function SettingsPane({ open: isOpen, onClose, settings, onChange, backupPath, onSetBackupPath, showToast, onClearRecents }) {
+export function SettingsPane({ open: isOpen, onClose, settings, onChange, backupPath, onSetBackupPath, showToast, onClearRecents, uiController }) {
   const {
     helpOpen,
     openHelp,
     closeHelp,
-    btnStyle,
     handleExport,
     handleImport,
     handleRollingBackup,
     handleClearRecents,
   } = useSettingsPane(showToast, onClearRecents);
 
+  const [dbDefaults, setDbDefaults] = useState({});
+  const [schemaArray, setSchemaArray] = useState([]);
+  const [workspaces, setWorkspaces] = useState([]);
+
+  useEffect(() => {
+     async function loadDefaults() {
+         try {
+             const { stateSchemaRegistry } = await import('../../atma/storage/state_schema_registry');
+             const schemas = Object.values(stateSchemaRegistry).filter(s => s.classification !== 'volatile');
+             
+             const { queryAPI } = await import('../../atma/singletons');
+             const rows = await queryAPI.getAllStateDefaults();
+             const ws = await queryAPI.getAllWorkspaces();
+             setWorkspaces(ws);
+             
+             const classOverridesRow = rows.find(r => r.key === '_classification_overrides' && r.scope === 'global');
+             const classOverrides = classOverridesRow ? classOverridesRow.value : {};
+
+             const defaultsMap = {};
+             for (const row of rows) {
+                 if (row.key === '_classification_overrides') continue;
+                 if (!defaultsMap[row.key]) defaultsMap[row.key] = [];
+                 defaultsMap[row.key].push({ scope: row.scope, value: row.value, hash: row.hash });
+             }
+             
+             // Attach classification overrides
+             const enrichedSchemas = schemas.map(schema => ({
+                 ...schema,
+                 classification: classOverrides[schema.key] || schema.classification
+             }));
+
+             setSchemaArray(enrichedSchemas);
+             setDbDefaults(defaultsMap);
+         } catch (err) {
+             console.error("Failed to load DB defaults:", err);
+         }
+     }
+     if (isOpen) {
+         loadDefaults();
+     }
+  }, [isOpen]);
+
+  const handleUpdateDefault = async (key, scope, val) => {
+      if (uiController) {
+          await uiController.updateDefaultValue(key, scope, val);
+          
+          setDbDefaults(prev => {
+              const next = { ...prev };
+              if (!next[key]) next[key] = [];
+              const idx = next[key].findIndex(d => d.scope === scope);
+              if (idx >= 0) {
+                  next[key][idx] = { ...next[key][idx], value: val };
+              } else {
+                  next[key].push({ scope, value: val, hash: '' });
+              }
+              return next;
+          });
+      }
+  };
+
+  const handleDeleteDefault = async (key, scope) => {
+      try {
+          if (uiController) {
+              await uiController.deleteDefaultValue(key, scope);
+          }
+          setDbDefaults(prev => {
+              const next = { ...prev };
+              if (next[key]) {
+                  next[key] = next[key].filter(d => d.scope !== scope);
+              }
+              return next;
+          });
+      } catch (err) {}
+  };
+
+  const handleUpdateClassification = async (key, cls) => {
+      if (uiController) {
+          await uiController.updateClassification(key, cls);
+          setSchemaArray(prev => prev.map(s => s.key === key ? { ...s, classification: cls } : s));
+      }
+  };
+
   return (
     <>
       {isOpen && <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 90, backdropFilter: 'blur(4px)' }} />}
-      <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: '340px', background: '#252932', borderLeft: '1px solid #374151', zIndex: 100, transform: isOpen ? 'translateX(0)' : 'translateX(100%)', transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)', display: 'flex', flexDirection: 'column', fontFamily: "'IBM Plex Mono', monospace", boxShadow: '-10px 0 30px rgba(0,0,0,0.3)' }}>
+      <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: '480px', background: '#252932', borderLeft: '1px solid #374151', zIndex: 100, transform: isOpen ? 'translateX(0)' : 'translateX(100%)', transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)', display: 'flex', flexDirection: 'column', fontFamily: "'IBM Plex Mono', monospace", boxShadow: '-10px 0 30px rgba(0,0,0,0.3)' }}>
 
         <div style={{ padding: '20px 24px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '13px', fontWeight: '600', color: '#f3f4f6', letterSpacing: '0.05em' }}>SETTINGS</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+          <ButtonFlat label="✕" onClick={onClose} />
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <Field label="Default split" hint={`${settings.defaultSplit}%`}>
-            <input type="range" min="20" max="80" step="5" value={settings.defaultSplit} onChange={(e) => onChange({ ...settings, defaultSplit: +e.target.value })} style={{ width: '100%', accentColor: '#3B82F6' }} />
-          </Field>
-          <Field label="Autosave delay" hint={`${settings.autosaveMs}ms`}>
-            <input type="range" min="200" max="2000" step="100" value={settings.autosaveMs} onChange={(e) => onChange({ ...settings, autosaveMs: +e.target.value })} style={{ width: '100%', accentColor: '#3B82F6' }} />
-          </Field>
-          <Field label="Max shortcut tools" hint={`${settings.maxGlobalPdfTools}`}>
-            <input type="range" min="1" max="12" step="1" value={settings.maxGlobalPdfTools} onChange={(e) => onChange({ ...settings, maxGlobalPdfTools: +e.target.value })} style={{ width: '100%', accentColor: '#3B82F6' }} />
-          </Field>
-          <Field label="Default Tool">
-            <select
-              value={settings.defaultTool}
-              onChange={(e) => onChange({ ...settings, defaultTool: e.target.value })}
-              style={{ width: '100%', background: '#1c1f26', border: '1px solid #4b5563', color: '#e5e7eb', padding: '8px', borderRadius: '6px', fontSize: '12px', outline: 'none', fontFamily: 'inherit' }}
-            >
-              <option value="select">Select</option>
-              <option value="draw">Draw (Pencil)</option>
-              <option value="handwriting">Handwriting</option>
-              <option value="eraser">Eraser</option>
-              <option value="arrow">Arrow</option>
-              <option value="text">Text</option>
-              <option value="note">Sticky Note</option>
-            </select>
-          </Field>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '11px', color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '4px' }}>State Variables (Layer 2)</span>
+              {schemaArray.map(schema => (
+                  <SettingsCard 
+                      key={schema.key}
+                      schema={schema}
+                      currentClassification={schema.classification}
+                      scopedDefaults={dbDefaults[schema.key] || []}
+                      onUpdateDefault={handleUpdateDefault}
+                      onUpdateClassification={handleUpdateClassification}
+                      onDeleteDefault={handleDeleteDefault}
+                  />
+              ))}
+          </div>
 
           <div style={{ borderTop: '1px solid #374151', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <span style={{ fontSize: '11px', color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Auto Backup</span>
-            <button onClick={onSetBackupPath} style={{ ...btnStyle, textAlign: 'left', borderColor: backupPath ? '#3B82F6' : '#374151' }}>
-              📁 {backupPath ? 'Change Backup Folder' : 'Set Backup Folder'}
-            </button>
+            <ButtonFlat label={backupPath ? 'Change Backup Folder' : 'Set Backup Folder'} icon="📁" onClick={onSetBackupPath} />
             {backupPath && (
               <span style={{ fontSize: '10px', color: '#9ca3af', wordBreak: 'break-all' }}>{backupPath}</span>
             )}
-            <button onClick={handleRollingBackup} style={{ ...btnStyle, background: 'rgba(59,130,246,0.1)', color: '#93C5FD', borderColor: '#3B82F6' }}>
-              Create Rolling Backup Now
-            </button>
+            <ButtonFlat label="Create Rolling Backup Now" onClick={handleRollingBackup} />
           </div>
 
           <div style={{ borderTop: '1px solid #374151', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <span style={{ fontSize: '11px', color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Data Export/Import</span>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={handleExport} style={btnStyle}>Export JSON</button>
-              <button onClick={handleImport} style={btnStyle}>Import JSON</button>
+              <ButtonFlat label="Export JSON" onClick={handleExport} />
+              <ButtonFlat label="Import JSON" onClick={handleImport} />
             </div>
-            <button onClick={handleClearRecents} style={{ ...btnStyle, color: '#F87171', borderColor: 'rgba(248, 113, 113, 0.3)' }}>Clear Recent Files</button>
+            <ButtonFlat label="Clear Recent Files" onClick={handleClearRecents} />
+          </div>
+
+          <div style={{ borderTop: '1px solid #374151', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <span style={{ fontSize: '11px', color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Workspace Selector</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {workspaces.map(ws => (
+                  <ButtonFlat 
+                      key={ws.id} 
+                      label={ws.name} 
+                      icon={settings?.activeWorkspaceId === ws.id ? '✓' : '◦'} 
+                      onClick={() => {
+                          if (uiController) {
+                              uiController.updateDefaultValue('activeWorkspaceId', 'global', ws.id);
+                          }
+                          if (onChange) {
+                              onChange({ ...settings, activeWorkspaceId: ws.id });
+                          }
+                      }} 
+                  />
+              ))}
+            </div>
           </div>
 
           <div style={{ borderTop: '1px solid #374151', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <span style={{ fontSize: '11px', color: '#9ca3af', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Help & Guide</span>
-            <button onClick={openHelp} style={{ ...btnStyle, background: 'rgba(16, 185, 129, 0.1)', color: '#34D399', borderColor: '#10B981' }}>
-              📖 View Mechanics & Shortcuts
-            </button>
+            <ButtonFlat label="View Mechanics & Shortcuts" icon="📖" onClick={openHelp} />
           </div>
         </div>
         <div style={{ padding: '16px 24px', borderTop: '1px solid #374151' }}><span style={{ fontSize: '10px', color: '#6b7280' }}>LemmaMap · local build</span></div>

@@ -28,27 +28,37 @@ async function initializeDatabaseIfEmpty(db: Database) {
     if (result.length === 0) {
         console.log('[tauri_sqlite] Database is empty or missing core tables. Executing schema commands...');
         
-        // Remove SQL comments (anything starting with -- until the end of the line)
-        const cleanSchema = SCHEMA_SQL.replace(/--.*$/gm, '');
-        
-        // Split the schema by semicolon into individual commands,
-        // and remove newlines to prevent Tauri from misinterpreting them.
-        const statements = cleanSchema.split(';')
-            .map(s => s.replace(/\s+/g, ' ').trim())
-            .filter(s => s.length > 0)
-            .map(s => s+';')
-            
-        for (let i = 0; i < statements.length; i++) {
-            const stmt = statements[i];
-            console.log(`[tauri_sqlite] Executing statement ${i + 1}/${statements.length}:`, stmt.substring(0, 40) + '...');
-            await db.execute(stmt);
-        }
-        console.log('[tauri_sqlite] Database schema initialization complete!');
-        
-        await runSeeds(db);
+        try {
+            await db.execute('BEGIN TRANSACTION;');
 
-        // Seed the default state variables
-        await initializeStateDefaults(true, initAdapter);
+            // Remove SQL comments (anything starting with -- until the end of the line)
+            const cleanSchema = SCHEMA_SQL.replace(/--.*$/gm, '');
+            
+            // Split the schema by semicolon into individual commands,
+            // and remove newlines to prevent Tauri from misinterpreting them.
+            const statements = cleanSchema.split(';')
+                .map(s => s.replace(/\s+/g, ' ').trim())
+                .filter(s => s.length > 0)
+                .map(s => s+';')
+                
+            for (let i = 0; i < statements.length; i++) {
+                const stmt = statements[i];
+                console.log(`[tauri_sqlite] Executing statement ${i + 1}/${statements.length}:`, stmt.substring(0, 40) + '...');
+                await db.execute(stmt);
+            }
+            console.log('[tauri_sqlite] Database schema initialization complete!');
+            
+            await runSeeds(db);
+
+            // Seed the default state variables
+            await initializeStateDefaults(true, initAdapter);
+
+            await db.execute('COMMIT;');
+        } catch (e) {
+            console.error('[tauri_sqlite] Initialization failed, rolling back!', e);
+            await db.execute('ROLLBACK;');
+            throw e;
+        }
     } else {
         console.log('[tauri_sqlite] Database already initialized. Ensuring missing defaults are seeded...');
         
@@ -70,6 +80,17 @@ async function runSeeds(db: Database) {
         const stmt = statements[i];
         console.log(`[tauri_sqlite] Executing seed ${i + 1}/${statements.length}:`, stmt.substring(0, 40) + '...');
         await db.execute(stmt);
+    }
+
+    // Seed the temporary Roopa layout
+    console.log('[tauri_sqlite] Seeding temporary Roopa layout...');
+    const result = await db.select<{id: string}[]>("SELECT id FROM ROOPA_WORKSPACES WHERE id = 'default_workspace'");
+    if (result.length === 0) {
+        const { TEMPORARY_ROOPA_LAYOUT } = await import('../../../roopa/temporary_layout');
+        await db.execute(
+            "INSERT INTO ROOPA_WORKSPACES (id, name, layout_json) VALUES (?, ?, ?)",
+            [TEMPORARY_ROOPA_LAYOUT.workspaceId, TEMPORARY_ROOPA_LAYOUT.name, JSON.stringify(TEMPORARY_ROOPA_LAYOUT)]
+        );
     }
 }
 

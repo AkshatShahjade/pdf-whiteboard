@@ -40,6 +40,8 @@ export interface UIController {
     saveBackupPath: (backupPath: string | null) => Promise<void>;
     saveWhiteboardSnapshot: (markId: string, snapshot: any, slotId?: string) => void;
     flushSession: () => void;
+    updateDefaultValue: (key: string, scope: string, value: any) => Promise<void>;
+    updateClassification: (key: string, classification: 'personalizable' | 'defaulted') => Promise<void>;
 }
 
 /**
@@ -258,6 +260,15 @@ export function createUIController(store: UIStateStore, onHomeCallback?: () => v
         },
         flushSession: () => {
             inputAPI.flushSession();
+        },
+        updateDefaultValue: async (key, scope, value) => {
+            await inputAPI.updateDefaultValue(key, scope, value);
+        },
+        deleteDefaultValue: async (key, scope) => {
+            await inputAPI.deleteDefaultValue(key, scope);
+        },
+        updateClassification: async (key, classification) => {
+            await inputAPI.updateClassification(key, classification);
         },
 
         // ─── OutputAPI Event Subscriptions (Read/Event Path) ──────────────────────

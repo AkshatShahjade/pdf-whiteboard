@@ -22,7 +22,10 @@ export interface InputAPIInterface {
   saveBackupPath(backupPath: string | null): Promise<void>;
   updateZoom(slotId: string, zoom: number): void;
   updateTool(slotId: string, tool: string): void;
-  updateSlotState(slotId: string, key: string, val: any): void;
+    updateSlotState(slotId: string, key: string, val: any): void;
+    updateDefaultValue(key: string, scope: string, value: any): Promise<void>;
+    deleteDefaultValue(key: string, scope: string): Promise<void>;
+    updateClassification(key: string, classification: 'personalizable' | 'defaulted'): Promise<void>;
 }
 
 /**
@@ -78,7 +81,11 @@ export function createInputAPI(
     },
 
     async saveSettings(settings: any): Promise<void> {
-      await StateInitialValuesRepository.setSpecificValue('settings', ['global'], settings);
+      await StateInitialValuesRepository.setSpecificValue('defaultSplit', ['global'], settings.defaultSplit);
+      await StateInitialValuesRepository.setSpecificValue('theme', ['global'], settings.theme);
+      await StateInitialValuesRepository.setSpecificValue('autosaveMs', ['global'], settings.autosaveMs);
+      await StateInitialValuesRepository.setSpecificValue('maxGlobalPdfTools', ['global'], settings.maxGlobalPdfTools);
+      await StateInitialValuesRepository.setSpecificValue('defaultTool', ['global'], settings.defaultTool);
     },
 
     async saveRecents(recents: any[]): Promise<void> {
@@ -115,6 +122,45 @@ export function createInputAPI(
           (draft.slots[slotId] as any)[key] = val;
         }
       });
+    },
+
+    async updateDefaultValue(key: string, scope: string, value: any): Promise<void> {
+      const { StateInitialValuesRepository } = await import('../storage/repositories/StateInitialValuesRepository');
+      await StateInitialValuesRepository.setDefaultValue(key, scope, value, 'defaulted');
+    },
+
+    async deleteDefaultValue(key: string, scope: string): Promise<void> {
+      const { StateInitialValuesRepository } = await import('../storage/repositories/StateInitialValuesRepository');
+      await StateInitialValuesRepository.deleteDefault(key, scope);
+    },
+
+    async updateClassification(key: string, classification: 'personalizable' | 'defaulted'): Promise<void> {
+      // 1. Update the in-memory schema registry
+      const { stateSchemaRegistry } = await import('../storage/state_schema_registry');
+      if (stateSchemaRegistry[key]) {
+          stateSchemaRegistry[key].classification = classification;
+      }
+      
+      // 2. Persist the override
+      const { StateInitialValuesRepository } = await import('../storage/repositories/StateInitialValuesRepository');
+      let overrides: Record<string, string> = {};
+      try {
+          const overridesStr = await StateInitialValuesRepository.getInitialValue<Record<string, string>>('defaulted', '_classification_overrides', ['global']);
+          if (overridesStr) overrides = overridesStr;
+      } catch (err) {
+          // It's perfectly fine if the base default doesn't exist yet, it just means we have no overrides.
+      }
+      
+      overrides[key] = classification;
+      
+      // IMPORTANT: setDefaultValue requires a 4th argument: type ('personalizable' | 'defaulted')
+      await StateInitialValuesRepository.setDefaultValue('_classification_overrides', 'global', overrides, 'defaulted');
+      
+      // 3. If downgraded to defaulted, purge all specific values
+      if (classification === 'defaulted') {
+          const { purgeDowngradedClassification } = await import('../storage/garbage_collector');
+          await purgeDowngradedClassification(key);
+      }
     }
   };
 }

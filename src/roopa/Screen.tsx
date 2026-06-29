@@ -1,157 +1,132 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { UIState } from '../ui/ui_state_store'
-import { UIController } from '../ui/ui_controller'
-import { getSlotRendererType } from './renderer_registry/slot_renderer_registry'
-import {
-    SlotConfig,
-    ScreenArrangementFn,
-    LayoutState,
-    reactGridArrangement,
-} from './screen_arrangement'
-
-const MIN_SPLIT_PCT = 15
-const MAX_SPLIT_PCT = 85
+import React, { useState, useEffect } from 'react';
+import { UIState } from '../ui/ui_state_store';
+import { UIController } from '../ui/ui_controller';
+import { getSlotRendererType } from './renderer_registry/slot_renderer_registry';
+import { DualSplitPane } from './elements/DualSplitPane';
 
 export interface ScreenProps {
-    slots: SlotConfig[]
-    uiState: UIState
-    uiController: UIController
-    settings?: any
-    onHome?: () => void
-    arrangement?: ScreenArrangementFn
-    initialSplitPct?: number
+    uiState: UIState;
+    uiController: UIController;
+    settings?: any;
+    onHome?: () => void;
+    workspaceId?: string;
+}
+
+/**
+ * Recursive layout renderer that traverses the Roopa config tree
+ * and maps layout nodes to structural React components.
+ */
+function RoopaLayoutRenderer({ node, uiState, uiController, settings, onHome }: any) {
+    if (!node) return null;
+
+    if (node.type === 'DualSplitPane') {
+        // Resolve split percentage from global UI State
+        const splitPct = (uiState as any)[node.splitPctStateKey] ?? 50;
+        
+        const onSplitPctChange = (pct: number) => {
+            // For now, statically bind leftPct. We will extend uiController later for dynamic keys.
+            if (node.splitPctStateKey === 'leftPct') {
+                uiController.setLeftPct(pct);
+            }
+        };
+
+        return (
+            <DualSplitPane 
+                direction={node.direction} 
+                splitPct={splitPct} 
+                onSplitPctChange={onSplitPctChange}
+            >
+                {node.children.map((child: any, i: number) => 
+                    RoopaLayoutRenderer({ key: i, node: child, uiState, uiController, settings, onHome })
+                )}
+            </DualSplitPane>
+        );
+    }
+    
+    if (node.type === 'Slot') {
+        const slotState = (uiState as any).slots?.[node.slotId];
+        const hasContent = !!(slotState && slotState.contentId && slotState.contentType);
+
+        if (!hasContent) {
+            return null;
+        }
+
+        const SlotComponent = getSlotRendererType(node.slotType).Component;
+        return (
+            <div 
+                style={{ width: '100%', height: '100%' }}
+                onMouseEnter={() => uiController.setActiveSlot(node.slotId)}
+            >
+                <SlotComponent
+                    slotId={node.slotId}
+                    uiState={uiState}
+                    uiController={uiController}
+                    settings={settings}
+                    onHome={onHome}
+                />
+            </div>
+        );
+    }
+
+    return null;
 }
 
 /**
  * Screen — the top-level workspace layout component.
  *
- * It holds resize state internally (Option B) and delegates the layout
- * calculation to the injected arrangement function (defaulting to
- * reactGridArrangement). It is otherwise fully content-agnostic: it maps
- * each SlotConfig to a SlotRenderer from the slot registry and positions it
- * according to the layout.
- *
- * Screen knows nothing about PDF, whiteboards, marks, or tools.
+ * Fetches the active layout config from SQLite and dynamically renders
+ * the layout tree. Screen knows nothing about PDF, whiteboards, or marks.
  */
 export default function Screen({
-    slots,
     uiState,
     uiController,
     settings,
     onHome,
-    arrangement = reactGridArrangement,
-    initialSplitPct = 50,
+    workspaceId = 'default_workspace',
 }: ScreenProps) {
-    const containerRef = useRef<HTMLDivElement>(null)
-    const [splitPct, setSplitPct] = useState(initialSplitPct)
-    const [isResizing, setIsResizing] = useState(false)
-
-    const layoutState: LayoutState = { splitPct }
-    const layout = arrangement(slots, layoutState)
-
-    // Drag-to-resize divider logic
-    const startResize = useCallback((e: React.MouseEvent) => {
-        e.preventDefault()
-        setIsResizing(true)
-    }, [])
+    const [layoutConfig, setLayoutConfig] = useState<any>(null);
 
     useEffect(() => {
-        if (!isResizing) return
-
-        const onMove = (e: MouseEvent) => {
-            if (!containerRef.current) return
-            const rect = containerRef.current.getBoundingClientRect()
-            const rawPct = ((e.clientX - rect.left) / rect.width) * 100
-            setSplitPct(Math.max(MIN_SPLIT_PCT, Math.min(MAX_SPLIT_PCT, rawPct)))
+        let active = true;
+        async function fetchLayout() {
+            try {
+                // Ensure singletons are imported so we can use queryAPI
+                const { queryAPI } = await import('../atma/singletons');
+                const result = await queryAPI.getWorkspaceLayout(workspaceId);
+                
+                if (active) {
+                    if (result) {
+                        setLayoutConfig(result);
+                    } else {
+                        const { TEMPORARY_ROOPA_LAYOUT } = await import('./temporary_layout');
+                        setLayoutConfig(TEMPORARY_ROOPA_LAYOUT);
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to fetch layout config:", err);
+                if (active) {
+                    const { TEMPORARY_ROOPA_LAYOUT } = await import('./temporary_layout');
+                    setLayoutConfig(TEMPORARY_ROOPA_LAYOUT);
+                }
+            }
         }
+        fetchLayout();
+        return () => { active = false; };
+    }, [workspaceId]);
 
-        const onUp = () => setIsResizing(false)
+    if (!layoutConfig) return null;
 
-        window.addEventListener('mousemove', onMove)
-        window.addEventListener('mouseup', onUp)
-        return () => {
-            window.removeEventListener('mousemove', onMove)
-            window.removeEventListener('mouseup', onUp)
-        }
-    }, [isResizing])
-
-    // Sync splitPct back to the uiController so it can be persisted if needed
-    useEffect(() => {
-        if (!isResizing) return
-        uiController.setLeftPct(splitPct)
-    }, [splitPct, isResizing, uiController])
-
-    // Keep splitPct in sync when uiState.leftPct changes externally (e.g. SESSION_LOADED)
-    useEffect(() => {
-        if (uiState.leftPct !== undefined && !isResizing) {
-            setSplitPct(uiState.leftPct)
-        }
-    }, [uiState.leftPct]) // intentionally omit isResizing — only sync on external changes
+    const activeScreen = layoutConfig.screens.find((s: any) => s.screenId === layoutConfig.activeScreenId) || layoutConfig.screens[0];
 
     return (
-        <div
-            ref={containerRef}
-            style={{
-                width: '100%',
-                height: '100%',
-                position: 'relative',
-                overflow: 'hidden',
-                userSelect: isResizing ? 'none' : 'auto',
-            }}
-        >
-            {slots.map((slot, idx) => {
-                const position = layout.positions[slot.id]
-                if (!position) return null
-
-                const SlotComponent = getSlotRendererType(slot.slotType).Component
-                const isNotLast = idx < slots.length - 1
-
-                return (
-                    <React.Fragment key={slot.id}>
-                        <div
-                            onMouseEnter={() => uiController.setActiveSlot(slot.id)}
-                            style={{
-                                position: 'absolute',
-                                left: position.left,
-                                top: position.top,
-                                width: position.width,
-                                height: position.height,
-                                transition: isResizing ? 'none' : 'left 0.3s cubic-bezier(0.4,0,0.2,1), width 0.3s cubic-bezier(0.4,0,0.2,1)',
-                                overflow: 'hidden',
-                            }}
-                        >
-                            <SlotComponent
-                                slotId={slot.id}
-                                uiState={uiState}
-                                uiController={uiController}
-                                settings={settings}
-                                onHome={onHome}
-                            />
-                        </div>
-
-                        {/* Drag-to-resize divider between adjacent slots */}
-                        {slots.length > 1 && isNotLast && (
-                            <div
-                                onMouseDown={startResize}
-                                style={{
-                                    position: 'absolute',
-                                    left: position.width,  // right edge of this slot
-                                    top: 0,
-                                    width: '6px',
-                                    height: '100%',
-                                    cursor: 'col-resize',
-                                    zIndex: 20,
-                                    background: isResizing ? '#3B82F6' : '#262a33',
-                                    borderLeft: '1px solid #374151',
-                                    borderRight: '1px solid #374151',
-                                    transition: isResizing ? 'none' : 'background 0.2s',
-                                    transform: 'translateX(-50%)',
-                                }}
-                            />
-                        )}
-                    </React.Fragment>
-                )
-            })}
+        <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+             <RoopaLayoutRenderer 
+                 node={activeScreen.layout} 
+                 uiState={uiState} 
+                 uiController={uiController} 
+                 settings={settings} 
+                 onHome={onHome} 
+             />
         </div>
-    )
+    );
 }

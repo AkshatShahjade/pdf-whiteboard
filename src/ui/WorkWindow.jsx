@@ -5,12 +5,12 @@ import { createUIStateStore } from './ui_state_store';
 import { createUIController } from './ui_controller';
 import { useUIState } from './useUIState';
 import { queryAPI } from '../atma/singletons';
-import { DEFAULT_APP_STATE } from '../atma/app_state_store';
 import { getContentRendererType } from './renderer_registry/content_renderer_registry';
 import { setupAllRegistries } from './renderer_registry/setup';
 import Screen from '../roopa/Screen';
 import { WorkspaceHeader } from '../roopa/elements/WorkspaceHeader';
 import { ScreenToolbar } from '../roopa/elements/ScreenToolbar';
+import { TriggerZone } from '../roopa/layout/TriggerZone';
 
 setupAllRegistries(); //TODO, find proper place
 
@@ -29,7 +29,6 @@ export default function Root() {
 
   const uiStore = useMemo(() => {
     return createUIStateStore({
-      ...DEFAULT_APP_STATE,
       activeSlot: 'left',
       slots: {}
     });
@@ -76,7 +75,6 @@ export default function Root() {
 // ─── WorkspaceContainer ─────────────────────────────────────────────────────────────
 function WorkspaceContainer({ contentId, contentType, contentName, settings, onHome, uiStore, uiController }) {
   const uiState = useUIState(uiStore);
-  const [headerVisible, setHeaderVisible] = useState(false);
   const lastSavedAt = null;
 
   const showToast = useCallback((msg, type = 'info') => {
@@ -104,19 +102,8 @@ function WorkspaceContainer({ contentId, contentType, contentName, settings, onH
 
   // Derive active slot configs from uiState — only slots with content are shown.
   // Order: 'left' first, then any additional slots (e.g. 'right').
-  const slotConfigs = useMemo(() => {
-    const activeSlots = [];
-    const slotEntries = uiState.slots || {};
-    // Ensure 'left' comes first, then remaining slots in insertion order
-    const orderedIds = ['left', ...Object.keys(slotEntries).filter(id => id !== 'left')];
-    for (const id of orderedIds) {
-      const slot = slotEntries[id];
-      if (slot?.contentType && slot?.slotType && slot?.contentId) {
-        activeSlots.push({ id, slotType: slot.slotType });
-      }
-    }
-    return activeSlots;
-  }, [uiState.slots]);
+  // NOTE: Screen now renders slots dynamically based on ROOPA_WORKSPACES configuration,
+  // so we no longer need to pass slotConfigs here.
 
   return (
     <div style={{ width: '100%', height: '100vh', background: '#1c1f26', fontFamily: "'IBM Plex Mono', monospace", position: 'relative', overflow: 'hidden' }}>
@@ -142,26 +129,36 @@ function WorkspaceContainer({ contentId, contentType, contentName, settings, onH
         </div>
       )}
 
-      <WorkspaceHeader
-        title={contentName || decodeURIComponent(contentId).split(/[/\\]/).pop()}
-        onHome={onHome}
-        onBackup={handleBackup}
-        savedAt={lastSavedAt}
-        headerVisible={headerVisible}
-        setHeaderVisible={setHeaderVisible}
-        uiStore={uiStore}
+      <TriggerZone 
+        position="top" 
+        style={{ left: '50%', transform: 'translateX(-50%)' }}
+        innerElement={
+          <WorkspaceHeader
+            title={contentName || decodeURIComponent(contentId).split(/[/\\]/).pop()}
+            onHome={onHome}
+            onBackup={handleBackup}
+            savedAt={lastSavedAt}
+            uiStore={uiStore}
+          />
+        }
       />
 
       {/* Screen: layout and slot rendering fully delegated to roopa/Screen */}
       <Screen
-        slots={slotConfigs}
         uiState={uiState}
         uiController={uiController}
         settings={settings}
         onHome={onHome}
-        initialSplitPct={uiState.leftPct ?? 50}
+        workspaceId={settings?.activeWorkspaceId}
       />
-      <ScreenToolbar uiState={uiState} uiController={uiController} uiStore={uiStore} />
+      
+      <TriggerZone
+        position="bottom"
+        style={{ left: '50%', transform: 'translateX(-50%)' }}
+        innerElement={
+          <ScreenToolbar uiState={uiState} uiController={uiController} uiStore={uiStore} />
+        }
+      />
     </div>
   );
 }

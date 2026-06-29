@@ -8,23 +8,44 @@ import { SessionDTO } from '../../shared_doman_models_and_dtos/dtos';
 import { getContentDomainType, createDefaultSlotState } from '../capabilities_registry/content_domain_registry';
 import { WhiteboardRepository } from '../storage/repositories/WhiteboardRepository';
 
-export function debounce(fn: Function, ms: number) {
+import { getSchema } from '../storage/state_schema_registry';
+import { hydrateStateCache, resolveStateValue, StateVariableContext } from '../storage/resolve_state_initial_value';
+
+export function debounce(fn: Function, ms: number, maxWait: number = 5000) {
   let timer: any = null;
   let lastArgs: any[] | null = null;
+  let firstCallTime: number | null = null;
   
   const debounced = (...args: any[]) => {
     lastArgs = args;
+    const now = Date.now();
+    
+    if (firstCallTime === null) {
+      firstCallTime = now;
+    }
+    
+    const timeElapsed = now - firstCallTime;
     clearTimeout(timer);
-    timer = setTimeout(() => {
+    
+    if (timeElapsed >= maxWait) {
       fn(...args);
       lastArgs = null;
+      firstCallTime = null;
       timer = null;
-    }, ms);
+    } else {
+      timer = setTimeout(() => {
+        fn(...args);
+        lastArgs = null;
+        firstCallTime = null;
+        timer = null;
+      }, ms);
+    }
   };
 
   debounced.flush = (...args: any[]) => {
     clearTimeout(timer);
     timer = null;
+    firstCallTime = null;
     if (args.length > 0) {
       fn(...args);
     } else if (lastArgs) {
@@ -35,9 +56,6 @@ export function debounce(fn: Function, ms: number) {
 
   return debounced;
 }
-
-// We will asynchronously fetch the types of all state keys from the database
-let keyTypes: Record<string, string> = {};
 
 export const stateSyncService = {
   
@@ -56,30 +74,24 @@ export const stateSyncService = {
   startSubscriber(store: AppStateStore, output: OutputAPIInterface) {
     let prevState = store.getState();
 
-    // Fire and forget fetch of key types. 
-    // This will definitely finish before the user's first 600ms debounced persist.
-    StateInitialValuesRepository.getAllKeyTypes()
-      .then(types => { keyTypes = types; })
-      .catch(console.error);
-
     const persistFlat = debounce(async (changedKeys: (keyof AppState)[], newState: AppState) => {
       for (const key of changedKeys) {
         if (key === 'slots') continue; // Handled separately
 
-        const type = keyTypes[key as string];
-        if (type === 'personalizable') {
+        const schema = getSchema(key as string);
+        if (schema && schema.classification === 'personalizable') {
           try {
              const val = newState[key];
-             const scope = ['global']; // Flat state is global for now
+             const scope = ['global']; // Flat state is globally scoped
              await StateInitialValuesRepository.setSpecificValue(key as string, scope, val);
           } catch (err) {
              console.error(`[StateSyncService] Failed to persist ${key}:`, err);
           }
         }
       }
-    }, 600);
+    }, 600, 5000);
 
-    const pendingSlotUpdates = new Map<string, { contentId: string; key: string; val: any }>();
+    const pendingSlotUpdates = new Map<string, { slotId: string, contentId: string; key: string; val: any }>();
 
     const persistSlotUpdates = debounce(async () => {
       if (pendingSlotUpdates.size === 0) return;
@@ -88,17 +100,26 @@ export const stateSyncService = {
       pendingSlotUpdates.clear();
 
       for (const update of updates) {
-        const type = keyTypes[update.key];
-        if (type === 'personalizable') {
+        const schema = getSchema(update.key);
+        if (schema && schema.classification === 'personalizable') {
           try {
-             const scope = ['doc:' + update.contentId, 'global'];
-             await StateInitialValuesRepository.setSpecificValue(update.key, scope, update.val);
+             let targetScope = '';
+             if (schema.cascade_path === 'content_tree') {
+                 targetScope = 'content:' + update.contentId;
+             } else if (schema.cascade_path === 'slot_tree') {
+                 targetScope = 'slot:' + update.slotId;
+             }
+             
+             if (targetScope) {
+                 const scopeArray = [targetScope, 'global'];
+                 await StateInitialValuesRepository.setSpecificValue(update.key, scopeArray, update.val);
+             }
           } catch (err) {
              console.error(`[StateSyncService] Failed to persist slot key ${update.key}:`, err);
           }
         }
       }
-    }, 600);
+    }, 600, 5000);
 
     this._flushPersist = () => {
       persistFlat.flush();
@@ -140,7 +161,8 @@ export const stateSyncService = {
           if ((slot as any)[key] !== prevSlot[key]) {
              slotsChanged = true;
              slotDelta[key] = (slot as any)[key];
-             pendingSlotUpdates.set(`${slot.contentId}:${key}`, {
+             pendingSlotUpdates.set(`${slotId}:${slot.contentId}:${key}`, {
+               slotId,
                contentId: slot.contentId,
                key,
                val: (slot as any)[key]
@@ -198,13 +220,29 @@ export const stateSyncService = {
       // Ensure the content is registered in the DB before we do any relational writing (like marks)
       await ContentRepository.ensureContentExists(contentId, 'core.' + contentType, filePath);
 
-      // Load individual keys via cascading scopes
-      const docScope = ['doc:' + contentId, 'global'];
-      const leftPct = await StateInitialValuesRepository.getInitialValue('personalized', 'leftPct', docScope);
-      const selectedMarkId = await StateInitialValuesRepository.getInitialValue('personalized', 'selectedMarkId', docScope);
-      const scrollTop = await StateInitialValuesRepository.getInitialValue('personalized', 'scrollTop', docScope);
-      const zoom = await StateInitialValuesRepository.getInitialValue('personalized', 'zoom', docScope);
-      const tool = await StateInitialValuesRepository.getInitialValue('personalized', 'tool', docScope);
+      // Hydrate the StateCache for this slot and content
+      const activeScopes = [
+          'global', 
+          `slot:${slotId}`, 
+          `slotType:verticalPane`,
+          `content:${contentId}`, 
+          `contentType:${contentType}`
+      ];
+      
+      const stateCache = await hydrateStateCache(activeScopes);
+      const context: StateVariableContext = {
+          slotId,
+          slotType: 'verticalPane',
+          contentId,
+          contentType
+      };
+
+      // Load individual keys via cascading scopes (Synchronous!)
+      const leftPct = resolveStateValue('leftPct', context, stateCache);
+      const selectedMarkId = resolveStateValue('selectedMarkId', context, stateCache);
+      const scrollTop = resolveStateValue('scrollTop', context, stateCache);
+      const zoom = resolveStateValue('zoom', context, stateCache);
+      const tool = resolveStateValue('tool', context, stateCache);
       
       // Marks are still stored in MARKS table as they are relational data, not 4-layer state presets
       const rawMarks = await MarkRepository.loadMarksByContentId(contentId);

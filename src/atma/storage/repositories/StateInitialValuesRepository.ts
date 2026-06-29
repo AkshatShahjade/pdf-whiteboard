@@ -116,6 +116,26 @@ export const StateInitialValuesRepository = {
         );
     },
 
+    async getAllDefaults(): Promise<{key: string, scope: string, value: any, hash: string}[]> {
+        const rows = await tauriSqlAdapter.select<{key: string, scope: string, value_json: string, value_hash: string}[]>(
+            `SELECT key, scope, value_json, value_hash FROM DEFAULT_INITIAL_VALUES`
+        );
+        
+        return rows.map(r => ({
+            key: r.key,
+            scope: r.scope,
+            value: JSON.parse(r.value_json),
+            hash: r.value_hash || ''
+        }));
+    },
+
+    async deleteDefault(key: string, scope: string): Promise<void> {
+        await tauriSqlAdapter.execute(
+            `DELETE FROM DEFAULT_INITIAL_VALUES WHERE key = ? AND scope = ?`,
+            [key, scope]
+        );
+    },
+
     /**
      * Sets a specific personalized value for a given scope.
      * @throws Error if no default exists to base this specific value on.

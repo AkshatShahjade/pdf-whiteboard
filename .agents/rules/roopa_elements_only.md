@@ -1,0 +1,2 @@
+Whenever you are creating ui, always use roopa elements / primitives, etc.
+If the ui you are trying to create cannot be made with existing elements, suggest which new roopa elements or primitives should be added.

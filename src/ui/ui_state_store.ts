@@ -47,10 +47,10 @@ export function createUIStateStore(initialState: Partial<UIState> = {}): UIState
         uiMode: { type: 'REGULAR' },
         slots: {},
         // These are required by AppState but usually provided by initialState:
-        workspace_layout: { screens: [] },
-        tool_config: {},
+        workspace_layout: null,
+        tool_config: null,
         libraryPath: null,
-        leftPct: 50,
+        leftPct: 50, // Hydrated dynamically
         ...initialState,
     };
 

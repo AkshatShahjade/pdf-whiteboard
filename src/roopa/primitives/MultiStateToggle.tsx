@@ -5,6 +5,7 @@ import { UIStateStore } from '../../ui/ui_state_store';
 export interface MultiStateToggleProps {
     states: string[];
     currentState: string;
+    variant?: 'expanded' | 'compact';
     permissionId?: UIElement;
     uiStore?: UIStateStore;
     onToggle: (newState: string) => void;
@@ -13,6 +14,7 @@ export interface MultiStateToggleProps {
 export function MultiStateToggle({
     states,
     currentState,
+    variant = 'expanded',
     permissionId,
     uiStore,
     onToggle
@@ -33,6 +35,7 @@ export function MultiStateToggle({
             style={{
                 display: 'flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '8px',
                 background: 'rgba(255, 255, 255, 0.05)',
                 color: isAllowed ? '#fff' : '#666',
@@ -52,19 +55,39 @@ export function MultiStateToggle({
                 if (isAllowed) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
             }}
         >
-            <span style={{ color: '#888' }}>[</span>
-            {states.map((s) => (
-                <span
-                    key={s}
-                    style={{
-                        fontWeight: s === currentState ? 'bold' : 'normal',
-                        color: s === currentState ? (isAllowed ? '#3B82F6' : '#666') : (isAllowed ? '#ccc' : '#444')
-                    }}
-                >
-                    {s}
-                </span>
-            )).reduce((prev, curr) => [prev, <span key={`sep-${Math.random()}`} style={{ color: '#444' }}>|</span>, curr] as any)}
-            <span style={{ color: '#888' }}>]</span>
+            {variant === 'expanded' ? (
+                <>
+                    <span style={{ color: '#888' }}>[</span>
+                    {states.map((s) => (
+                        <span
+                            key={s}
+                            style={{
+                                fontWeight: s === currentState ? 'bold' : 'normal',
+                                color: s === currentState ? (isAllowed ? '#3B82F6' : '#666') : (isAllowed ? '#ccc' : '#444')
+                            }}
+                        >
+                            {s}
+                        </span>
+                    )).reduce((prev, curr) => [prev, <span key={`sep-${Math.random()}`} style={{ color: '#444' }}>|</span>, curr] as any)}
+                    <span style={{ color: '#888' }}>]</span>
+                </>
+            ) : (
+                <div style={{ display: 'grid' }}>
+                    {states.map((s) => (
+                        <span
+                            key={s}
+                            style={{
+                                gridArea: '1 / 1',
+                                visibility: s === currentState ? 'visible' : 'hidden',
+                                fontWeight: 'bold',
+                                color: isAllowed ? '#3B82F6' : '#666'
+                            }}
+                        >
+                            {s}
+                        </span>
+                    ))}
+                </div>
+            )}
         </button>
     );
 }
