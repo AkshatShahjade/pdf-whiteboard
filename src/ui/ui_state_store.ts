@@ -24,6 +24,7 @@ export interface SlotUIState extends SlotAppState {
 export type UIState = Omit<AppState, 'slots'> & {
     activeSlot: string; // slotId of active slot
     toast: ToastState | null;
+    uiMode: import('./mode_system').UIMode;
     slots: Record<string, SlotUIState>;
 }
 
@@ -43,6 +44,7 @@ export function createUIStateStore(initialState: Partial<UIState> = {}): UIState
         // purely volatile UI states
         activeSlot: 'left', // default active slot
         toast: null,
+        uiMode: { type: 'REGULAR' },
         slots: {},
         // These are required by AppState but usually provided by initialState:
         workspace_layout: { screens: [] },

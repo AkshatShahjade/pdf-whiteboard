@@ -24,6 +24,8 @@ export interface UIController {
     setSlotState: (slotId: string, key: string, val: any) => void;
     setSlotStates: (slotId: string, patch: Record<string, any>) => void;
     closeSlot: (slotId: string) => void;
+    enterMarkSelectionMode: (selectedMarkId?: string) => void;
+    exitMarkSelectionMode: () => void;
     connect: () => () => void;
 
     // ─── Domain / Data Commands Delegations (Refactored from InputAPI) ────────
@@ -215,6 +217,12 @@ export function createUIController(store: UIStateStore, onHomeCallback?: () => v
                     }
                 }
             });
+        },
+        enterMarkSelectionMode: (selectedMarkId) => {
+            store.setState({ uiMode: { type: 'MARK_SELECTION', selectedMarkId } });
+        },
+        exitMarkSelectionMode: () => {
+            store.setState({ uiMode: { type: 'REGULAR' } });
         },
 
         // ─── Domain Commands Delegations ──────────────────────────────────────────
