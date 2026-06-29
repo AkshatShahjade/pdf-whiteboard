@@ -79,6 +79,10 @@ These buttons are similar to the tools in appearance in the toolbar (at least fo
 The workspace header shouldn't need to show the name of the content. as there is already a path shower bar for each slot.
 \
 
+\ Critique compared to entity component system and game engines
+
+\
+
 \
 One of the big goals with the ui design is that it should be invisible until it is needed - and there is a strong push for users to learn and configure their keyboard shortcuts so they don't need the ui. This is to maximize screen space for content and not ui. 
 Acheived by:

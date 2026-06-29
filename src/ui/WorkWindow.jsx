@@ -149,6 +149,7 @@ function WorkspaceContainer({ contentId, contentType, contentName, settings, onH
         savedAt={lastSavedAt}
         headerVisible={headerVisible}
         setHeaderVisible={setHeaderVisible}
+        uiStore={uiStore}
       />
 
       {/* Screen: layout and slot rendering fully delegated to roopa/Screen */}
@@ -160,7 +161,7 @@ function WorkspaceContainer({ contentId, contentType, contentName, settings, onH
         onHome={onHome}
         initialSplitPct={uiState.leftPct ?? 50}
       />
-      <ScreenToolbar uiState={uiState} uiController={uiController} />
+      <ScreenToolbar uiState={uiState} uiController={uiController} uiStore={uiStore} />
     </div>
   );
 }
