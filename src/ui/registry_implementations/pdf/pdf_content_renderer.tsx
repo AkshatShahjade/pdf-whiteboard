@@ -119,7 +119,8 @@ function PDFContentComponent({
   const marksArr = useMemo(() => {
     const rawMap = slotState?.marks;
     if (!rawMap) return [];
-    return Array.isArray(rawMap) ? rawMap : Array.from(rawMap.values());
+    const arr = Array.isArray(rawMap) ? rawMap : Array.from(rawMap.values());
+    return arr.filter((m: any) => markRendererRegistry.has(m.type));
   }, [slotState?.marks]);
   const marks = useMemo(() => updateSectionWidths(marksArr), [marksArr]);
 

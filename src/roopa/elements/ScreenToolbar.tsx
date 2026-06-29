@@ -19,7 +19,9 @@ export function ScreenToolbar({ uiState, uiController }: ScreenToolbarProps) {
         if (tool.onActivate) {
             tool.onActivate({ uiState, uiController })
         }
-        uiController?.showToast(`${tool.label} activated! (Dummy)`, 'success')
+        if (tool.id.id === 'link') {
+            uiController?.showToast(`${tool.label} activated! (Dummy)`, 'success')
+        }
         setTimeout(() => {
             setActiveToolId(null)
         }, 1200)
@@ -34,8 +36,8 @@ export function ScreenToolbar({ uiState, uiController }: ScreenToolbarProps) {
                 bottom: 0,
                 left: '50%',
                 transform: 'translateX(-50%)',
-                width: '300px',
-                height: visible ? '58px' : '16px',
+                width: '60px',
+                height: visible ? '120px' : '16px',
                 zIndex: 10000,
                 pointerEvents: 'none',
                 display: 'flex',
@@ -77,11 +79,12 @@ export function ScreenToolbar({ uiState, uiController }: ScreenToolbarProps) {
                 position: 'relative',
                 zIndex: 10001,
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '12px',
-                padding: '0 16px',
-                height: '48px',
+                padding: '12px 0',
+                width: '48px',
                 background: 'rgba(38, 42, 51, 0.85)',
                 backdropFilter: 'blur(10px)',
                 borderRadius: '12px 12px 0 0',

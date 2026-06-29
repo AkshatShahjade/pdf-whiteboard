@@ -8,7 +8,6 @@ import { rectTool } from "../registry_implementations/pdf/tools/marking/spatial/
 import { sectionTool } from "../registry_implementations/pdf/tools/marking/spatial/spatial_section_mark_tool";
 import { removeTool } from "../registry_implementations/pdf/tools/system/remove_mark_tool";
 import { selectionTool } from "../registry_implementations/pdf/tools/system/selection_tool";
-import { contentSelectorTool } from "../registry_implementations/pdf/tools/system/content_selector_tool";
 import { markRendererRegistry, registerMarkRendererType } from "./pdf/mark_renderer_registry";
 import { registerToolRendererType, toolRendererRegistry } from "./pdf/tool_renderer_registry";
 import { whiteboardToolRendererRegistry, registerWhiteboardToolRendererType } from "./whiteboard/tool_renderer_registry";
@@ -21,6 +20,7 @@ import { whiteboardContentRenderer } from "../registry_implementations/whiteboar
 import { contentSelectorContentRenderer } from "../registry_implementations/content_selector/content_selector_content_renderer";
 import { setupSlotRegistry } from "../../roopa/renderer_registry/setup";
 import { linkToolRenderer } from "../registry_implementations/screen_level/tools/link_tool_renderer";
+import { openContentToolRenderer } from "../registry_implementations/screen_level/tools/open_content_tool_renderer";
 import { registerScreenToolRendererType, screenToolRendererRegistry } from "./screen_level/tool_renderer_registry";
 
 export function setupMarkRegistry() {
@@ -57,9 +57,6 @@ export function setupToolRegistry() {
     if (!toolRendererRegistry.has(removeTool.id.id)) {
         registerToolRendererType(removeTool);
     }
-    if (!toolRendererRegistry.has(contentSelectorTool.id.id)) {
-        registerToolRendererType(contentSelectorTool);
-    }
     if (!whiteboardToolRendererRegistry.has(pinWhiteboardTool.id.id)) {
         registerWhiteboardToolRendererType(pinWhiteboardTool);
     }
@@ -68,6 +65,9 @@ export function setupToolRegistry() {
     }
     if (!screenToolRendererRegistry.has(linkToolRenderer.id.id)) {
         registerScreenToolRendererType(linkToolRenderer);
+    }
+    if (!screenToolRendererRegistry.has(openContentToolRenderer.id.id)) {
+        registerScreenToolRendererType(openContentToolRenderer);
     }
 }
 

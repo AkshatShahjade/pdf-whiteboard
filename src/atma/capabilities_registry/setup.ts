@@ -12,7 +12,7 @@ import { pdfContentDomain } from "../registry_implementations/pdf/pdf_domain_con
 import { whiteboardContentDomain } from "../registry_implementations/whiteboard/whiteboard_domain_content";
 import { contentSelectorDomainContent } from "../registry_implementations/content_selector/content_selector_domain_content";
 import { linkToolDomain } from "../registry_implementations/screen_level/tools/link_tool_domain";
-import { searchToolDomain } from "../registry_implementations/screen_level/tools/search_tool_domain";
+import { openContentToolDomain } from "../registry_implementations/screen_level/tools/open_content_tool_domain";
 import { toolDomainRegistry, registerToolDomainType } from "./screen_level/tool_domain_registry";
 
 export function setupMarkDomainRegistry() {
@@ -52,8 +52,8 @@ export function setupToolDomainRegistry() {
     if (!toolDomainRegistry.has(linkToolDomain.id)) {
         registerToolDomainType(linkToolDomain);
     }
-    if (!toolDomainRegistry.has(searchToolDomain.id)) {
-        registerToolDomainType(searchToolDomain);
+    if (!toolDomainRegistry.has(openContentToolDomain.id)) {
+        registerToolDomainType(openContentToolDomain);
     }
 }
 

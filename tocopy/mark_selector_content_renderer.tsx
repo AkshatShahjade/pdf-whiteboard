@@ -215,6 +215,8 @@ function ContentSelectorComponent({
                 setCurrentDir={setCurrentDir}
                 onEntryClick={handleEntryClick}
                 showToast={showToast}
+                isSelectMode={true}
+                onSelectContent={handleEntryClick}
               />
             </div>
 
@@ -255,7 +257,7 @@ function ContentSelectorComponent({
   );
 }
 
-export const contentSelectorContentRenderer: ContentRendererType = {
-  id: 'content_selector',
+export const markSelectorContentRenderer: ContentRendererType = {
+  id: 'mark_selector',
   Component: ContentSelectorComponent,
 };
