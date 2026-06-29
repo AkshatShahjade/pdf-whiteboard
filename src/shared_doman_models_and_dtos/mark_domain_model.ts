@@ -42,8 +42,6 @@ export interface TldrawMark {
     id: UUID;
     type: 'tldraw'
     shapeId: string;
-    x: number;
-    y: number;
 }
 
 export type Mark = RectMark | LassoMark | SectionMark | PinMark | TldrawMark

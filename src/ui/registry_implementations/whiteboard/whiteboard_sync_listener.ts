@@ -24,9 +24,7 @@ export function setupWhiteboardSync(editor: Editor, slotId: string, parentConten
                     const newMark: TldrawMarkDTO = {
                         id: markId,
                         type: 'tldraw',
-                        shapeId: shape.id,
-                        x: shape.x || 0,
-                        y: shape.y || 0
+                        shapeId: shape.id
                     };
                     
                     uiController.addMark(slotId, newMark);
@@ -54,9 +52,7 @@ export function setupWhiteboardSync(editor: Editor, slotId: string, parentConten
                     const newMark: TldrawMarkDTO = {
                         id: markId,
                         type: 'tldraw',
-                        shapeId: after.id,
-                        x: after.x || 0,
-                        y: after.y || 0
+                        shapeId: after.id
                     };
                     
                     uiController.addMark(slotId, newMark);

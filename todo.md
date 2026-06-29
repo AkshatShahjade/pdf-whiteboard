@@ -16,6 +16,28 @@ Also, ther is no indication that a tldraw shape has been marked in the ui. There
 research the reasons for why this is happening and propse fixes.
 It should be that on right clicking a shape in the whiteboard, a new option in the options pane is added 'Open Link' opens the linked mark, or on clicking the link symbol next to the shape it also opens the linked mark.
 
+\
+put 'Scanning Whiteboard Directories...' inside the library explorer pane so that it doesn't take up extra vertical space when it dissappears it doesn't change the vertical positions of elements. I try to click somehting, but then the scanning whiteabord directories dissappears, the library explorer moves up and I click on a different card that was below the card I wanted.
+\
+
+\ ui error.
+New folder and new whiteboard ui is messed up
+\
+
+\
+Improve Ui of content_selector
+\
+
+\
+If a whiteboard is already open in the opposite slot and I click a mark, the whiteboard doesn't get replaced with the whiteboard of the new mark. Nothing happens. but if there were a pdf it would be replaced. Investigate this inconsistency - hinting at incomplete content agnosticism.
+\
+
+\ WhiteboardOnly Ui component
+Currently, when pdf is opened from homescreen it is opened with workspacecontainer, but when whiteboard is opened it uses whiteboardonly. After the content agnostic transformation to codebase, both content types should use workspacecontainer, whiteboardonly should be removed completely. And then I can open whiteboard first, use opencontent to open pdfs in the other slot as well...
+\
+
+
+
 \ Mark tool mods
 Also at this point it is clear that the current functioning of the mark tools (to immediately create a new whiteboard and open it) is to be modified. Infact the current functioning is one mode of the mark tool family called "instant link to new whiteboard". The default mode however is when the mark tools just create the unlinked marks. Then we can link those marks to other marks or contents using the link tool. in the ui of the mark tools, there will be an option to change the tool mode and that would be persisted as a personalizable state for each mark tool. it will later also be possible to add multiple rectangle tools into your toolbar, operating with different modes - some autolink to code editors, others to whiteboards, some are default...
 its when you double click any tool that you can change its modes and other properties. single clicking just activates the tool. But if the tool has modes and other configerations, then double clicking opens a mini pane (similar to the shortcut tool pane) that allows you to edit the config and modes. In this pane, if the tool is tied to a personalizable state, then there will be a scope selector. It is also an n-state toggle between options like "content, content type, slot, slot type, global" for content related tools, or "slot, slot type, screen, global" for slot related tools, "screen, global" for screen level tools. this is so the user can decide the scope of the tool preset that is made.

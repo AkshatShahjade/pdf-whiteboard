@@ -1,9 +1,5 @@
-import { Selection, Point, Mark, SelectionContext, RenderMarkContext } from "../../../shared_doman_models_and_dtos/mark_domain_model";
-
 export interface MarkDomainType {
-    id: string
-
-    hasSelectedBorder: (pt: Point, r: Mark, ctx: SelectionContext) => boolean   
+    id: string  
 
     validate?: (mark: any) => { isValid: boolean; error?: string };
     parseRaw: (raw: any) => any;

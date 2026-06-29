@@ -58,12 +58,8 @@ export default function Root() {
     return (
       <HomeScreen
         uiController={uiController}
-        onOpen={(pdfPath, whiteboard, settings) => {
-          if (whiteboard?.id) {
-            setSession({ mode: 'whiteboard', whiteboardId: whiteboard.id, whiteboardName: whiteboard.name, settings });
-            return;
-          }
-          setSession({ mode: 'pdf', pdfPath, settings });
+        onOpen={({ contentId, contentType, contentName, settings }) => {
+          setSession({ contentId, contentType, contentName, settings });
         }}
       />
     );
@@ -74,63 +70,11 @@ export default function Root() {
     setSession(null);
   };
 
-  if (session.mode === 'whiteboard') {
-    return (
-      <WhiteboardOnlyApp
-        whiteboardId={session.whiteboardId}
-        whiteboardName={session.whiteboardName}
-        settings={session.settings}
-        onHome={handleHome}
-        uiController={uiController}
-        uiStore={uiStore}
-      />
-    );
-  }
-  return <WorkspaceContainer pdfPath={session.pdfPath} settings={session.settings} onHome={handleHome} uiStore={uiStore} uiController={uiController} />;
-}
-
-function WhiteboardOnlyApp({ whiteboardId, whiteboardName, settings, onHome, uiController, uiStore }) {
-  const uiState = useUIState(uiStore);
-  const [headerVisible, setHeaderVisible] = useState(false);
-  const lastSavedAt = null;
-  const [toast, setToast] = useState(null);
-  
-  const showToast = useCallback((msg, type = 'info') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
-  }, []);
-  const handleBackup = async () => {
-    showToast(`Backup migrating to new SQLite architecture!`, 'success');
-  };
-
-  return (
-    <div style={{ width: '100%', height: '100vh', background: '#1c1f26', position: 'relative', overflow: 'hidden', fontFamily: "'IBM Plex Mono', monospace" }}>
-      {toast && (
-        <div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', background: toast.type === 'error' ? 'rgba(239, 68, 68, 0.95)' : 'rgba(16, 185, 129, 0.95)', backdropFilter: 'blur(8px)', border: `1px solid ${toast.type === 'error' ? '#F87171' : '#34D399'}`, color: '#fff', padding: '10px 20px', borderRadius: '8px', zIndex: 9999, fontSize: '12px', fontWeight: '500', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {toast.type === 'error' ? '⚠' : '✓'} {toast.msg}
-        </div>
-      )}
-      <WorkspaceHeader title={`Whiteboard: ${whiteboardName || 'Untitled'}`} onHome={onHome} onBackup={handleBackup} savedAt={lastSavedAt} headerVisible={headerVisible} setHeaderVisible={setHeaderVisible} />
-      <div style={{ width: '100%', height: '100%' }}>
-        {(() => {
-          const Renderer = getContentRendererType('whiteboard').Component;
-          return (
-            <Renderer
-              slotId="left"
-              contentId={whiteboardId}
-              settings={settings}
-              uiController={uiController}
-            />
-          );
-        })()}
-      </div>
-      <ScreenToolbar uiState={uiState} uiController={uiController} />
-    </div>
-  );
+  return <WorkspaceContainer contentId={session.contentId} contentType={session.contentType} contentName={session.contentName} settings={session.settings} onHome={handleHome} uiStore={uiStore} uiController={uiController} />;
 }
 
 // ─── WorkspaceContainer ─────────────────────────────────────────────────────────────
-function WorkspaceContainer({ pdfPath, settings, onHome, uiStore, uiController }) {
+function WorkspaceContainer({ contentId, contentType, contentName, settings, onHome, uiStore, uiController }) {
   const uiState = useUIState(uiStore);
   const [headerVisible, setHeaderVisible] = useState(false);
   const lastSavedAt = null;
@@ -142,10 +86,10 @@ function WorkspaceContainer({ pdfPath, settings, onHome, uiStore, uiController }
 
   // Core Session Loading Effect
   useEffect(() => {
-    if (pdfPath && uiController) {
-      uiController.onContentChange('left', pdfPath, 'pdf');
+    if (contentId && contentType && uiController) {
+      uiController.onContentChange('left', contentId, contentType);
     }
-  }, [pdfPath, uiController]);
+  }, [contentId, contentType, uiController]);
 
   // Unload handler: Flush any pending saves
   useEffect(() => {
@@ -199,7 +143,7 @@ function WorkspaceContainer({ pdfPath, settings, onHome, uiStore, uiController }
       )}
 
       <WorkspaceHeader
-        title={decodeURIComponent(pdfPath).split(/[/\\]/).pop()}
+        title={contentName || decodeURIComponent(contentId).split(/[/\\]/).pop()}
         onHome={onHome}
         onBackup={handleBackup}
         savedAt={lastSavedAt}

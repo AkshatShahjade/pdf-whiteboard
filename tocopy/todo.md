@@ -16,10 +16,6 @@ Also, ther is no indication that a tldraw shape has been marked in the ui. There
 research the reasons for why this is happening and propse fixes.
 It should be that on right clicking a shape in the whiteboard, a new option in the options pane is added 'Open Link' opens the linked mark, or on clicking the link symbol next to the shape it also opens the linked mark.
 
-\ Whiteboard Mark registry
-
-\
-
 \ Mark tool mods
 The current functioning of the mark tools (to immediately create a new whiteboard and open it) is one 'mark mode' out of many. Infact the current functioning is one mode of the mark tool family called "instant link to new whiteboard". The basic mode however is when the mark tools just create the unlinked marks. Then we can link those marks to other marks or contents using the link tool. 
 in the ui of the mark tools, there will be an option to change the tool mode and that would be persisted as a personalizable state for each mark tool. it will later also be possible to add multiple rectangle tools into your toolbar, operating with different modes - some autolink to code editors, others to whiteboards, some are default...

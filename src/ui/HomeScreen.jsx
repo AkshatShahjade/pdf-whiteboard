@@ -329,12 +329,12 @@ export default function HomeScreen({ onOpen, uiController }) {
           const wbPath = `whiteboard:${id}`;
           const recentEntry = { path: wbPath, name: id, openedAt: Date.now(), isWhiteboard: true, sourcePath: fullPath };
           await pushRecent(recentEntry);
-          onOpen(null, { id, name: id }, settings, null);
+          onOpen({ contentId: id, contentType: 'whiteboard', contentName: id, settings });
           return;
         }
         const recentEntry = { path: fullPath, name: entry.name, openedAt: Date.now(), isLocal: true };
         await pushRecent(recentEntry);
-        onOpen(fullPath, null, settings);
+        onOpen({ contentId: fullPath, contentType: 'pdf', contentName: entry.name, settings });
       }
     } catch (err) { console.error(err); }
   };
@@ -351,10 +351,10 @@ export default function HomeScreen({ onOpen, uiController }) {
     await pushRecent({ ...entry, openedAt: Date.now() });
     if (entry.path.startsWith('whiteboard:')) {
       const id = entry.path.replace('whiteboard:', '');
-      onOpen(null, { id, name: entry.name || 'Whiteboard' }, settings, null);
+      onOpen({ contentId: id, contentType: 'whiteboard', contentName: entry.name || 'Whiteboard', settings });
       return;
     }
-    onOpen(entry.sourcePath || entry.path, null, settings);
+    onOpen({ contentId: entry.sourcePath || entry.path, contentType: 'pdf', contentName: entry.name, settings });
   }, [onOpen, settings, pushRecent]);
 
   const confirmNewWhiteboard = async () => {
