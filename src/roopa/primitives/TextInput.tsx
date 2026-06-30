@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { UIElement, useUIElement } from '../../ui/mode_system';
+import { RoopaElement, useRoopaElement } from '../mode_system';
 import { UIStateStore } from '../../ui/ui_state_store';
 
 export interface RulesContext {
@@ -20,7 +20,7 @@ export interface TextInputProps {
     placeholder?: string;
     value: string;
     autoFocus?: boolean;
-    permissionId?: UIElement;
+    permissionId?: RoopaElement;
     uiStore?: UIStateStore;
     onChange: (val: string) => void;
     onSubmit?: (val: string) => void;
@@ -128,7 +128,7 @@ export function TextInput({
     returnJSON = false,
     onValidationError
 }: TextInputProps) {
-    const isAllowed = permissionId && uiStore ? useUIElement(uiStore, permissionId) : true;
+    const isAllowed = permissionId && uiStore ? useRoopaElement(uiStore, permissionId) : true;
     const [touched, setTouched] = useState(false);
 
     const naturalVal = returnJSON ? parseJSONToNatural(value) : value;

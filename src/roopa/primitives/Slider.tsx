@@ -1,5 +1,5 @@
 import React from 'react';
-import { UIElement, useUIElement } from '../../ui/mode_system';
+import { RoopaElement, useRoopaElement } from '../mode_system';
 import { UIStateStore } from '../../ui/ui_state_store';
 
 export interface SliderProps {
@@ -7,7 +7,7 @@ export interface SliderProps {
     max: number;
     step?: number;
     value: number;
-    permissionId?: UIElement;
+    permissionId?: RoopaElement;
     uiStore?: UIStateStore;
     onChange: (val: number) => void;
 }
@@ -21,7 +21,7 @@ export function Slider({
     uiStore,
     onChange
 }: SliderProps) {
-    const isAllowed = permissionId && uiStore ? useUIElement(uiStore, permissionId) : true;
+    const isAllowed = permissionId && uiStore ? useRoopaElement(uiStore, permissionId) : true;
 
     return (
         <input

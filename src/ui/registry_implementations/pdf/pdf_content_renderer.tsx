@@ -465,6 +465,16 @@ function PDFContentComponent({
   const handleBorderClick = useCallback(async (e: any, markId: string) => {
     e.stopPropagation();
     if (!slotState) return;
+
+    if (uiState?.uiMode?.type === 'MARK_SELECTION') {
+      if (uiState?.uiMode?.selectedMarkId === markId) {
+        uiController.enterMarkSelectionMode(undefined);
+      } else {
+        uiController.enterMarkSelectionMode(markId);
+      }
+      return;
+    }
+
     const toolType = getToolType(slotState.tool);
     await toolType.onBorderClick?.({
       regionId: markId,
@@ -478,7 +488,7 @@ function PDFContentComponent({
         clearShortcutUi: () => {}, // Handled by shortcutManager in WorkspaceContainer
       },
     });
-  }, [slotState, selectMark, setMarksWithSectionWidths]);
+  }, [slotState, selectMark, setMarksWithSectionWidths, uiState, uiController]);
 
   const sectionSelection = currentSelection?.type === 'section'
     ? currentSelection
@@ -660,7 +670,8 @@ function PDFContentComponent({
             {marks.map((r: any, idx: number) => {
               const color = markColor(r.id);
               const isSelected = slotState?.selectedMarkId === r.id;
-              let renderCtx = { zoom: slotState?.zoom || 1, PDFWIDTH: PDF_WIDTH, tool: slotState?.tool, color, idx, onClick: handleBorderClick, isSelected };
+              const uiMode = uiState.uiMode || { type: 'REGULAR' };
+              let renderCtx = { zoom: slotState?.zoom || 1, PDFWIDTH: PDF_WIDTH, tool: slotState?.tool, color, idx, onClick: handleBorderClick, isSelected, uiMode };
               return getMarkRendererType(r.type).render(r, renderCtx);
             })}
             {currentSelection && 

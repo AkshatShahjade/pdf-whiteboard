@@ -24,7 +24,7 @@ export interface SlotUIState extends SlotAppState {
 export type UIState = Omit<AppState, 'slots'> & {
     activeSlot: string; // slotId of active slot
     toast: ToastState | null;
-    uiMode: import('./mode_system').UIMode;
+    uiMode: import('../roopa/mode_system').RoopaMode;
     slots: Record<string, SlotUIState>;
 }
 

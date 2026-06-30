@@ -19,8 +19,6 @@ export interface AppState {
   slots: Record<string, SlotAppState>;
 }
 
-
-
 export interface AppStateStore {
   getState(): AppState;
   setState(updater: (state: AppState) => void): void;

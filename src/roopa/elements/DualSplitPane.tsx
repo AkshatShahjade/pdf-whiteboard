@@ -75,42 +75,43 @@ export function DualSplitPane({
     const leftChild = children[0];
     const rightChild = children[1];
 
-    if (!leftChild && !rightChild) {
+    const hasLeft = !!leftChild;
+    const hasRight = !!rightChild;
+
+    if (!hasLeft && !hasRight) {
         return null;
     }
 
-    if (leftChild && !rightChild) {
-        return <div style={{ width: '100%', height: '100%', position: 'relative' }}>{leftChild}</div>;
-    }
-
-    if (!leftChild && rightChild) {
-        return <div style={{ width: '100%', height: '100%', position: 'relative' }}>{rightChild}</div>;
-    }
+    const leftVal = !hasRight ? 100 : (!hasLeft ? 0 : localPct);
+    const rightVal = !hasLeft ? 100 : (!hasRight ? 0 : (100 - localPct));
+    const showDivider = hasLeft && hasRight;
 
     if (direction === 'horizontal') {
         return (
             <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', userSelect: isResizing ? 'none' : 'auto' }}>
-                <div style={{ position: 'absolute', left: 0, top: 0, width: `${localPct}%`, height: '100%', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', left: 0, top: 0, width: `${leftVal}%`, height: '100%', overflow: 'hidden', display: hasLeft ? 'block' : 'none' }}>
                     {leftChild}
                 </div>
-                <div 
-                    onMouseDown={startResize}
-                    style={{
-                        position: 'absolute',
-                        left: `${localPct}%`,
-                        top: 0,
-                        width: '6px',
-                        height: '100%',
-                        cursor: 'col-resize',
-                        zIndex: 20,
-                        background: isResizing ? '#3B82F6' : '#262a33',
-                        borderLeft: '1px solid #374151',
-                        borderRight: '1px solid #374151',
-                        transform: 'translateX(-50%)',
-                        transition: isResizing ? 'none' : 'background 0.2s',
-                    }}
-                />
-                <div style={{ position: 'absolute', left: `${localPct}%`, top: 0, width: `${100 - localPct}%`, height: '100%', overflow: 'hidden' }}>
+                {showDivider && (
+                    <div 
+                        onMouseDown={startResize}
+                        style={{
+                            position: 'absolute',
+                            left: `${localPct}%`,
+                            top: 0,
+                            width: '6px',
+                            height: '100%',
+                            cursor: 'col-resize',
+                            zIndex: 20,
+                            background: isResizing ? '#3B82F6' : '#262a33',
+                            borderLeft: '1px solid #374151',
+                            borderRight: '1px solid #374151',
+                            transform: 'translateX(-50%)',
+                            transition: isResizing ? 'none' : 'background 0.2s',
+                        }}
+                    />
+                )}
+                <div style={{ position: 'absolute', left: `${leftVal}%`, top: 0, width: `${rightVal}%`, height: '100%', overflow: 'hidden', display: hasRight ? 'block' : 'none' }}>
                     {rightChild}
                 </div>
             </div>
@@ -119,27 +120,29 @@ export function DualSplitPane({
         // Vertical split
         return (
             <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', userSelect: isResizing ? 'none' : 'auto' }}>
-                <div style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: `${localPct}%`, overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: `${leftVal}%`, overflow: 'hidden', display: hasLeft ? 'block' : 'none' }}>
                     {leftChild}
                 </div>
-                <div 
-                    onMouseDown={startResize}
-                    style={{
-                        position: 'absolute',
-                        left: 0,
-                        top: `${localPct}%`,
-                        width: '100%',
-                        height: '6px',
-                        cursor: 'row-resize',
-                        zIndex: 20,
-                        background: isResizing ? '#3B82F6' : '#262a33',
-                        borderTop: '1px solid #374151',
-                        borderBottom: '1px solid #374151',
-                        transform: 'translateY(-50%)',
-                        transition: isResizing ? 'none' : 'background 0.2s',
-                    }}
-                />
-                <div style={{ position: 'absolute', left: 0, top: `${localPct}%`, width: '100%', height: `${100 - localPct}%`, overflow: 'hidden' }}>
+                {showDivider && (
+                    <div 
+                        onMouseDown={startResize}
+                        style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: `${localPct}%`,
+                            width: '100%',
+                            height: '6px',
+                            cursor: 'row-resize',
+                            zIndex: 20,
+                            background: isResizing ? '#3B82F6' : '#262a33',
+                            borderTop: '1px solid #374151',
+                            borderBottom: '1px solid #374151',
+                            transform: 'translateY(-50%)',
+                            transition: isResizing ? 'none' : 'background 0.2s',
+                        }}
+                    />
+                )}
+                <div style={{ position: 'absolute', left: 0, top: `${leftVal}%`, width: '100%', height: `${rightVal}%`, overflow: 'hidden', display: hasRight ? 'block' : 'none' }}>
                     {rightChild}
                 </div>
             </div>

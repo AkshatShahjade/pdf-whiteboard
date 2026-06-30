@@ -104,6 +104,11 @@ There is an issue with the library folder selection. it isn't setting.
 Specific values once made must also be updated if changes happen. in the 4-level system.
 \
 
+\LAte Stage::: other apps, timers, etc.
+I am beginning to think  that the whole src/atma and src/ui stuff is mainly the implmentaiton of one type of roopa element that is the vertical pane slot. All the contents and marks are just inbuilt features of that one roopa element. And if I added a webbrowser element, then it would have its own completely different code that could also be extensive and large...
+Although somethings I feel aren't specific to the contents and marks - like the 4-layer state variable system. a lot of the backend architecture like the repositories, the apis, etc. they could be used elsewhere, like in a timer elementm the variables like current time left, clock default time could be stored as variables in the 4-layer. And if a user defined his own variables, that too could just use the 4-layer.
+\
+
 - Session .mode -> .screen
 - toasts are handled inside the slot components. It should be screen level.
 - pdf page size adapts to content size (eg- ppt should be landscape....)

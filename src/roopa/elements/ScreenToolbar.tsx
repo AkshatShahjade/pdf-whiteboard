@@ -59,6 +59,28 @@ export function ScreenToolbar({ uiState, uiController, uiStore }: ScreenToolbarP
                     />
                 );
             })}
+            
+            {/* Temporary UI Mode Switcher */}
+            <ButtonSquare
+                icon="🔄"
+                tooltip={`Mode: ${uiState.uiMode?.type || 'REGULAR'}`}
+                isActive={uiState.uiMode?.type === 'MARK_SELECTION'}
+                uiStore={uiStore}
+                onClick={() => {
+                    const currentType = uiState.uiMode?.type || 'REGULAR';
+                    if (currentType === 'REGULAR') {
+                        uiStore.setState({ 
+                            uiMode: { type: 'MARK_SELECTION' } 
+                        });
+                        uiController?.showToast(`Mode switched to MARK_SELECTION`, 'success');
+                    } else {
+                        uiStore.setState({ 
+                            uiMode: { type: 'REGULAR' } 
+                        });
+                        uiController?.showToast('Mode switched to REGULAR', 'success');
+                    }
+                }}
+            />
         </div>
     )
 }

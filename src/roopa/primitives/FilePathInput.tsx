@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UIElement } from '../../ui/mode_system';
+import { RoopaElement } from '../mode_system';
 import { UIStateStore } from '../../ui/ui_state_store';
 import { pickFiles, pickFolder, basename } from '../../atma/platform_adapter/switch';
 import { MarqueeTextButton } from './MarqueeTextButton';
@@ -11,7 +11,7 @@ export interface FilePathInputProps {
     placeholder?: string;
     mode?: 'file' | 'directory';
     extensions?: string[];
-    permissionId?: UIElement;
+    permissionId?: RoopaElement;
     uiStore?: UIStateStore;
 }
 

@@ -93,6 +93,7 @@ export interface RenderMarkContext {
     idx?: number
     isSelected?: boolean
     onClick: (e: React.MouseEvent, id: string) => void;
+    uiMode?: any;
 }
 
 export const STROKE_HIT_WIDTH = 12;

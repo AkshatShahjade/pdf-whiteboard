@@ -223,6 +223,9 @@ export const stateSyncService = {
       // Hydrate the StateCache for this slot and content
       const activeScopes = [
           'global', 
+          'workspace:default_workspace',
+          'screen:screen_main',
+          'pane:split_1',
           `slot:${slotId}`, 
           `slotType:verticalPane`,
           `content:${contentId}`, 

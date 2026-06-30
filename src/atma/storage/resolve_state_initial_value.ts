@@ -97,15 +97,24 @@ export async function hydrateStateCache(
 function generateCascadeScopes(cascadePath: CascadePath, context: StateVariableContext): string[] {
     const scopes: string[] = [];
     
+    // We are hardcoding the spatial inheritance path based on the single hardcoded layout:
+    // Slot -> Pane (split_1) -> Screen (screen_main) -> Workspace (default_workspace)
+    
     if (cascadePath === 'content_tree') {
         if (context.contentId) scopes.push(`content:${context.contentId}`);
         if (context.contentType) scopes.push(`contentType:${context.contentType}`);
-        if (context.screenId) scopes.push(`screen:${context.screenId}`);
+        if (context.slotType) scopes.push(`slotType:${context.slotType}`);
+        if (context.slotId) scopes.push(`slot:${context.slotId}`);
+        scopes.push('pane:split_1');
+        scopes.push('screen:screen_main');
+        scopes.push('workspace:default_workspace');
         scopes.push('global');
     } else if (cascadePath === 'slot_tree') {
         if (context.slotId) scopes.push(`slot:${context.slotId}`);
         if (context.slotType) scopes.push(`slotType:${context.slotType}`);
-        if (context.screenId) scopes.push(`screen:${context.screenId}`);
+        scopes.push('pane:split_1');
+        scopes.push('screen:screen_main');
+        scopes.push('workspace:default_workspace');
         scopes.push('global');
     }
     

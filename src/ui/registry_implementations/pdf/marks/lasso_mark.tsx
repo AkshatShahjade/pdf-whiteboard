@@ -102,12 +102,56 @@ export const lassoMark: PDFMarkRendererType = {
             const borderWidth = STROKE_HIT_WIDTH;
             const rx = r.x * ctx.zoom, ry = r.y * ctx.zoom, rw = r.w * ctx.zoom, rh = r.h * ctx.zoom;
             const pointsStr = r.points.map(p => `${rx + (p.x * ctx.zoom)},${ry + (p.y * ctx.zoom)}`).join(' ');
+            const isSelectionMode = ctx.uiMode?.type === 'MARK_SELECTION';
+            const isSourceMark = isSelectionMode && ctx.uiMode?.selectedMarkId === r.id;
+            const isTargetCandidate = isSelectionMode && ctx.uiMode?.selectedMarkId !== r.id;
+
             return (
-            <g key={r.id}>
+            <g key={r.id} className={`${isSourceMark ? 'mark-source-' + r.id : ''} ${isTargetCandidate ? 'mark-candidate-' + r.id : ''}`}>
+                <style>{`
+                  @keyframes pulseSource-${r.id} {
+                    0% { stroke-width: 6px; opacity: 0.5; stroke: #3B82F6; }
+                    100% { stroke-width: 16px; opacity: 0.9; stroke: #93C5FD; }
+                  }
+                  @keyframes pulseCandidate-${r.id} {
+                    0% { stroke-width: 4px; opacity: 0.15; }
+                    100% { stroke-width: 7px; opacity: 0.35; }
+                  }
+                  .mark-source-${r.id} .pulse-glow {
+                    animation: pulseSource-${r.id} 0.6s infinite alternate ease-in-out;
+                  }
+                  .mark-candidate-${r.id} .candidate-glow {
+                    animation: pulseCandidate-${r.id} 1.5s infinite alternate ease-in-out;
+                  }
+                  .mark-candidate-${r.id}:hover .candidate-glow {
+                    animation: none;
+                    opacity: 0.8 !important;
+                    stroke-width: 10px !important;
+                    stroke: #34D399 !important;
+                  }
+                  .mark-candidate-${r.id}:hover .visual-border {
+                    stroke-width: 2px !important;
+                    stroke-dasharray: none !important;
+                  }
+                  .mark-candidate-${r.id}:hover {
+                    cursor: pointer;
+                  }
+                `}</style>
+
+                {/* Pulsating background glow for source mark */}
+                {isSourceMark && (
+                    <polygon className="pulse-glow" points={pointsStr} fill="none" stroke="#3B82F6" strokeWidth={6} style={{ pointerEvents: 'none', transition: 'all 0.2s' }} />
+                )}
+
+                {/* Faint pulsating glow for target candidates */}
+                {isTargetCandidate && (
+                    <polygon className="candidate-glow" points={pointsStr} fill="none" stroke="#10B981" strokeWidth={5} style={{ pointerEvents: 'none', transition: 'all 0.2s' }} />
+                )}
+
                 <g style={{ pointerEvents: 'auto' }} onMouseDown={(e) => { if (e.ctrlKey || e.metaKey) return; if (ctx.tool === 'rect' || ctx.tool === 'section' || ctx.tool === 'lasso') return; e.stopPropagation(); }} onClick={(e) => { if (e.ctrlKey || e.metaKey) return; ctx.onClick(e, r.id); }}>
-                <polygon points={pointsStr} fill="transparent" stroke="transparent" strokeWidth={borderWidth} style={{ pointerEvents: 'stroke', cursor: ctx.tool === 'select' ? 'pointer' : 'crosshair' }} />
+                <polygon points={pointsStr} fill="transparent" stroke="transparent" strokeWidth={borderWidth} style={{ pointerEvents: 'stroke', cursor: isSelectionMode ? 'pointer' : (ctx.tool === 'select' ? 'pointer' : 'crosshair') }} />
                 </g>
-                <polygon points={pointsStr} fill={ctx.isSelected ? `${ctx.color}1A` : 'none'} stroke={ctx.color} strokeWidth={ctx.isSelected ? 2 : 1.5} strokeDasharray={ctx.isSelected ? 'none' : '7 3'} style={{ pointerEvents: 'none', transition: 'fill 0.15s, stroke-width 0.1s' }} />
+                <polygon className="visual-border" points={pointsStr} fill={ctx.isSelected ? `${ctx.color}1A` : 'none'} stroke={ctx.color} strokeWidth={ctx.isSelected ? 2 : 1.5} strokeDasharray={ctx.isSelected ? 'none' : '7 3'} style={{ pointerEvents: 'none', transition: 'fill 0.15s, stroke-width 0.1s' }} />
                 <rect x={rx + 1} y={ry + 1} width={28} height={15} fill={ctx.color} rx={2} style={{ pointerEvents: 'none' }} />
                 <text x={rx + 15} y={ry + 11} textAnchor="middle" fill="white" fontSize={9} fontFamily="'IBM Plex Mono', monospace" fontWeight="700" style={{ pointerEvents: 'none' }}>{`R${ctx.idx + 1}`}</text>
             </g>

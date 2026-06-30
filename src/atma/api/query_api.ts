@@ -13,9 +13,9 @@ export interface QueryAPIInterface {
   getRecents(): Promise<any[]>;
   getLibraryPath(): Promise<string | null>;
   getBackupPath(): Promise<string | null>;
-    getWorkspaceLayout(id: string): Promise<any | null>;
-    getAllWorkspaces(): Promise<{id: string, name: string}[]>;
-    getAllStateDefaults(): Promise<any[]>;
+  getWorkspaceLayout(id: string): Promise<any | null>;
+  getAllWorkspaces(): Promise<{id: string, name: string}[]>;
+  getAllStateDefaults(): Promise<any[]>;
 }
 
 /**

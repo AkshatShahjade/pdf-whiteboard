@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { UIElement, useUIElement } from '../../ui/mode_system';
+import { RoopaElement, useRoopaElement } from '../mode_system';
 import { UIStateStore } from '../../ui/ui_state_store';
 
 export interface MarqueeTextButtonProps {
     value: string;
     placeholder?: string;
     onClick?: () => void;
-    permissionId?: UIElement;
+    permissionId?: RoopaElement;
     uiStore?: UIStateStore;
     title?: string;
 }
@@ -19,7 +19,7 @@ export function MarqueeTextButton({
     uiStore,
     title
 }: MarqueeTextButtonProps) {
-    const isAllowed = permissionId && uiStore ? useUIElement(uiStore, permissionId) : true;
+    const isAllowed = permissionId && uiStore ? useRoopaElement(uiStore, permissionId) : true;
     
     const containerRef = useRef<HTMLDivElement>(null);
     const measureRef = useRef<HTMLSpanElement>(null);

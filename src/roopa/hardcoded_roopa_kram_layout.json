@@ -1,0 +1,67 @@
+{
+  "workspaceId": "default_workspace",
+  "name": "LemmaMap Workspace",
+  "activeScreenId": "screen_main",
+  
+  "elements": {
+    "header_1": {
+      "type": "WorkspaceHeader",
+      "properties": {
+        "title": { "type": "dynamic", "source": "CONTENT_NAME" }
+      }
+    },
+    "toolbar_1": {
+      "type": "ScreenToolbar"
+    },
+    "split_1": {
+      "type": "DualSplitPane",
+      "properties": { "direction": "horizontal" }
+    },
+    "slot_left": {
+      "type": "Slot",
+      "properties": { "slotId": "left", "slotType": "verticalPane" }
+    },
+    "slot_right": {
+      "type": "Slot",
+      "properties": { "slotId": "right", "slotType": "verticalPane" }
+    }
+  },
+
+  "layout": {
+    "screen_main": {
+      "tree": {
+        "id": "split_1",
+        "children": ["slot_left", "slot_right"]
+      },
+      "triggerZones": [
+        { "position": "top", "elementId": "header_1" },
+        { "position": "bottom", "elementId": "toolbar_1" }
+      ]
+    }
+  },
+
+  "kram_edges": [
+    {
+      "id": "edge_home",
+      "source": "header_1",
+      "outputPort": "onHome",
+      "action": "NavigateHome"
+    },
+    {
+      "id": "edge_backup",
+      "source": "header_1",
+      "outputPort": "onBackup",
+      "action": "TriggerSystemBackup"
+    },
+    {
+      "id": "edge_split",
+      "source": "split_1",
+      "outputPort": "onSplitPctChange",
+      "action": "UpdateStateVariable",
+      "params": {
+        "key": "dualSplitPaneLeftPct",
+        "value": "$PAYLOAD.pct"
+      }
+    }
+  ]
+}

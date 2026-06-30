@@ -42,6 +42,7 @@ export interface UIController {
     flushSession: () => void;
     updateDefaultValue: (key: string, scope: string, value: any) => Promise<void>;
     updateClassification: (key: string, classification: 'personalizable' | 'defaulted') => Promise<void>;
+    getRecentCardData: (path: string) => Promise<{ marksCount: number, session: any }>;
 }
 
 /**
@@ -269,6 +270,25 @@ export function createUIController(store: UIStateStore, onHomeCallback?: () => v
         },
         updateClassification: async (key, classification) => {
             await inputAPI.updateClassification(key, classification);
+        },
+        getRecentCardData: async (path) => {
+            const { MarkRepository } = await import('../atma/storage/repositories/MarkRepository');
+            const { StateInitialValuesRepository } = await import('../atma/storage/repositories/StateInitialValuesRepository');
+            let marksCount = 0;
+            let session: any = null;
+            try {
+                if (!path || path.startsWith('whiteboard:')) return { marksCount, session };
+                const marks = await MarkRepository.loadMarksByContentId(path);
+                marksCount = marks?.length || 0;
+                
+                try {
+                    const scrollTop = await StateInitialValuesRepository.getInitialValue<number>('personalized', 'scrollTop', [`content:${path}`, 'global']);
+                    if (scrollTop != null) {
+                        session = { scrollTop };
+                    }
+                } catch (e) {}
+            } catch (err) { }
+            return { marksCount, session };
         },
 
         // ─── OutputAPI Event Subscriptions (Read/Event Path) ──────────────────────

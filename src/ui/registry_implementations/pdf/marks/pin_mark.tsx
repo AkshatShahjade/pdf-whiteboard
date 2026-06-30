@@ -49,8 +49,51 @@ export const pinMark: PDFMarkRendererType = {
         if (r.type === 'pin' && ctx.zoom !== undefined) {
             const rx = r.x * ctx.zoom;
             const ry = r.y * ctx.zoom;
+            const isSelectionMode = ctx.uiMode?.type === 'MARK_SELECTION';
+            const isSourceMark = isSelectionMode && ctx.uiMode?.selectedMarkId === r.id;
+            const isTargetCandidate = isSelectionMode && ctx.uiMode?.selectedMarkId !== r.id;
+
             return (
-                <g key={r.id}>
+                <g key={r.id} className={`${isSourceMark ? 'mark-source-' + r.id : ''} ${isTargetCandidate ? 'mark-candidate-' + r.id : ''}`}>
+                    <style>{`
+                      @keyframes pulseSource-${r.id} {
+                        0% { stroke-width: 6px; opacity: 0.5; stroke: #3B82F6; }
+                        100% { stroke-width: 16px; opacity: 0.9; stroke: #93C5FD; }
+                      }
+                      @keyframes pulseCandidate-${r.id} {
+                        0% { stroke-width: 4px; opacity: 0.15; }
+                        100% { stroke-width: 7px; opacity: 0.35; }
+                      }
+                      .mark-source-${r.id} .pulse-glow {
+                        animation: pulseSource-${r.id} 0.6s infinite alternate ease-in-out;
+                      }
+                      .mark-candidate-${r.id} .candidate-glow {
+                        animation: pulseCandidate-${r.id} 1.5s infinite alternate ease-in-out;
+                      }
+                      .mark-candidate-${r.id}:hover .candidate-glow {
+                        animation: none;
+                        opacity: 0.8 !important;
+                        stroke-width: 10px !important;
+                        stroke: #34D399 !important;
+                      }
+                      .mark-candidate-${r.id}:hover .visual-border {
+                        fill: #10B981 !important;
+                      }
+                      .mark-candidate-${r.id}:hover {
+                        cursor: pointer;
+                      }
+                    `}</style>
+
+                    {/* Glowing background circles for Pin drop */}
+                    {isSourceMark && (
+                        <circle className="pulse-glow" cx={rx} cy={ry} r={12} fill="none" stroke="#3B82F6" strokeWidth={6} style={{ pointerEvents: 'none' }} />
+                    )}
+
+                    {/* Faint pulsating glow for target candidates */}
+                    {isTargetCandidate && (
+                        <circle className="candidate-glow" cx={rx} cy={ry} r={12} fill="none" stroke="#10B981" strokeWidth={5} style={{ pointerEvents: 'none', transition: 'all 0.2s' }} />
+                    )}
+
                     <g 
                         style={{ pointerEvents: 'auto' }} 
                         onMouseDown={(e) => { 
@@ -63,10 +106,10 @@ export const pinMark: PDFMarkRendererType = {
                             ctx.onClick(e, r.id); 
                         }}
                     >
-                        {renderPin(rx, ry, ctx.isSelected ? ctx.color : '#6B7280')}
+                        {renderPin(rx, ry, ctx.isSelected ? ctx.color : '#6B7280', 'visual-border')}
                         
                         {/* Hit area for selection */}
-                        <circle cx={rx} cy={ry} r={12} fill="transparent" style={{ pointerEvents: 'fill', cursor: ctx.tool === 'select' ? 'pointer' : 'crosshair' }} />
+                        <circle cx={rx} cy={ry} r={12} fill="transparent" style={{ pointerEvents: 'fill', cursor: isSelectionMode ? 'pointer' : (ctx.tool === 'select' ? 'pointer' : 'crosshair') }} />
                     </g>
                     
                     {/* Selected state indicator */}
@@ -89,11 +132,12 @@ export const pinMark: PDFMarkRendererType = {
     }
 };
 
-function renderPin(x: number, y: number, color: string) {
+function renderPin(x: number, y: number, color: string, className?: string) {
     return (
         <g transform={`translate(${x - 12}, ${y - 24})`} style={{ pointerEvents: 'none' }}>
             {/* simple pin drop SVG icon */}
             <path 
+                className={className}
                 d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" 
                 fill={color} 
             />

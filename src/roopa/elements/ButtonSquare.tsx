@@ -1,5 +1,5 @@
 import React from 'react';
-import { UIElement, useUIElement } from '../../ui/mode_system';
+import { RoopaElement, useRoopaElement } from '../mode_system';
 import { UIStateStore } from '../../ui/ui_state_store';
 
 export interface ButtonSquareProps {
@@ -7,7 +7,7 @@ export interface ButtonSquareProps {
     tooltip?: string;
     isActive?: boolean;
     variant?: 'primary' | 'ghost' | 'danger';
-    permissionId?: UIElement;
+    permissionId?: RoopaElement;
     uiStore?: UIStateStore;
     onClick: () => void;
 }
@@ -21,7 +21,7 @@ export function ButtonSquare({
     uiStore,
     onClick
 }: ButtonSquareProps) {
-    const isAllowed = permissionId && uiStore ? useUIElement(uiStore, permissionId) : true;
+    const isAllowed = permissionId && uiStore ? useRoopaElement(uiStore, permissionId) : true;
     
     // Basic styling derived from variant & state
     let bg = 'transparent';

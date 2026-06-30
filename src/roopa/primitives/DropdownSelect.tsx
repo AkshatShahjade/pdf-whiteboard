@@ -1,11 +1,11 @@
 import React from 'react';
-import { UIElement, useUIElement } from '../../ui/mode_system';
+import { RoopaElement, useRoopaElement } from '../mode_system';
 import { UIStateStore } from '../../ui/ui_state_store';
 
 export interface DropdownSelectProps {
     options: { label: string; value: string }[];
     selectedValue: string;
-    permissionId?: UIElement;
+    permissionId?: RoopaElement;
     uiStore?: UIStateStore;
     onSelect: (val: string) => void;
 }
@@ -17,7 +17,7 @@ export function DropdownSelect({
     uiStore,
     onSelect
 }: DropdownSelectProps) {
-    const isAllowed = permissionId && uiStore ? useUIElement(uiStore, permissionId) : true;
+    const isAllowed = permissionId && uiStore ? useRoopaElement(uiStore, permissionId) : true;
 
     return (
         <select
