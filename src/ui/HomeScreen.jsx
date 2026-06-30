@@ -151,7 +151,6 @@ export default function HomeScreen({ onOpen, uiController }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aboutOpen, setAboutOpen]     = useState(false);
   const [settings, setSettings]       = useState({
-    defaultSplit: 50,
     theme:        'dark',
     autosaveMs:   800,
     maxGlobalPdfTools: 8,

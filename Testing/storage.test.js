@@ -167,11 +167,11 @@ describe('saveSession() / loadSession()', () => {
   beforeEach(() => localStorageMock.clear());
 
   it('round-trips basic session data', () => {
-    const data = { regions: [], selectedRegionId: null, leftPct: 50, scrollTop: 0 };
+    const data = { regions: [], selectedRegionId: null, dualSplitPaneLeftPct: 50, scrollTop: 0 };
     saveSession('/docs/paper.pdf', data);
     const result = loadSession('/docs/paper.pdf');
     expect(result.regions).toEqual([]);
-    expect(result.leftPct).toBe(50);
+    expect(result.dualSplitPaneLeftPct).toBe(50);
     expect(result.pdfPath).toBe('/docs/paper.pdf');
   });
 
@@ -200,7 +200,7 @@ describe('saveSession() / loadSession()', () => {
       { id: 'reg_2', type: 'lasso', x: 5, y: 5, w: 80, h: 60, points: [{ x: 0, y: 0 }, { x: 80, y: 60 }] },
       { id: 'reg_3', type: 'section', x: 0, y: 100, w: 16, h: 200 },
     ];
-    saveSession('/docs/paper.pdf', { regions, selectedRegionId: 'reg_1', leftPct: 60, scrollTop: 450 });
+    saveSession('/docs/paper.pdf', { regions, selectedRegionId: 'reg_1', dualSplitPaneLeftPct: 60, scrollTop: 450 });
     const result = loadSession('/docs/paper.pdf');
     expect(result.regions).toHaveLength(3);
     expect(result.regions[1].points).toHaveLength(2);
@@ -214,10 +214,10 @@ describe('saveSession() / loadSession()', () => {
   });
 
   it('sessions for different PDFs are independent', () => {
-    saveSession('/a.pdf', { leftPct: 40 });
-    saveSession('/b.pdf', { leftPct: 70 });
-    expect(loadSession('/a.pdf').leftPct).toBe(40);
-    expect(loadSession('/b.pdf').leftPct).toBe(70);
+    saveSession('/a.pdf', { dualSplitPaneLeftPct: 40 });
+    saveSession('/b.pdf', { dualSplitPaneLeftPct: 70 });
+    expect(loadSession('/a.pdf').dualSplitPaneLeftPct).toBe(40);
+    expect(loadSession('/b.pdf').dualSplitPaneLeftPct).toBe(70);
   });
 });
 
@@ -515,7 +515,7 @@ describe('toRoman()', () => {
 
 const SETTINGS_KEY = 'lemmamap:settings';
 const DEFAULT_SETTINGS = {
-  defaultSplit: 50, theme: 'dark', autosaveMs: 800,
+  theme: 'dark', autosaveMs: 800,
   maxGlobalPdfTools: 8, defaultTool: 'draw',
 };
 
@@ -534,15 +534,13 @@ describe('loadSettings()', () => {
 
   it('returns defaults when nothing is saved', () => {
     const s = loadSettings();
-    expect(s.defaultSplit).toBe(50);
     expect(s.maxGlobalPdfTools).toBe(8);
     expect(s.defaultTool).toBe('draw');
   });
 
   it('merges saved settings over defaults', () => {
-    saveSettings({ defaultSplit: 35, maxGlobalPdfTools: 4 });
+    saveSettings({ maxGlobalPdfTools: 4 });
     const s = loadSettings();
-    expect(s.defaultSplit).toBe(35);
     expect(s.maxGlobalPdfTools).toBe(4);
     expect(s.defaultTool).toBe('draw'); // default preserved
   });
@@ -550,7 +548,7 @@ describe('loadSettings()', () => {
   it('returns defaults if stored JSON is corrupt', () => {
     localStorage.setItem(SETTINGS_KEY, '{BAD JSON');
     const s = loadSettings();
-    expect(s.defaultSplit).toBe(50);
+    expect(s.maxGlobalPdfTools).toBe(8);
   });
 });
 

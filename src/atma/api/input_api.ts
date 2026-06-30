@@ -9,7 +9,7 @@ import { StateInitialValuesRepository } from '../storage/repositories/StateIniti
 export interface InputAPIInterface {
   loadSession(contentId: string, contentType: string, slotId?: string): Promise<void>;
   flushSession(): void;
-  updateSplitter(leftPct: number): void;
+  updateSplitter(dualSplitPaneLeftPct: number): void;
   selectMark(slotId: string, markId: string | null): void;
   updateScrollTop(slotId: string, scrollTop: number): void;
   addMark(slotId: string, mark: Omit<MarkDTO, 'id'> & { id?: string }): Promise<string>;
@@ -44,8 +44,8 @@ export function createInputAPI(
       stateSyncService.flushSession();
     },
 
-    async updateSplitter(leftPct: number): Promise<void> {
-      store.setState(draft => { draft.leftPct = leftPct; });
+    async updateSplitter(dualSplitPaneLeftPct: number): Promise<void> {
+      store.setState(draft => { draft.dualSplitPaneLeftPct = dualSplitPaneLeftPct; });
     },
 
     selectMark(slotId: string, markId: string | null): void {
@@ -81,7 +81,6 @@ export function createInputAPI(
     },
 
     async saveSettings(settings: any): Promise<void> {
-      await StateInitialValuesRepository.setSpecificValue('defaultSplit', ['global'], settings.defaultSplit);
       await StateInitialValuesRepository.setSpecificValue('theme', ['global'], settings.theme);
       await StateInitialValuesRepository.setSpecificValue('autosaveMs', ['global'], settings.autosaveMs);
       await StateInitialValuesRepository.setSpecificValue('maxGlobalPdfTools', ['global'], settings.maxGlobalPdfTools);

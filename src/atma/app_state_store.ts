@@ -15,7 +15,7 @@ export interface AppState {
   workspace_layout: any;
   tool_config: any;
   libraryPath: string | null;
-  leftPct: number;
+  dualSplitPaneLeftPct: number;
   slots: Record<string, SlotAppState>;
 }
 
@@ -32,7 +32,7 @@ export function createAppStateStore(initialState?: Partial<AppState>): AppStateS
     workspace_layout: null,
     tool_config: null,
     libraryPath: null,
-    leftPct: 50, // This will be hydrated dynamically later
+    dualSplitPaneLeftPct: 50, // This will be hydrated dynamically later
     slots: {},
     ...initialState
   };

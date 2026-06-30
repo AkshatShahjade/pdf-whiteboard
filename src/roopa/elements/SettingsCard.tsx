@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { MultiStateToggle } from '../primitives/MultiStateToggle';
 import { TextInput } from '../primitives/TextInput';
 import { ButtonFlat } from '../primitives/ButtonFlat';
+import { DropdownSelect } from '../primitives/DropdownSelect';
+import { FilePathInput } from '../primitives/FilePathInput';
+import { ScopeSelector } from '../primitives/ScopeSelector';
 
 interface SettingsCardProps {
     schema: any;
@@ -10,6 +13,8 @@ interface SettingsCardProps {
     onUpdateClassification: (key: string, cls: 'personalizable' | 'defaulted') => void;
     onUpdateDefault: (key: string, scope: string, val: any) => void;
     onDeleteDefault: (key: string, scope: string) => void;
+    onValidationError?: (key: string, scope: string, err: string | null) => void;
+    libraryPath?: string;
 }
 
 export function SettingsCard({
@@ -18,7 +23,9 @@ export function SettingsCard({
     scopedDefaults,
     onUpdateClassification,
     onUpdateDefault,
-    onDeleteDefault
+    onDeleteDefault,
+    onValidationError,
+    libraryPath
 }: SettingsCardProps) {
     const [expanded, setExpanded] = useState(false);
     const [newScope, setNewScope] = useState('');
@@ -31,6 +38,13 @@ export function SettingsCard({
     useEffect(() => {
         setGlobalVal(JSON.stringify(globalDefault));
     }, [globalDefault]);
+
+    // Initialize dropdown option for add-default form if applicable
+    useEffect(() => {
+        if (expanded && schema.inputType === 'dropdown' && !newValue) {
+            setNewValue(schema.dropdownOptions?.[0]?.value || '');
+        }
+    }, [expanded, schema.inputType, schema.dropdownOptions, newValue]);
     
     // Filter out global for the table
     const specificDefaults = scopedDefaults.filter(d => d.scope !== 'global');
@@ -41,7 +55,6 @@ export function SettingsCard({
             <div 
                 style={{ padding: 12, display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 12 }}
                 onClick={(e) => {
-                    // Prevent toggle if clicking inside inputs or buttons
                     const target = e.target as HTMLElement;
                     if (!target.closest('input, button, select')) {
                         setExpanded(!expanded);
@@ -59,20 +72,61 @@ export function SettingsCard({
                 />
 
                 {/* Global Default Input */}
-                <div style={{ width: 120 }}>
-                    <TextInput 
-                        value={globalVal}
-                        onChange={setGlobalVal}
-                        onSubmit={(newVal) => {
-                            try {
-                                const val = JSON.parse(newVal);
-                                if (JSON.stringify(val) !== JSON.stringify(globalDefault)) {
+                <div style={{ width: 140 }}>
+                    {schema.inputType === 'dropdown' ? (
+                        <DropdownSelect 
+                            options={schema.dropdownOptions || []}
+                            selectedValue={globalVal}
+                            onSelect={(newVal) => {
+                                setGlobalVal(newVal);
+                                try {
+                                    const val = JSON.parse(newVal);
                                     onUpdateDefault(schema.key, 'global', val);
+                                } catch (err) {
+                                    onUpdateDefault(schema.key, 'global', newVal);
                                 }
-                            } catch (err) {}
-                        }}
-                        placeholder="Global Default"
-                    />
+                            }}
+                        />
+                    ) : schema.inputType === 'filepath' ? (
+                        <FilePathInput 
+                            value={globalVal}
+                            onChange={(newVal) => {
+                                setGlobalVal(newVal);
+                                try {
+                                    const val = JSON.parse(newVal);
+                                    onUpdateDefault(schema.key, 'global', val);
+                                } catch (err) {
+                                    onUpdateDefault(schema.key, 'global', newVal);
+                                }
+                            }}
+                            returnJSON={schema.returnJSON}
+                            mode={schema.rules?.mode || 'directory'}
+                            extensions={schema.rules?.extensions}
+                        />
+                    ) : (
+                        <TextInput 
+                            value={globalVal}
+                            onChange={(newVal) => {
+                                setGlobalVal(newVal);
+                                try {
+                                    const val = JSON.parse(newVal);
+                                    onUpdateDefault(schema.key, 'global', val);
+                                } catch (err) {
+                                    onUpdateDefault(schema.key, 'global', newVal);
+                                }
+                            }}
+                            variant={schema.inputType}
+                            rules={schema.rules}
+                            rulesContext={{ key: schema.key, scope: 'global' }}
+                            returnJSON={schema.returnJSON}
+                            onValidationError={(err) => {
+                                if (onValidationError) {
+                                    onValidationError(schema.key, 'global', err);
+                                }
+                            }}
+                            placeholder="Global Default"
+                        />
+                    )}
                 </div>
                 
                 <div style={{ fontSize: 10, opacity: 0.5 }}>{expanded ? '▲' : '▼'}</div>
@@ -99,6 +153,7 @@ export function SettingsCard({
                                         schema={schema} 
                                         onUpdateDefault={onUpdateDefault} 
                                         onDeleteDefault={onDeleteDefault} 
+                                        onValidationError={onValidationError}
                                     />
                                 ))}
                             </tbody>
@@ -110,29 +165,43 @@ export function SettingsCard({
                     {/* Add Form */}
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         <div style={{ flex: 1 }}>
-                            <TextInput 
-                                placeholder="Scope (e.g. contentType:pdf)" 
+                            <ScopeSelector 
                                 value={newScope}
                                 onChange={setNewScope}
+                                libraryPath={libraryPath}
                             />
                         </div>
                         <div style={{ flex: 1 }}>
-                            <TextInput 
-                                placeholder="Value (JSON)" 
-                                value={newValue}
-                                onChange={setNewValue}
-                                onSubmit={(val) => {
-                                    if (!newScope || !val) return;
-                                    try {
-                                        const parsed = JSON.parse(val);
-                                        onUpdateDefault(schema.key, newScope, parsed);
-                                        setNewScope('');
-                                        setNewValue('');
-                                    } catch (err) {
-                                        alert('Value must be valid JSON');
-                                    }
-                                }}
-                            />
+                            {schema.inputType === 'dropdown' ? (
+                                <DropdownSelect
+                                    options={schema.dropdownOptions || []}
+                                    selectedValue={newValue}
+                                    onSelect={setNewValue}
+                                />
+                            ) : schema.inputType === 'filepath' ? (
+                                <FilePathInput 
+                                    value={newValue}
+                                    onChange={setNewValue}
+                                    returnJSON={schema.returnJSON}
+                                    mode={schema.rules?.mode || 'directory'}
+                                    extensions={schema.rules?.extensions}
+                                />
+                            ) : (
+                                <TextInput 
+                                    placeholder={schema.returnJSON ? "Value" : "Value (JSON)"}
+                                    value={newValue}
+                                    onChange={setNewValue}
+                                    variant={schema.inputType}
+                                    rules={schema.rules}
+                                    rulesContext={{ key: schema.key, scope: newScope || 'temp_scope' }}
+                                    returnJSON={schema.returnJSON}
+                                    onValidationError={(err) => {
+                                        if (onValidationError) {
+                                            onValidationError(schema.key, 'add_new_scope_val', err);
+                                        }
+                                    }}
+                                />
+                            )}
                         </div>
                         <ButtonFlat 
                             label="+ Add" 
@@ -142,7 +211,10 @@ export function SettingsCard({
                                     const val = JSON.parse(newValue);
                                     onUpdateDefault(schema.key, newScope, val);
                                     setNewScope('');
-                                    setNewValue('');
+                                    setNewValue(schema.inputType === 'dropdown' ? (schema.dropdownOptions?.[0]?.value || '') : '');
+                                    if (onValidationError) {
+                                        onValidationError(schema.key, 'add_new_scope_val', null);
+                                    }
                                 } catch (err) {
                                     alert('Value must be valid JSON');
                                 }
@@ -155,7 +227,19 @@ export function SettingsCard({
     );
 }
 
-function SettingsCardRow({ d, schema, onUpdateDefault, onDeleteDefault }: { d: any, schema: any, onUpdateDefault: any, onDeleteDefault: any }) {
+function SettingsCardRow({ 
+    d, 
+    schema, 
+    onUpdateDefault, 
+    onDeleteDefault, 
+    onValidationError 
+}: { 
+    d: any, 
+    schema: any, 
+    onUpdateDefault: any, 
+    onDeleteDefault: any, 
+    onValidationError?: any 
+}) {
     const [val, setVal] = useState(JSON.stringify(d.value));
     
     useEffect(() => {
@@ -166,23 +250,69 @@ function SettingsCardRow({ d, schema, onUpdateDefault, onDeleteDefault }: { d: a
         <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <td style={{ padding: '6px 0' }}>{d.scope}</td>
             <td style={{ padding: '6px 0' }}>
-                <TextInput 
-                    value={val}
-                    onChange={setVal}
-                    onSubmit={(newVal) => {
-                        try {
-                            const parsed = JSON.parse(newVal);
-                            if (JSON.stringify(parsed) !== JSON.stringify(d.value)) {
+                {schema.inputType === 'dropdown' ? (
+                    <DropdownSelect
+                        options={schema.dropdownOptions || []}
+                        selectedValue={val}
+                        onSelect={(newVal) => {
+                            setVal(newVal);
+                            try {
+                                const parsed = JSON.parse(newVal);
                                 onUpdateDefault(schema.key, d.scope, parsed);
+                            } catch (err) {
+                                onUpdateDefault(schema.key, d.scope, newVal);
                             }
-                        } catch (err) {}
-                    }}
-                />
+                        }}
+                    />
+                ) : schema.inputType === 'filepath' ? (
+                    <FilePathInput 
+                        value={val}
+                        onChange={(newVal) => {
+                            setVal(newVal);
+                            try {
+                                const parsed = JSON.parse(newVal);
+                                onUpdateDefault(schema.key, d.scope, parsed);
+                            } catch (err) {
+                                onUpdateDefault(schema.key, d.scope, newVal);
+                            }
+                        }}
+                        returnJSON={schema.returnJSON}
+                        mode={schema.rules?.mode || 'directory'}
+                        extensions={schema.rules?.extensions}
+                    />
+                ) : (
+                    <TextInput 
+                        value={val}
+                        onChange={(newVal) => {
+                            setVal(newVal);
+                            try {
+                                const parsed = JSON.parse(newVal);
+                                onUpdateDefault(schema.key, d.scope, parsed);
+                            } catch (err) {
+                                onUpdateDefault(schema.key, d.scope, newVal);
+                            }
+                        }}
+                        variant={schema.inputType}
+                        rules={schema.rules}
+                        rulesContext={{ key: schema.key, scope: d.scope }}
+                        returnJSON={schema.returnJSON}
+                        onValidationError={(err) => {
+                            if (onValidationError) {
+                                onValidationError(schema.key, d.scope, err);
+                            }
+                        }}
+                    />
+                )}
             </td>
             <td style={{ padding: '6px 0', textAlign: 'right' }}>
                 <ButtonFlat 
                     label="🗑️" 
-                    onClick={() => onDeleteDefault(schema.key, d.scope)}
+                    onClick={() => {
+                        onDeleteDefault(schema.key, d.scope);
+                        if (onValidationError) {
+                            onValidationError(schema.key, d.scope, null);
+                        }
+                    }}
                 />
             </td>
         </tr>

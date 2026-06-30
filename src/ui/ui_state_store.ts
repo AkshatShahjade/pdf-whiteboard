@@ -50,7 +50,7 @@ export function createUIStateStore(initialState: Partial<UIState> = {}): UIState
         workspace_layout: null,
         tool_config: null,
         libraryPath: null,
-        leftPct: 50, // Hydrated dynamically
+        dualSplitPaneLeftPct: 50, // Hydrated dynamically
         ...initialState,
     };
 

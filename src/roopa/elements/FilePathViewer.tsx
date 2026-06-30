@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-
+import { TextInput } from '../primitives/TextInput';
+import { ButtonSquare } from '../primitives/ButtonSquare';
 interface FilePathViewerProps {
   slotId: string;
   uiState: any;
@@ -50,25 +51,14 @@ export function FilePathViewer({ slotId, uiState, uiController }: FilePathViewer
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, overflow: 'hidden' }}>
         <span style={{ color: '#6b7280', userSelect: 'none' }}>PATH:</span>
         {isEditing ? (
-          <input
-            autoFocus
-            type="text"
-            value={editValue}
-            onChange={e => setEditValue(e.target.value)}
-            onBlur={handleSave}
-            onKeyDown={e => e.key === 'Enter' && handleSave()}
-            style={{
-              flex: 1,
-              background: '#181b21',
-              border: '1px solid #3b82f6',
-              color: '#e5e7eb',
-              borderRadius: '4px',
-              padding: '2px 6px',
-              fontSize: '11px',
-              fontFamily: 'inherit',
-              outline: 'none'
-            }}
-          />
+          <div style={{ flex: 1 }} onBlur={handleSave}>
+            <TextInput
+              autoFocus
+              value={editValue}
+              onChange={setEditValue}
+              onSubmit={handleSave}
+            />
+          </div>
         ) : (
           <div
             onClick={() => setIsEditing(true)}
@@ -90,33 +80,12 @@ export function FilePathViewer({ slotId, uiState, uiController }: FilePathViewer
           </div>
         )}
       </div>
-      <button
+      <ButtonSquare
+        icon="✕"
+        tooltip="Close slot"
+        variant="danger"
         onClick={() => uiController.closeSlot(slotId)}
-        title="Close slot"
-        style={{
-          background: 'transparent',
-          border: 'none',
-          color: '#9ca3af',
-          cursor: 'pointer',
-          fontSize: '11px',
-          padding: '2px 6px',
-          borderRadius: '3px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'all 0.15s'
-        }}
-        onMouseEnter={e => {
-          e.currentTarget.style.background = 'rgba(248, 113, 113, 0.2)';
-          e.currentTarget.style.color = '#F87171';
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.background = 'transparent';
-          e.currentTarget.style.color = '#9ca3af';
-        }}
-      >
-        ✕
-      </button>
+      />
     </div>
   );
 }

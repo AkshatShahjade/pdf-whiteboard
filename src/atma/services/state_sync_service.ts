@@ -238,7 +238,7 @@ export const stateSyncService = {
       };
 
       // Load individual keys via cascading scopes (Synchronous!)
-      const leftPct = resolveStateValue('leftPct', context, stateCache);
+      const dualSplitPaneLeftPct = resolveStateValue('dualSplitPaneLeftPct', context, stateCache);
       const selectedMarkId = resolveStateValue('selectedMarkId', context, stateCache);
       const scrollTop = resolveStateValue('scrollTop', context, stateCache);
       const zoom = resolveStateValue('zoom', context, stateCache);
@@ -256,7 +256,7 @@ export const stateSyncService = {
 
       // Mutate store (Subscriber will automatically pick this up, but we'll ignore initial load diffing or just let it re-persist safely)
       store.setState(draft => {
-        draft.leftPct = leftPct;
+        draft.dualSplitPaneLeftPct = dualSplitPaneLeftPct;
         draft.slots[slotId] = {
           ...baseState,
           contentId: contentId,
@@ -271,7 +271,7 @@ export const stateSyncService = {
       });
 
       const sessionDTO: SessionDTO = {
-        leftPct,
+        dualSplitPaneLeftPct,
         slots: {
           [slotId]: {
             contentId: contentId,

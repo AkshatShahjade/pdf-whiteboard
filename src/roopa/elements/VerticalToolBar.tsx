@@ -1,6 +1,9 @@
 import React from 'react';
 import { confirmDialog } from '../../atma/platform_adapter/switch';
 import { toRoman } from '../../ui/helper';
+import { ButtonFlat } from '../primitives/ButtonFlat';
+import { ButtonSquare } from '../primitives/ButtonSquare';
+import { TextInput } from '../primitives/TextInput';
 
 interface VerticalToolBarProps {
   settings: any;
@@ -119,15 +122,12 @@ export function VerticalToolBar({
           const icon = tool.icon || '?';
           return (
             <div key={id} style={{ position: 'relative' }}>
-              <button
+              <ButtonSquare
+                icon={icon}
+                tooltip={key ? `${label} [${key}]` : label}
+                isActive={activeTool === id}
                 onClick={() => activateTool(tool)}
-                title={key ? `${label} [${key}]` : label}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '6px', border: `1px solid ${activeTool === id ? '#3B82F6' : 'transparent'}`, background: activeTool === id ? 'rgba(59,130,246,0.2)' : 'transparent', color: activeTool === id ? '#93C5FD' : '#d1d5db', cursor: 'pointer', fontSize: '18px', transition: 'all 0.15s' }}
-                onMouseEnter={e => { if (activeTool !== id) { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; } }}
-                onMouseLeave={e => { if (activeTool !== id) { e.currentTarget.style.color = '#d1d5db'; e.currentTarget.style.background = 'transparent'; } }}
-              >
-                {icon}
-              </button>
+              />
               {tool.renderToolbarExtras?.({
                 toolId: id,
                 tool: activeTool,
@@ -152,19 +152,18 @@ export function VerticalToolBar({
             const showSelectPanel = shortcutState.selectPanelIdx === idx;
             return (
               <div key={`gtool-${idx}`} style={{ position: 'relative' }}>
-                <button
+                <ButtonSquare
+                  icon={toRoman(idx + 1)}
+                  tooltip={`Shortcut Tool ${idx + 1}`}
+                  isActive={isActive}
                   onClick={() => shortcutManager.openSlot(idx, slotState?.selectedMarkId)}
-                  title={`Shortcut Tool ${idx + 1}`}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '6px', border: `1px solid ${isActive ? '#3B82F6' : 'transparent'}`, background: isActive ? 'rgba(59,130,246,0.2)' : 'transparent', color: isActive ? '#93C5FD' : '#d1d5db', cursor: 'pointer', fontSize: '16px' }}
-                >
-                  {toRoman(idx + 1)}
-                </button>
+                />
                 {showControls && (
                   <div style={{ position: 'absolute', right: 'calc(100% + 12px)', top: '50%', transform: 'translateY(-50%)', background: 'rgba(38,42,51,0.9)', backdropFilter: 'blur(10px)', borderRadius: '8px', padding: '6px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', gap: '8px', alignItems: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
-                    <button onClick={() => shortcutManager.showUpdatePanel(idx)} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #3B82F6', background: 'rgba(59,130,246,0.2)', color: '#93C5FD', cursor: 'pointer' }}>Update</button>
-                    <button onClick={() => shortcutManager.closeSlot()} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #4b5563', background: 'transparent', color: '#d1d5db', cursor: 'pointer' }}>Close</button>
+                    <ButtonFlat label="Update" onClick={() => shortcutManager.showUpdatePanel(idx)} active />
+                    <ButtonFlat label="Close" onClick={() => shortcutManager.closeSlot()} />
                     {shortcutState.slotCount > 1 && (
-                      <button onClick={() => deleteShortcutTool(idx)} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '11px', border: '1px solid #F87171', background: 'transparent', color: '#F87171', cursor: 'pointer' }}>Delete Tool</button>
+                      <ButtonFlat label="Delete Tool" onClick={() => deleteShortcutTool(idx)} />
                     )}
                   </div>
                 )}
@@ -174,46 +173,44 @@ export function VerticalToolBar({
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                       <div style={{ fontSize: '10px', color: '#9ca3af', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Session Tool {toRoman(idx + 1)}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <button onClick={handleCreateFromPanel} style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid #3B82F6', background: 'rgba(59,130,246,0.2)', color: '#93C5FD', cursor: 'pointer', fontSize: '11px' }}>Create</button>
-                        <button onClick={cancelShortcutSelection} style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid #F87171', background: 'transparent', color: '#F87171', cursor: 'pointer', fontSize: '11px' }}>Cancel</button>
+                        <ButtonFlat label="Create" onClick={handleCreateFromPanel} active />
+                        <ButtonFlat label="Cancel" onClick={cancelShortcutSelection} />
                         {shortcutState.slotCount > 1 && (
-                          <button
-                            onClick={() => deleteShortcutTool(idx)}
-                            style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid #F87171', background: 'transparent', color: '#F87171', cursor: 'pointer', fontSize: '11px' }}
-                          >
-                            Delete
-                          </button>
+                          <ButtonFlat label="Delete" onClick={() => deleteShortcutTool(idx)} />
                         )}
                       </div>
                     </div>
                     <div style={{ maxHeight: '182px', overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       {shortcutState.availableWhiteboards.map((wb: any) => (
-                        <button
+                        <ButtonFlat
                           key={wb.id}
+                          label={wb.name}
+                          active={shortcutState.draftId === wb.id}
                           onClick={() => shortcutManager.applySelection(idx, wb.id, wb.name, slotState?.selectedMarkId)}
-                          style={{ textAlign: 'left', padding: '8px 10px', borderRadius: '6px', border: `1px solid ${shortcutState.draftId === wb.id ? '#3B82F6' : '#374151'}`, background: shortcutState.draftId === wb.id ? 'rgba(59,130,246,0.18)' : '#262a33', color: '#e5e7eb', cursor: 'pointer', fontSize: '12px', minHeight: '30px' }}
-                        >
-                          {wb.name}
-                        </button>
+                        />
                       ))}
                       {shortcutState.availableWhiteboards.length === 0 && <span style={{ fontSize: '11px', color: '#9ca3af', textAlign: 'center', padding: '8px' }}>No whiteboards yet.</span>}
                     </div>
-                    <input value={shortcutState.newWhiteboardName} onChange={(e) => shortcutManager.setNewWhiteboardName(e.target.value)} placeholder="New whiteboard name..." style={{ width: '100%', background: '#1c1f26', border: '1px solid #4b5563', color: '#e5e7eb', borderRadius: '6px', padding: '6px 8px', fontSize: '11px', outline: 'none' }} />
+                    <TextInput
+                      value={shortcutState.newWhiteboardName}
+                      onChange={shortcutManager.setNewWhiteboardName}
+                      placeholder="New whiteboard name..."
+                    />
                   </div>
                 )}
               </div>
             );
           })}
           {shortcutState.slotCount < (settings?.maxGlobalPdfTools ?? 8) && (
-            <button onClick={() => shortcutManager.addSlot()} title="Add shortcut tool" style={{ width: '36px', height: '32px', borderRadius: '6px', border: '1px dashed #4b5563', background: 'transparent', color: '#d1d5db', cursor: 'pointer', fontSize: '16px' }}>+</button>
+            <ButtonSquare icon="+" tooltip="Add shortcut tool" onClick={() => shortcutManager.addSlot()} />
           )}
         </div>
       )}
 
       <div style={{ background: 'rgba(38,42,51,0.65)', backdropFilter: 'blur(10px)', borderRadius: '8px', padding: '6px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
-        <button onClick={zoomIn} title="Zoom In" style={{ width: '32px', height: '32px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '18px', borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>+</button>
+        <ButtonSquare icon="+" tooltip="Zoom In" onClick={zoomIn} />
         <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '500', margin: '2px 0' }}>{Math.round(zoom * 100)}%</span>
-        <button onClick={zoomOut} title="Zoom Out" style={{ width: '32px', height: '32px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '18px', borderRadius: '4px' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>-</button>
+        <ButtonSquare icon="-" tooltip="Zoom Out" onClick={zoomOut} />
       </div>
     </div>
   );

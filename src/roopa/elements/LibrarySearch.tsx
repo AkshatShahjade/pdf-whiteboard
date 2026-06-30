@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { readDir } from '../../atma/storage/storage_adapter/switch';
 import { joinPath } from '../../atma/platform_adapter/switch';
+import { TextInput } from '../primitives/TextInput';
+import { ButtonFlat } from '../primitives/ButtonFlat';
 
 // --- Recursive scanner helper ---
 async function scanDirectory(dir: string): Promise<Array<{ name: string; path: string }>> {
@@ -92,31 +94,10 @@ export function LibrarySearch({ libraryPath, onSelectFile, query, setQuery }: Li
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '12px' }}>
       <div style={{ position: 'relative', width: '100%' }}>
-        <input
-          type="text"
+        <TextInput
           placeholder="Search library..."
           value={activeQuery}
-          onChange={(e) => activeSetQuery(e.target.value)}
-          style={{
-            width: '100%',
-            background: '#1c1f26',
-            border: '1px solid #4b5563',
-            color: '#e5e7eb',
-            borderRadius: '8px',
-            padding: '10px 12px 10px 36px',
-            fontSize: '13px',
-            outline: 'none',
-            fontFamily: 'inherit',
-            transition: 'border-color 0.2s, box-shadow 0.2s',
-          }}
-          onFocus={e => {
-            e.currentTarget.style.borderColor = '#3B82F6';
-            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.25)';
-          }}
-          onBlur={e => {
-            e.currentTarget.style.borderColor = '#4b5563';
-            e.currentTarget.style.boxShadow = 'none';
-          }}
+          onChange={activeSetQuery}
         />
         <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: '14px', pointerEvents: 'none' }}>
           🔍
@@ -140,39 +121,15 @@ export function LibrarySearch({ libraryPath, onSelectFile, query, setQuery }: Li
             </span>
           ) : (
             results.map(file => (
-              <button
-                key={file.path}
-                onClick={() => onSelectFile(file.path, file.name)}
-                style={{
-                  textAlign: 'left',
-                  padding: '12px',
-                  borderRadius: '6px',
-                  background: '#262a33',
-                  border: '1px solid #374151',
-                  color: '#e5e7eb',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  transition: 'all 0.15s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = '#3B82F6';
-                  e.currentTarget.style.background = 'rgba(59,130,246,0.1)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.borderColor = '#374151';
-                  e.currentTarget.style.background = '#262a33';
-                }}
-              >
-                <span style={{ fontSize: '16px', opacity: 0.9 }}>
-                  {file.name.toLowerCase().endsWith('.tldr') ? '🧠' : '📄'}
-                </span>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {file.name.toLowerCase().endsWith('.tldr') ? file.name.replace(/\.tldr$/i, '') : file.name}
-                </span>
-              </button>
+              <div key={file.path} style={{ display: 'flex', width: '100%' }}>
+                <div style={{ flex: 1, display: 'flex' }}>
+                  <ButtonFlat
+                    label={file.name.toLowerCase().endsWith('.tldr') ? file.name.replace(/\.tldr$/i, '') : file.name}
+                    icon={file.name.toLowerCase().endsWith('.tldr') ? '🧠' : '📄'}
+                    onClick={() => onSelectFile(file.path, file.name)}
+                  />
+                </div>
+              </div>
             ))
           )}
         </div>

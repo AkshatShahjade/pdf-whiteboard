@@ -3,6 +3,9 @@ import { readDir, makeDirectory, exists, remove } from '../../atma/storage/stora
 import { joinPath, confirmDialog, dirname } from '../../atma/platform_adapter/switch';
 import { WhiteboardRepository } from '../../atma/storage/repositories/WhiteboardRepository';
 import { ContentRepository } from '../../atma/storage/repositories/ContentRepository';
+import { ButtonFlat } from '../primitives/ButtonFlat';
+import { ButtonSquare } from '../primitives/ButtonSquare';
+import { TextInput } from '../primitives/TextInput';
 
 // --- Capability Hook ---
 export function useLibraryExplorer(
@@ -166,15 +169,15 @@ export function LibraryExplorer({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <span style={{ fontSize: '10px', color: '#9ca3af', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Library Explorer</span>
         <div style={{ display: 'flex', gap: '6px' }}>
-          <button onClick={refreshDir} title="Refresh folder" style={{ background: 'none', border: '1px solid #4b5563', borderRadius: '4px', color: '#d1d5db', cursor: 'pointer', fontSize: '12px', padding: '4px 8px', lineHeight: 1 }}>↻</button>
-          <button onClick={() => { setNewFolderName(''); setIsFolderModalOpen(true); }} style={{ background: 'none', border: '1px solid #4b5563', borderRadius: '4px', color: '#d1d5db', cursor: 'pointer', fontSize: '10px', padding: '4px 8px' }}>+ New Folder</button>
-          <button onClick={() => { setNewWhiteboardName(''); setIsWhiteboardModalOpen(true); }} style={{ background: 'none', border: '1px solid #3B82F6', borderRadius: '4px', color: '#93C5FD', cursor: 'pointer', fontSize: '10px', padding: '4px 8px' }}>+ Whiteboard</button>
+          <ButtonSquare icon="↻" tooltip="Refresh folder" onClick={refreshDir} />
+          <ButtonFlat label="New Folder" icon="+" onClick={() => { setNewFolderName(''); setIsFolderModalOpen(true); }} />
+          <ButtonFlat label="Whiteboard" icon="+" onClick={() => { setNewWhiteboardName(''); setIsWhiteboardModalOpen(true); }} />
         </div>
       </div>
 
       <div style={{ fontSize: '11px', color: '#d1d5db', marginBottom: '12px', background: '#252932', padding: '6px 10px', borderRadius: '6px', border: '1px solid #374151', display: 'flex', alignItems: 'center', gap: '8px' }}>
         {currentDir !== libraryPath && (
-          <button onClick={handleUpDir} style={{ background: 'none', border: 'none', color: '#60A5FA', cursor: 'pointer', padding: 0 }}>↑ Back</button>
+          <ButtonFlat label="Back" icon="↑" onClick={handleUpDir} />
         )}
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {currentDir.replace(libraryPath, 'Library')}
@@ -188,55 +191,20 @@ export function LibraryExplorer({
           <span style={{ fontSize: '12px', color: '#9ca3af', textAlign: 'center', padding: '20px' }}>Folder is empty.</span>
         ) : (
           entries.map(entry => (
-            <div key={`${entry.name}-fs`} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                onClick={() => onEntryClick(entry)}
-                style={{
-                  flex: 1,
-                  textAlign: 'left',
-                  padding: '12px',
-                  borderRadius: '6px',
-                  background: '#262a33',
-                  border: '1px solid #374151',
-                  color: '#e5e7eb',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  transition: 'all 0.15s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = '#3B82F6';
-                  e.currentTarget.style.background = 'rgba(59,130,246,0.1)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.borderColor = '#374151';
-                  e.currentTarget.style.background = '#262a33';
-                }}
-              >
-                <span style={{ fontSize: '16px', opacity: 0.9 }}>
-                  {entry.isDirectory ? '📁' : entry.name.toLowerCase().endsWith('.tldr') ? '🧠' : '📄'}
-                </span>
-                <span>
-                  {entry.name.toLowerCase().endsWith('.tldr') ? entry.name.replace(/\.tldr$/i, '') : entry.name}
-                </span>
-              </button>
-              <button
-                title="Delete"
+            <div key={`${entry.name}-fs`} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+              <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+                <ButtonFlat
+                  label={entry.name.toLowerCase().endsWith('.tldr') ? entry.name.replace(/\.tldr$/i, '') : entry.name}
+                  icon={entry.isDirectory ? '📁' : entry.name.toLowerCase().endsWith('.tldr') ? '🧠' : '📄'}
+                  onClick={() => onEntryClick(entry)}
+                />
+              </div>
+              <ButtonSquare
+                icon="✕"
+                tooltip="Delete"
+                variant="danger"
                 onClick={() => deleteEntry(entry.name, entry.isDirectory)}
-                style={{
-                  width: '34px',
-                  height: '34px',
-                  borderRadius: '6px',
-                  border: '1px solid rgba(248,113,113,0.4)',
-                  background: 'rgba(248,113,113,0.08)',
-                  color: '#F87171',
-                  cursor: 'pointer'
-                }}
-              >
-                ✕
-              </button>
+              />
             </div>
           ))
         )}
@@ -246,18 +214,16 @@ export function LibraryExplorer({
         <div style={{ position: 'fixed', inset: 0, zIndex: 20000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
           <div style={{ background: '#262a33', border: '1px solid #374151', borderRadius: '8px', padding: '24px', width: '320px', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', fontFamily: "'IBM Plex Mono', monospace" }}>
             <h3 style={{ margin: 0, fontSize: '14px', color: '#f3f4f6' }}>Create New Folder</h3>
-            <input
+            <TextInput
               autoFocus
-              type="text"
               placeholder="Folder name..."
               value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && createFolder(newFolderName)}
-              style={{ background: '#1c1f26', border: '1px solid #4b5563', color: '#e5e7eb', padding: '10px 12px', borderRadius: '6px', outline: 'none', fontFamily: 'inherit', fontSize: '13px' }}
+              onChange={setNewFolderName}
+              onSubmit={() => createFolder(newFolderName)}
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
-              <button onClick={() => setIsFolderModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#d1d5db', cursor: 'pointer', padding: '6px 12px', fontSize: '12px' }}>Cancel</button>
-              <button onClick={() => createFolder(newFolderName)} style={{ background: '#3B82F6', border: 'none', color: '#fff', cursor: 'pointer', padding: '6px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}>Create</button>
+              <ButtonFlat label="Cancel" onClick={() => setIsFolderModalOpen(false)} />
+              <ButtonFlat label="Create" onClick={() => createFolder(newFolderName)} active />
             </div>
           </div>
         </div>
@@ -267,18 +233,16 @@ export function LibraryExplorer({
         <div style={{ position: 'fixed', inset: 0, zIndex: 20000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
           <div style={{ background: '#262a33', border: '1px solid #374151', borderRadius: '8px', padding: '24px', width: '320px', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', fontFamily: "'IBM Plex Mono', monospace" }}>
             <h3 style={{ margin: 0, fontSize: '14px', color: '#f3f4f6' }}>Create Whiteboard</h3>
-            <input
+            <TextInput
               autoFocus
-              type="text"
               placeholder="Whiteboard name..."
               value={newWhiteboardName}
-              onChange={(e) => setNewWhiteboardName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && createWhiteboard(newWhiteboardName)}
-              style={{ background: '#1c1f26', border: '1px solid #4b5563', color: '#e5e7eb', padding: '10px 12px', borderRadius: '6px', outline: 'none', fontFamily: 'inherit', fontSize: '13px' }}
+              onChange={setNewWhiteboardName}
+              onSubmit={() => createWhiteboard(newWhiteboardName)}
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
-              <button onClick={() => setIsWhiteboardModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#d1d5db', cursor: 'pointer', padding: '6px 12px', fontSize: '12px' }}>Cancel</button>
-              <button onClick={() => createWhiteboard(newWhiteboardName)} style={{ background: '#3B82F6', border: 'none', color: '#fff', cursor: 'pointer', padding: '6px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}>Create</button>
+              <ButtonFlat label="Cancel" onClick={() => setIsWhiteboardModalOpen(false)} />
+              <ButtonFlat label="Create" onClick={() => createWhiteboard(newWhiteboardName)} active />
             </div>
           </div>
         </div>

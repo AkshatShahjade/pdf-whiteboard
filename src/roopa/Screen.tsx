@@ -24,9 +24,9 @@ function RoopaLayoutRenderer({ node, uiState, uiController, settings, onHome }: 
         const splitPct = (uiState as any)[node.splitPctStateKey] ?? 50;
         
         const onSplitPctChange = (pct: number) => {
-            // For now, statically bind leftPct. We will extend uiController later for dynamic keys.
-            if (node.splitPctStateKey === 'leftPct') {
-                uiController.setLeftPct(pct);
+            // For now, statically bind dualSplitPaneLeftPct. We will extend uiController later for dynamic keys.
+            if (node.splitPctStateKey === 'dualSplitPaneLeftPct') {
+                uiController.setDualSplitPaneLeftPct(pct);
             }
         };
 

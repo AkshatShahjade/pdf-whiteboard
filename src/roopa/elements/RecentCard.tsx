@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MarkRepository } from '../../atma/storage/repositories/MarkRepository';
 import { LastUIStateRepository } from '../../atma/storage/repositories/LastUIStateRepository';
+import { ButtonSquare } from '../primitives/ButtonSquare';
 
 // --- Capability Hook ---
 export function useRecentCardData(path: string) {
@@ -55,24 +56,17 @@ export function RecentCard({ entry, onOpen, onRemove }: RecentCardProps) {
       }}
       onClick={() => onOpen(entry)}
     >
-      <button
-        onClick={(e) => { e.stopPropagation(); onRemove(entry.path); }}
-        style={{ 
-          position: 'absolute', 
-          top: '10px', 
-          right: '10px', 
-          background: 'none', 
-          border: 'none', 
-          cursor: 'pointer', 
-          color: '#6b7280', 
-          fontSize: '13px', 
-          padding: '2px 5px', 
-          opacity: hovered ? 1 : 0, 
-          transition: 'opacity 0.15s', 
-          borderRadius: '4px' 
-        }}
-        title="Remove from recents"
-      >✕</button>
+      <div 
+        onClick={(e) => e.stopPropagation()} 
+        style={{ position: 'absolute', top: '10px', right: '10px', opacity: hovered ? 1 : 0, transition: 'opacity 0.15s' }}
+      >
+        <ButtonSquare
+          icon="✕"
+          tooltip="Remove from recents"
+          onClick={() => onRemove(entry.path)}
+          variant="danger"
+        />
+      </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         <span style={{ fontSize: '18px', opacity: 0.8 }}>
           {entry.path.startsWith('whiteboard:') ? '🧠' : '📄'}

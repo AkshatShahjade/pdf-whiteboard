@@ -35,7 +35,7 @@ export function createQueryAPI(store: AppStateStore): QueryAPIInterface {
       }
 
       return {
-        leftPct: state.leftPct,
+        dualSplitPaneLeftPct: state.dualSplitPaneLeftPct,
         slots: slotsDto
       };
     },
@@ -59,7 +59,6 @@ export function createQueryAPI(store: AppStateStore): QueryAPIInterface {
     },
 
     async getSettings(): Promise<any> {
-      const defaultSplit = await StateInitialValuesRepository.getInitialValue('personalized', 'defaultSplit', ['global']);
       const theme = await StateInitialValuesRepository.getInitialValue('personalized', 'theme', ['global']);
       const autosaveMs = await StateInitialValuesRepository.getInitialValue('personalized', 'autosaveMs', ['global']);
       const maxGlobalPdfTools = await StateInitialValuesRepository.getInitialValue('personalized', 'maxGlobalPdfTools', ['global']);
@@ -67,7 +66,6 @@ export function createQueryAPI(store: AppStateStore): QueryAPIInterface {
       const activeWorkspaceId = await StateInitialValuesRepository.getInitialValue('personalized', 'activeWorkspaceId', ['global']);
 
       return {
-        defaultSplit,
         theme,
         autosaveMs,
         maxGlobalPdfTools,

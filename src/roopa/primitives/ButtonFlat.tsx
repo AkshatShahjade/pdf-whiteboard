@@ -6,6 +6,7 @@ export interface ButtonFlatProps {
     label: string;
     icon?: string;
     disabled?: boolean;
+    active?: boolean;
     permissionId?: UIElement;
     uiStore?: UIStateStore;
     onClick: () => void;
@@ -15,6 +16,7 @@ export function ButtonFlat({
     label,
     icon,
     disabled = false,
+    active = false,
     permissionId,
     uiStore,
     onClick
@@ -30,9 +32,9 @@ export function ButtonFlat({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                color: effectivelyDisabled ? '#666' : '#fff',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+                background: active ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                color: effectivelyDisabled ? '#666' : (active ? '#60A5FA' : '#fff'),
+                border: active ? '1px solid #3B82F6' : '1px solid rgba(255, 255, 255, 0.1)',
                 padding: '6px 12px',
                 borderRadius: '6px',
                 cursor: effectivelyDisabled ? 'not-allowed' : 'pointer',
@@ -42,10 +44,10 @@ export function ButtonFlat({
                 opacity: effectivelyDisabled ? 0.6 : 1
             }}
             onMouseOver={(e) => {
-                if (!effectivelyDisabled) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                if (!effectivelyDisabled) e.currentTarget.style.background = active ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255, 255, 255, 0.1)';
             }}
             onMouseOut={(e) => {
-                if (!effectivelyDisabled) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                if (!effectivelyDisabled) e.currentTarget.style.background = active ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)';
             }}
         >
             {icon && <span>{icon}</span>}

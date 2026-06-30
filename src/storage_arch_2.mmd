@@ -19,7 +19,7 @@ flowchart TD
         • zoom: number
         • tool: string
         • libraryPath: string | null
-        • leftPct: number
+        • dualSplitPaneLeftPct: number
         • scrollTop: number
         • selectedMarkId: string | null
         • marks: Map<string, MarkDTO>"]:::store
@@ -105,7 +105,7 @@ flowchart TD
     I1 --> S_load
     
     %% Input API Mutates Store Directly!
-    I2 -->|Mutates leftPct| Store
+    I2 -->|Mutates dualSplitPaneLeftPct| Store
     I3 -->|Mutates selectedMarkId| Store
     I4 -->|Mutates scrollTop| Store
     I13 -->|Mutates zoom| Store

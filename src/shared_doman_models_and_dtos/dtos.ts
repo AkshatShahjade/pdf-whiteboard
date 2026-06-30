@@ -56,7 +56,7 @@ export interface SlotSessionDTO {
 }
 
 export interface SessionDTO {
-  leftPct: number;
+  dualSplitPaneLeftPct: number;
   slots: Record<string, SlotSessionDTO>;
   metadata?: Record<string, any>;
 }

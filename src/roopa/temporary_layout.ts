@@ -35,8 +35,8 @@ export const TEMPORARY_ROOPA_LAYOUT = {
             layout: {
                 type: "DualSplitPane",
                 direction: "horizontal",
-                // This binds the split percentage to the 'leftPct' state variable in the 4-layer architecture
-                splitPctStateKey: "leftPct", 
+                // This binds the split percentage to the 'dualSplitPaneLeftPct' state variable in the 4-layer architecture
+                splitPctStateKey: "dualSplitPaneLeftPct", 
                 
                 children: [
                     {

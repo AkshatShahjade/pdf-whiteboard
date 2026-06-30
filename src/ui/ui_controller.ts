@@ -9,7 +9,7 @@ import { ContentRepository } from '../atma/storage/repositories/ContentRepositor
 export interface UIController {
     // ─── Transient UI / Layout Mutations ──────────────────────────────────────
     setZoom: (zoom: number, slotId?: string) => void;
-    setLeftPct: (pct: number) => void;
+    setDualSplitPaneLeftPct: (pct: number) => void;
     setCurrentPage: (currentPage: number, slotId?: string) => void;
     setPageInput: (pageInput: string, slotId?: string) => void;
     setTool: (tool: string, slotId?: string) => void;
@@ -53,8 +53,8 @@ export function createUIController(store: UIStateStore, onHomeCallback?: () => v
         setZoom: (zoom, slotId) => {
             inputAPI.updateZoom(slotId || store.getState().activeSlot, zoom);
         },
-        setLeftPct: (leftPct) => {
-            inputAPI.updateSplitter(leftPct);
+        setDualSplitPaneLeftPct: (dualSplitPaneLeftPct) => {
+            inputAPI.updateSplitter(dualSplitPaneLeftPct);
         },
         setCurrentPage: (currentPage, slotId) => {
             const target = slotId || store.getState().activeSlot;
@@ -286,7 +286,7 @@ export function createUIController(store: UIStateStore, onHomeCallback?: () => v
                     }
 
                     store.setState({
-                        leftPct: session.leftPct,
+                        dualSplitPaneLeftPct: session.dualSplitPaneLeftPct,
                         slots: mergedSlots
                     });
                 }),

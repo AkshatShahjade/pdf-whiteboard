@@ -84,6 +84,15 @@ The workspace header shouldn't need to show the name of the content. as there is
 \
 
 \
+on entering the new info in settingsCard, if I don't press enter , it doesn't store the info. 
+So if I close the settings pane without pressing enter no changes are made. Add a save and cancel button.
+Also add different variants of the textInput primitive that only accept numbers , or emails, or valid file paths, or mobile numbers, or names, etc. And the textinput also accepts rules. For number variant in the case of maxGlobalPDfTool, the rule would be that the 1<var<=8. 
+Lastly, analyze why the settingsCard is taking all the values in as if it were JSON. add a property in each textinput variant called 'returnJSON' that converts natural user input into JSON.
+Furthermore, things with fixed options like tool / defaultTool should use dropdown not textInput.
+For each setting in Settings Pane, output the correct input format to take the information in?
+\
+
+\
 One of the big goals with the ui design is that it should be invisible until it is needed - and there is a strong push for users to learn and configure their keyboard shortcuts so they don't need the ui. This is to maximize screen space for content and not ui. 
 Acheived by:
     1. hidden ui that appears when mouse enters a certain region (highlight the activation region in a faint primary colour glow). eg- for workspace header or screen level toolbar

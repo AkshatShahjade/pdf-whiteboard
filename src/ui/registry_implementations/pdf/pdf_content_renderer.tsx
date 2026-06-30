@@ -552,7 +552,7 @@ function PDFContentComponent({
     if (e.key === '\\' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       if (!slotState?.selectedMarkId && (!shortcutState || shortcutState.selectedIdx === null)) return;
-      uiController.setLeftPct(55);
+      uiController.setDualSplitPaneLeftPct(55);
       return;
     }
 

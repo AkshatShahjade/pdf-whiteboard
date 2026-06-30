@@ -123,13 +123,16 @@ export function SettingsPane({ open: isOpen, onClose, settings, onChange, backup
 
   const [dbDefaults, setDbDefaults] = useState({});
   const [schemaArray, setSchemaArray] = useState([]);
+  const [originalDbDefaults, setOriginalDbDefaults] = useState({});
+  const [originalSchemaArray, setOriginalSchemaArray] = useState([]);
+  const [errors, setErrors] = useState({});
   const [workspaces, setWorkspaces] = useState([]);
 
   useEffect(() => {
      async function loadDefaults() {
          try {
              const { stateSchemaRegistry } = await import('../../atma/storage/state_schema_registry');
-             const schemas = Object.values(stateSchemaRegistry).filter(s => s.classification !== 'volatile');
+             const schemas = Object.values(stateSchemaRegistry).filter(s => s.classification !== 'volatile' && s.userModifyable === true);
              
              const { queryAPI } = await import('../../atma/singletons');
              const rows = await queryAPI.getAllStateDefaults();
@@ -154,6 +157,9 @@ export function SettingsPane({ open: isOpen, onClose, settings, onChange, backup
 
              setSchemaArray(enrichedSchemas);
              setDbDefaults(defaultsMap);
+             setOriginalSchemaArray(JSON.parse(JSON.stringify(enrichedSchemas)));
+             setOriginalDbDefaults(JSON.parse(JSON.stringify(defaultsMap)));
+             setErrors({});
          } catch (err) {
              console.error("Failed to load DB defaults:", err);
          }
@@ -163,54 +169,122 @@ export function SettingsPane({ open: isOpen, onClose, settings, onChange, backup
      }
   }, [isOpen]);
 
-  const handleUpdateDefault = async (key, scope, val) => {
-      if (uiController) {
-          await uiController.updateDefaultValue(key, scope, val);
-          
-          setDbDefaults(prev => {
-              const next = { ...prev };
-              if (!next[key]) next[key] = [];
-              const idx = next[key].findIndex(d => d.scope === scope);
-              if (idx >= 0) {
-                  next[key][idx] = { ...next[key][idx], value: val };
-              } else {
-                  next[key].push({ scope, value: val, hash: '' });
-              }
-              return next;
-          });
-      }
-  };
-
-  const handleDeleteDefault = async (key, scope) => {
-      try {
-          if (uiController) {
-              await uiController.deleteDefaultValue(key, scope);
+  const handleUpdateDefault = (key, scope, val) => {
+      setDbDefaults(prev => {
+          const next = { ...prev };
+          if (!next[key]) next[key] = [];
+          const idx = next[key].findIndex(d => d.scope === scope);
+          if (idx >= 0) {
+              next[key][idx] = { ...next[key][idx], value: val };
+          } else {
+              next[key].push({ scope, value: val, hash: '' });
           }
-          setDbDefaults(prev => {
-              const next = { ...prev };
-              if (next[key]) {
-                  next[key] = next[key].filter(d => d.scope !== scope);
-              }
-              return next;
-          });
-      } catch (err) {}
+          return next;
+      });
   };
 
-  const handleUpdateClassification = async (key, cls) => {
+  const handleDeleteDefault = (key, scope) => {
+      setDbDefaults(prev => {
+          const next = { ...prev };
+          if (next[key]) {
+              next[key] = next[key].filter(d => d.scope !== scope);
+          }
+          return next;
+      });
+  };
+
+  const handleUpdateClassification = (key, cls) => {
+      setSchemaArray(prev => prev.map(s => s.key === key ? { ...s, classification: cls } : s));
+  };
+
+  const handleValidationError = (key, scope, err) => {
+      setErrors(prev => {
+          const id = `${key}-${scope}`;
+          if (err) {
+              if (prev[id] === err) return prev;
+              const next = { ...prev };
+              next[id] = err;
+              return next;
+          } else {
+              if (!(id in prev)) return prev;
+              const next = { ...prev };
+              delete next[id];
+              return next;
+          }
+      });
+  };
+
+  const handleSave = async () => {
+      if (Object.keys(errors).length > 0) return;
+
       if (uiController) {
-          await uiController.updateClassification(key, cls);
-          setSchemaArray(prev => prev.map(s => s.key === key ? { ...s, classification: cls } : s));
+          try {
+              // 1. Commit classification overrides
+              for (const s of schemaArray) {
+                  const orig = originalSchemaArray.find(o => o.key === s.key);
+                  if (orig && orig.classification !== s.classification) {
+                      await uiController.updateClassification(s.key, s.classification);
+                  }
+              }
+
+              // 2. Commit default updates & deletions
+              const allKeys = new Set([...Object.keys(originalDbDefaults), ...Object.keys(dbDefaults)]);
+              for (const key of allKeys) {
+                  const origList = originalDbDefaults[key] || [];
+                  const currList = dbDefaults[key] || [];
+
+                  // Compare and update/insert
+                  for (const curr of currList) {
+                      const orig = origList.find(o => o.scope === curr.scope);
+
+                      let parsedValue = curr.value;
+                      if (typeof curr.value === 'string') {
+                          try {
+                              parsedValue = JSON.parse(curr.value);
+                          } catch (e) {
+                              parsedValue = curr.value;
+                          }
+                      }
+
+                      if (!orig || JSON.stringify(orig.value) !== JSON.stringify(parsedValue)) {
+                          await uiController.updateDefaultValue(key, curr.scope, parsedValue);
+                      }
+                  }
+
+                  // Delete removed scopes
+                  for (const orig of origList) {
+                      const curr = currList.find(c => c.scope === orig.scope);
+                      if (!curr) {
+                          await uiController.deleteDefaultValue(key, orig.scope);
+                      }
+                  }
+              }
+
+              showToast('Settings saved successfully', 'success');
+              onClose();
+          } catch (err) {
+              console.error("Failed to save settings:", err);
+              showToast('Failed to save settings', 'error');
+          }
       }
+  };
+
+  const handleCancel = () => {
+      // Revert states and close
+      setSchemaArray(JSON.parse(JSON.stringify(originalSchemaArray)));
+      setDbDefaults(JSON.parse(JSON.stringify(originalDbDefaults)));
+      setErrors({});
+      onClose();
   };
 
   return (
     <>
-      {isOpen && <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 90, backdropFilter: 'blur(4px)' }} />}
+      {isOpen && <div onClick={handleCancel} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 90, backdropFilter: 'blur(4px)' }} />}
       <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: '480px', background: '#252932', borderLeft: '1px solid #374151', zIndex: 100, transform: isOpen ? 'translateX(0)' : 'translateX(100%)', transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)', display: 'flex', flexDirection: 'column', fontFamily: "'IBM Plex Mono', monospace", boxShadow: '-10px 0 30px rgba(0,0,0,0.3)' }}>
 
         <div style={{ padding: '20px 24px', borderBottom: '1px solid #374151', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '13px', fontWeight: '600', color: '#f3f4f6', letterSpacing: '0.05em' }}>SETTINGS</span>
-          <ButtonFlat label="✕" onClick={onClose} />
+          <ButtonFlat label="✕" onClick={handleCancel} />
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -225,6 +299,8 @@ export function SettingsPane({ open: isOpen, onClose, settings, onChange, backup
                       onUpdateDefault={handleUpdateDefault}
                       onUpdateClassification={handleUpdateClassification}
                       onDeleteDefault={handleDeleteDefault}
+                      onValidationError={handleValidationError}
+                      libraryPath={settings?.libraryPath}
                   />
               ))}
           </div>
@@ -273,7 +349,18 @@ export function SettingsPane({ open: isOpen, onClose, settings, onChange, backup
             <ButtonFlat label="View Mechanics & Shortcuts" icon="📖" onClick={openHelp} />
           </div>
         </div>
-        <div style={{ padding: '16px 24px', borderTop: '1px solid #374151' }}><span style={{ fontSize: '10px', color: '#6b7280' }}>LemmaMap · local build</span></div>
+
+        <div style={{ padding: '16px 24px', borderTop: '1px solid #374151', display: 'flex', flexDirection: 'column', gap: '12px', background: '#1c1f26' }}>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+            <ButtonFlat label="Cancel" onClick={handleCancel} />
+            <ButtonFlat 
+              label="Save" 
+              disabled={Object.keys(errors).length > 0} 
+              onClick={handleSave} 
+            />
+          </div>
+          <span style={{ fontSize: '10px', color: '#6b7280', textAlign: 'center' }}>LemmaMap · local build</span>
+        </div>
       </div>
       <HelpModal open={helpOpen} onClose={closeHelp} />
     </>

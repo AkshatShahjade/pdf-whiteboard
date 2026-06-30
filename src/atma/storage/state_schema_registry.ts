@@ -7,6 +7,11 @@ export interface StateVariableSchema {
     classification: 'volatile' | 'defaulted' | 'personalizable';
     cascade_path: CascadePath;
     seed_default_value: any;
+    userModifyable: boolean;
+    inputType?: 'text' | 'dropdown' | 'filepath'| 'number' | 'email' | 'tel' | 'name';
+    dropdownOptions?: { label: string; value: string }[];
+    rules?: any;
+    returnJSON?: boolean;
 }
 
 // We will import the partial schemas here.
