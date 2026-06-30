@@ -1,15 +1,18 @@
-import React, { useEffect, useState } from 'react'
-import { ScreenToolRendererType } from "../../../../renderer_registry/screen_level/tool_renderer_registry"
-import { linkToolDomain } from "../../../../atma/registry_implementations/screen_level/tools/link_tool_domain"
-import { UIState } from '../../../../ui/ui_state_store'
-import { UIController } from '../../../../ui/ui_controller'
+import React from 'react';
+import { ScreenToolRendererType } from "../../../../renderer_registry/screen_level/tool_renderer_registry";
+import { linkToolDomain } from "../../../../atma/registry_implementations/screen_level/tools/link_tool_domain";
+import { UIState, UIStateStore } from '../../../../ui/ui_state_store';
+import { UIController } from '../../../../ui/ui_controller';
+import { ButtonFlat } from '../../../../roopa/primitives/ButtonFlat';
+import { ButtonSquare } from '../../../../roopa/primitives/ButtonSquare';
 
 export interface DrawerProps {
     uiState: UIState;
     uiController: UIController;
+    uiStore?: UIStateStore;
 }
 
-function LinkToolDrawer({ uiState, uiController }: DrawerProps) {
+function LinkToolDrawer({ uiState, uiController, uiStore }: DrawerProps) {
     const linkMode = uiState.linkMode;
     const { isActive, activeTarget, direction, sourceMarkId, destinationMarkId } = linkMode;
 
@@ -22,7 +25,7 @@ function LinkToolDrawer({ uiState, uiController }: DrawerProps) {
             sourceMarkId: null,
             destinationMarkId: null
         });
-        uiController.restoreSlots();
+        uiController.exitMarkSelectionMode();
     };
 
     const handleConfirm = async () => {
@@ -46,7 +49,6 @@ function LinkToolDrawer({ uiState, uiController }: DrawerProps) {
             await LinkRepository.insertLinks(links);
             uiController.showToast?.('Link created successfully!', 'success');
             
-            // Close the tool and mark selector
             uiController.setLinkMode({
                 isActive: false,
                 activeTarget: null,
@@ -54,10 +56,7 @@ function LinkToolDrawer({ uiState, uiController }: DrawerProps) {
                 destinationMarkId: null
             });
             
-            // Only close mark_selector slot if it exists. We might not want to restore everything,
-            // actually we do want to restore slots! 
-            uiController.restoreSlots();
-            
+            uiController.exitMarkSelectionMode();
         } catch (err: any) {
             console.error(err);
             uiController.showToast?.(err.message || 'Failed to create link.', 'error');
@@ -66,9 +65,20 @@ function LinkToolDrawer({ uiState, uiController }: DrawerProps) {
 
     const renderBox = (target: 'source' | 'destination', markId: string | null) => {
         const isTargetActive = activeTarget === target;
+        const colorBorder = isTargetActive ? '#60A5FA' : (markId ? '#10B981' : '#F87171');
+        const colorBg = isTargetActive ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)';
+        
         return (
             <div
-                onClick={() => uiController.setLinkMode({ activeTarget: isTargetActive ? null : target })}
+                onClick={() => {
+                    const newTarget = isTargetActive ? null : target;
+                    uiController.setLinkMode({ activeTarget: newTarget });
+                    if (newTarget) {
+                        uiController.enterMarkSelectionMode(target === 'source' ? sourceMarkId || undefined : destinationMarkId || undefined);
+                    } else {
+                        uiController.exitMarkSelectionMode();
+                    }
+                }}
                 style={{
                     display: 'flex',
                     flexDirection: 'column',
@@ -76,19 +86,19 @@ function LinkToolDrawer({ uiState, uiController }: DrawerProps) {
                     justifyContent: 'center',
                     padding: '8px 16px',
                     borderRadius: '8px',
-                    border: `1.5px dashed ${isTargetActive ? '#3B82F6' : '#4b5563'}`,
-                    background: isTargetActive ? 'rgba(59, 130, 246, 0.1)' : 'rgba(255, 255, 255, 0.03)',
+                    border: `1.5px ${markId ? 'solid' : 'dashed'} ${colorBorder}`,
+                    background: colorBg,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                     width: '120px',
                     height: '60px'
                 }}
             >
-                <div style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <div style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     {target}
                 </div>
-                <div style={{ fontSize: '12px', color: markId ? '#10B981' : '#d1d5db', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>
-                    {markId ? 'Selected' : 'Click a mark'}
+                <div style={{ fontSize: '13px', fontWeight: '500', color: markId ? '#10B981' : '#F87171', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>
+                    {markId ? 'Selected' : 'None'}
                 </div>
             </div>
         );
@@ -103,12 +113,12 @@ function LinkToolDrawer({ uiState, uiController }: DrawerProps) {
             display: 'flex',
             alignItems: 'center',
             gap: '16px',
-            background: 'rgba(38, 42, 51, 0.9)',
+            background: 'rgba(28, 31, 38, 0.95)',
             backdropFilter: 'blur(12px)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
             borderRadius: '12px',
             padding: '16px 24px',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+            boxShadow: '0 12px 48px rgba(0,0,0,0.6)',
             zIndex: 10002,
             pointerEvents: 'auto'
         }}>
@@ -124,14 +134,15 @@ function LinkToolDrawer({ uiState, uiController }: DrawerProps) {
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid #4b5563',
                     borderRadius: '50%',
-                    width: '32px',
-                    height: '32px',
+                    width: '36px',
+                    height: '36px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: '#93C5FD',
                     cursor: 'pointer',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.2s',
+                    fontSize: '16px'
                 }}
                 onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; }}
@@ -144,58 +155,43 @@ function LinkToolDrawer({ uiState, uiController }: DrawerProps) {
             <div style={{ width: '1px', height: '40px', background: 'rgba(255, 255, 255, 0.1)', margin: '0 8px' }} />
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <button
-                    onClick={handleConfirm}
+                <ButtonFlat 
+                    label="Confirm" 
+                    onClick={handleConfirm} 
                     disabled={!sourceMarkId || !destinationMarkId}
-                    style={{
-                        background: sourceMarkId && destinationMarkId ? '#3B82F6' : 'rgba(59, 130, 246, 0.3)',
-                        border: 'none',
-                        borderRadius: '6px',
-                        color: '#fff',
-                        padding: '6px 16px',
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                        cursor: sourceMarkId && destinationMarkId ? 'pointer' : 'not-allowed',
-                        transition: 'all 0.2s'
-                    }}
-                >
-                    Confirm
-                </button>
-                <button
+                    active={!!(sourceMarkId && destinationMarkId)}
+                />
+                
+                <ButtonFlat 
+                    label="Browse" 
                     onClick={() => {
-                        const activeSlotId = uiState?.activeSlot || 'left';
-                        const inactiveSlotId = Object.keys(uiState?.slots || {}).find(id => id !== activeSlotId) || 'right';
-                        uiController?.onContentChange(inactiveSlotId, 'mark_selector', 'mark_selector');
-                    }}
-                    style={{
-                        background: 'rgba(59, 130, 246, 0.1)',
-                        border: '1px solid #3B82F6',
-                        borderRadius: '6px',
-                        color: '#93C5FD',
-                        padding: '4px 16px',
-                        fontSize: '11px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'; }}
-                >
-                    Browse
-                </button>
+                        uiController.setMarkSelectorOpen(true);
+                    }} 
+                />
+                
                 <button
                     onClick={handleCancel}
                     style={{
                         background: 'transparent',
-                        border: '1px solid #F87171',
+                        border: '1px solid rgba(248, 113, 113, 0.3)',
                         borderRadius: '6px',
                         color: '#F87171',
                         padding: '4px 16px',
-                        fontSize: '11px',
+                        fontSize: '12px',
                         cursor: 'pointer',
-                        transition: 'all 0.2s'
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(248, 113, 113, 0.1)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                    onMouseEnter={e => { 
+                        e.currentTarget.style.background = 'rgba(248, 113, 113, 0.1)'; 
+                        e.currentTarget.style.border = '1px solid rgba(248, 113, 113, 0.8)';
+                    }}
+                    onMouseLeave={e => { 
+                        e.currentTarget.style.background = 'transparent'; 
+                        e.currentTarget.style.border = '1px solid rgba(248, 113, 113, 0.3)';
+                    }}
                 >
                     Cancel
                 </button>
@@ -210,13 +206,13 @@ export const linkToolRenderer: ScreenToolRendererType = {
     icon: '🔗',
     onActivate(ctx: { uiState: UIState, uiController: UIController }) {
         if (!ctx.uiState.linkMode.isActive) {
-            ctx.uiController.snapshotSlots();
             ctx.uiController.setLinkMode({
                 isActive: true,
                 activeTarget: 'source',
                 sourceMarkId: null,
                 destinationMarkId: null
             });
+            ctx.uiController.enterMarkSelectionMode(undefined);
         }
     },
     DrawerComponent: LinkToolDrawer

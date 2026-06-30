@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { ButtonFlat } from './ButtonFlat';
-import { Text } from './Text';
+import { ButtonFlat } from '../primitives/ButtonFlat';
+import { Text } from '../primitives/Text';
 
 export interface CenterScreenPanelProps {
     title: string;

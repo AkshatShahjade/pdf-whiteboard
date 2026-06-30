@@ -18,6 +18,7 @@ import { setupAllRegistries as setupAtmaRegistries } from "../../atma/capabiliti
 import { pdfContentRenderer } from "../registry_implementations/pdf/pdf_content_renderer";
 import { whiteboardContentRenderer } from "../registry_implementations/whiteboard/whiteboard_content_renderer";
 import { contentSelectorContentRenderer } from "../registry_implementations/content_selector/content_selector_content_renderer";
+import { markSelectorContentRenderer } from "../registry_implementations/mark_selector/mark_selector_content_renderer";
 import { setupSlotRegistry } from "../../roopa/renderer_registry/setup";
 import { linkToolRenderer } from "../registry_implementations/screen_level/tools/link_tool_renderer";
 import { openContentToolRenderer } from "../registry_implementations/screen_level/tools/open_content_tool_renderer";
@@ -80,6 +81,9 @@ export function setupContentRendererRegistry() {
     }
     if (!contentRendererRegistry.has(contentSelectorContentRenderer.id)) {
         registerContentRendererType(contentSelectorContentRenderer);
+    }
+    if (!contentRendererRegistry.has(markSelectorContentRenderer.id)) {
+        registerContentRendererType(markSelectorContentRenderer);
     }
 }
 

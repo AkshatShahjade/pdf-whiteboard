@@ -467,6 +467,40 @@ function PDFContentComponent({
     if (!slotState) return;
 
     if (uiState?.uiMode?.type === 'MARK_SELECTION') {
+      if (uiState?.linkMode?.isActive) {
+        const { activeTarget, sourceMarkId, destinationMarkId } = uiState.linkMode;
+        if (activeTarget === 'source') {
+          if (sourceMarkId === markId) {
+            uiController.setLinkMode({ sourceMarkId: null });
+            uiController.enterMarkSelectionMode(undefined);
+          } else {
+            uiController.setLinkMode({ sourceMarkId: markId });
+            // Auto advance only if both were empty
+            if (!sourceMarkId && !destinationMarkId) {
+              uiController.setLinkMode({ activeTarget: 'destination' });
+              uiController.enterMarkSelectionMode(undefined);
+            } else {
+              uiController.enterMarkSelectionMode(markId);
+            }
+          }
+        } else if (activeTarget === 'destination') {
+          if (destinationMarkId === markId) {
+            uiController.setLinkMode({ destinationMarkId: null });
+            uiController.enterMarkSelectionMode(undefined);
+          } else {
+            uiController.setLinkMode({ destinationMarkId: markId });
+            // Auto advance only if both were empty
+            if (!sourceMarkId && !destinationMarkId) {
+              uiController.setLinkMode({ activeTarget: 'source' });
+              uiController.enterMarkSelectionMode(undefined);
+            } else {
+              uiController.enterMarkSelectionMode(markId);
+            }
+          }
+        }
+        return;
+      }
+
       if (uiState?.uiMode?.selectedMarkId === markId) {
         uiController.enterMarkSelectionMode(undefined);
       } else {

@@ -11,7 +11,7 @@ In every shape / markable object producing tool like rec
 
 \
 
-why is it that when I create a mark in a whiteboard on the right slot it opens in the elft slot, but then If I create a mark in the elft slot no whiteboard opens.
+why is it that when I create a mark in a whiteboard on the right slot it opens in the elft slot, but then If I create a mark in the left slot no whiteboard opens.
 Also, ther is no indication that a tldraw shape has been marked in the ui. There should be a linked symbol next to the shape.
 research the reasons for why this is happening and propse fixes.
 It should be that on right clicking a shape in the whiteboard, a new option in the options pane is added 'Open Link' opens the linked mark, or on clicking the link symbol next to the shape it also opens the linked mark.

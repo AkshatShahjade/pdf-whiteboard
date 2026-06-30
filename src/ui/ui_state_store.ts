@@ -21,10 +21,22 @@ export interface SlotUIState extends SlotAppState {
     sectionTarget: 'start' | 'end';
 }
 
+export interface LinkModeState {
+    isActive: boolean;
+    activeTarget: 'source' | 'destination' | null;
+    direction: '1-way' | '1-way-reverse' | '2-way';
+    sourceMarkId: string | null;
+    destinationMarkId: string | null;
+}
+
 export type UIState = Omit<AppState, 'slots'> & {
     activeSlot: string; // slotId of active slot
     toast: ToastState | null;
     uiMode: import('../roopa/mode_system').RoopaMode;
+    linkMode: LinkModeState;
+    slotsSnapshot: Record<string, SlotUIState> | null;
+    isContentSelectorOpen: boolean;
+    isMarkSelectorOpen: boolean;
     slots: Record<string, SlotUIState>;
 }
 
@@ -45,6 +57,16 @@ export function createUIStateStore(initialState: Partial<UIState> = {}): UIState
         activeSlot: 'left', // default active slot
         toast: null,
         uiMode: { type: 'REGULAR' },
+        linkMode: {
+            isActive: false,
+            activeTarget: null,
+            direction: '2-way',
+            sourceMarkId: null,
+            destinationMarkId: null
+        },
+        slotsSnapshot: null,
+        isContentSelectorOpen: false,
+        isMarkSelectorOpen: false,
         slots: {},
         // These are required by AppState but usually provided by initialState:
         workspace_layout: null,

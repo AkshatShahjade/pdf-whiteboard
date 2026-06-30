@@ -11,6 +11,7 @@ import { contentDomainRegistry, registerContentDomainType } from "./content_doma
 import { pdfContentDomain } from "../registry_implementations/pdf/pdf_domain_content";
 import { whiteboardContentDomain } from "../registry_implementations/whiteboard/whiteboard_domain_content";
 import { contentSelectorDomainContent } from "../registry_implementations/content_selector/content_selector_domain_content";
+import { markSelectorDomainContent } from "../registry_implementations/mark_selector/mark_selector_domain_content";
 import { linkToolDomain } from "../registry_implementations/screen_level/tools/link_tool_domain";
 import { openContentToolDomain } from "../registry_implementations/screen_level/tools/open_content_tool_domain";
 import { toolDomainRegistry, registerToolDomainType } from "./screen_level/tool_domain_registry";
@@ -43,6 +44,9 @@ export function setupContentDomainRegistry() {
     }
     if (!contentDomainRegistry.has(contentSelectorDomainContent.id)) {
         registerContentDomainType(contentSelectorDomainContent);
+    }
+    if (!contentDomainRegistry.has(markSelectorDomainContent.id)) {
+        registerContentDomainType(markSelectorDomainContent);
     }
 }
 

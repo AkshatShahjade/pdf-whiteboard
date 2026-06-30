@@ -11,6 +11,9 @@ import Screen from '../roopa/Screen';
 import { WorkspaceHeader } from '../roopa/elements/WorkspaceHeader';
 import { ScreenToolbar } from '../roopa/elements/ScreenToolbar';
 import { TriggerZone } from '../roopa/screen_edge_primitives/TriggerZone';
+import { screenToolRendererRegistry } from './renderer_registry/screen_level/tool_renderer_registry';
+import { ContentSelector } from '../roopa/elements/ContentSelector';
+import { MarkSelector } from '../roopa/elements/MarkSelector';
 
 setupAllRegistries(); //TODO, find proper place
 
@@ -152,6 +155,25 @@ function WorkspaceContainer({ contentId, contentType, contentName, settings, onH
         workspaceId={settings?.activeWorkspaceId}
       />
       
+      {/* Screen Tool Drawers */}
+      {(() => {
+        const tools = Array.from(screenToolRendererRegistry.values());
+        const activeTool = tools.find(t => t.DrawerComponent && uiState.linkMode?.isActive && t.id.id === 'link'); // Currently specifically checking link tool
+        if (activeTool && activeTool.DrawerComponent) {
+          const DrawerComp = activeTool.DrawerComponent;
+          return <DrawerComp uiState={uiState} uiController={uiController} />;
+        }
+        return null;
+      })()}
+
+      {/* Content and Mark Selectors */}
+      {uiState.isContentSelectorOpen && (
+        <ContentSelector uiState={uiState} uiController={uiController} />
+      )}
+      {uiState.isMarkSelectorOpen && (
+        <MarkSelector uiState={uiState} uiController={uiController} />
+      )}
+
       <TriggerZone
         position="bottom"
         style={{ left: '50%', transform: 'translateX(-50%)' }}

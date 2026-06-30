@@ -26,6 +26,11 @@ export interface UIController {
     closeSlot: (slotId: string) => void;
     enterMarkSelectionMode: (selectedMarkId?: string) => void;
     exitMarkSelectionMode: () => void;
+    setLinkMode: (patch: Partial<import('./ui_state_store').LinkModeState>) => void;
+    snapshotSlots: () => void;
+    restoreSlots: () => void;
+    setContentSelectorOpen: (open: boolean) => void;
+    setMarkSelectorOpen: (open: boolean) => void;
     connect: () => () => void;
 
     // ─── Domain / Data Commands Delegations (Refactored from InputAPI) ────────
@@ -227,6 +232,16 @@ export function createUIController(store: UIStateStore, onHomeCallback?: () => v
         exitMarkSelectionMode: () => {
             store.setState({ uiMode: { type: 'REGULAR' } });
         },
+        setLinkMode: (patch) => {
+            const state = store.getState();
+            store.setState({ linkMode: { ...state.linkMode, ...patch } });
+        },
+        setContentSelectorOpen: (open) => {
+            store.setState({ isContentSelectorOpen: open });
+        },
+        setMarkSelectorOpen: (open) => {
+            store.setState({ isMarkSelectorOpen: open });
+        },
 
         // ─── Domain Commands Delegations ──────────────────────────────────────────
         onContentChange: async (slotId, contentId, contentType) => {
@@ -315,7 +330,12 @@ export function createUIController(store: UIStateStore, onHomeCallback?: () => v
                     if (patch.slots) {
                         const newSlots = { ...currentState.slots };
                         for (const [slotId, slotPatch] of Object.entries(patch.slots)) {
-                           newSlots[slotId] = { ...(newSlots[slotId] || {}), ...(slotPatch as any) };
+                            const existingSlot = newSlots[slotId] || {};
+                            const patchMarks = (slotPatch as any).marks;
+                            const mergedMarks = patchMarks 
+                                ? (Array.isArray(patchMarks) ? new Map(patchMarks) : patchMarks) 
+                                : existingSlot.marks;
+                            newSlots[slotId] = { ...existingSlot, ...(slotPatch as any), marks: mergedMarks };
                         }
                         store.setState({ ...patch, slots: newSlots });
                     } else {

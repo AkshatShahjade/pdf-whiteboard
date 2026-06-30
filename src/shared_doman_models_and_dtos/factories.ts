@@ -7,6 +7,13 @@ export function generateMarkId(): string {
   return `mark_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
 }
 
+/**
+ * Generates a generic UUID.
+ */
+export function generateUUID(): string {
+  return crypto.randomUUID();
+}
+
 import { getMarkDomainType as getPdfMarkDomainType } from '../atma/capabilities_registry/pdf/mark_domain_registry.js';
 import { getMarkDomainType as getWhiteboardMarkDomainType } from '../atma/capabilities_registry/whiteboard/mark_domain_registry.js';
 
