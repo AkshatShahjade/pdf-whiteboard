@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { MarkRepository } from '../../atma/storage/repositories/MarkRepository';
-import { LastUIStateRepository } from '../../atma/storage/repositories/LastUIStateRepository';
-import { ButtonSquare } from '../primitives/ButtonSquare';
+import { ButtonSquare } from '../elements/ButtonSquare';
 
 // --- Capability Hook ---
-export function useRecentCardData(path: string) {
+export function useRecentCardData(path: string, uiController: any) {
   const [marksCount, setMarksCount] = useState(0);
   const [session, setSession] = useState<any>(null);
 
   useEffect(() => {
-    if (!path || path.startsWith('whiteboard:')) return;
-    MarkRepository.loadMarksByContentId(path).then(m => setMarksCount(m?.length || 0)).catch(() => {});
-    LastUIStateRepository.loadSessionState(path).then(s => setSession(s)).catch(() => {});
-  }, [path]);
+    if (!path || path.startsWith('whiteboard:') || !uiController) return;
+    uiController.getRecentCardData(path).then((data: any) => {
+        setMarksCount(data.marksCount);
+        setSession(data.session);
+    }).catch(() => {});
+  }, [path, uiController]);
 
   return { marksCount, session };
 }
@@ -22,11 +22,12 @@ interface RecentCardProps {
   entry: { path: string; name?: string; openedAt?: number };
   onOpen: (entry: any) => void;
   onRemove: (path: string) => void;
+  uiController?: any;
 }
 
-export function RecentCard({ entry, onOpen, onRemove }: RecentCardProps) {
+export function RecentCard({ entry, onOpen, onRemove, uiController }: RecentCardProps) {
   const [hovered, setHovered] = useState(false);
-  const { marksCount, session } = useRecentCardData(entry.path);
+  const { marksCount, session } = useRecentCardData(entry.path, uiController);
   const name = entry.name || entry.path.split('/').pop() || '';
 
   const timeAgo = (ts?: number) => {

@@ -10,7 +10,7 @@ import { setupAllRegistries } from './renderer_registry/setup';
 import Screen from '../roopa/Screen';
 import { WorkspaceHeader } from '../roopa/elements/WorkspaceHeader';
 import { ScreenToolbar } from '../roopa/elements/ScreenToolbar';
-import { TriggerZone } from '../roopa/layout/TriggerZone';
+import { TriggerZone } from '../roopa/screen_edge_primitives/TriggerZone';
 
 setupAllRegistries(); //TODO, find proper place
 

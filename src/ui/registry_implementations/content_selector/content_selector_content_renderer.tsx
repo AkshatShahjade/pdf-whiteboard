@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ContentRendererType, ContentRendererProps } from '../../renderer_registry/content_renderer_registry';
-import { RecentCard } from '../../../roopa/elements/RecentCard';
+import { RecentCard } from '../../../roopa/primitives/RecentCard';
 import { LibrarySearch } from '../../../roopa/elements/LibrarySearch';
 import { DropZone } from '../../../roopa/elements/DropZone';
 import { LibraryExplorer } from '../../../roopa/elements/LibraryExplorer';

@@ -2,7 +2,7 @@ import React from 'react';
 import { confirmDialog } from '../../atma/platform_adapter/switch';
 import { toRoman } from '../../ui/helper';
 import { ButtonFlat } from '../primitives/ButtonFlat';
-import { ButtonSquare } from '../primitives/ButtonSquare';
+import { ButtonSquare } from './ButtonSquare';
 import { TextInput } from '../primitives/TextInput';
 
 interface VerticalToolBarProps {

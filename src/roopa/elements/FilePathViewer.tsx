@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TextInput } from '../primitives/TextInput';
-import { ButtonSquare } from '../primitives/ButtonSquare';
+import { ButtonSquare } from './ButtonSquare';
 interface FilePathViewerProps {
   slotId: string;
   uiState: any;

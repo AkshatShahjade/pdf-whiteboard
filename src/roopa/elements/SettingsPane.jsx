@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { confirmDialog } from '../../atma/platform_adapter/switch.ts';
-import { SettingsCard } from './SettingsCard';
+import { SettingsCard } from '../primitives/SettingsCard';
 import { ButtonFlat } from '../primitives/ButtonFlat';
 
 function HelpModal({ open, onClose }) {

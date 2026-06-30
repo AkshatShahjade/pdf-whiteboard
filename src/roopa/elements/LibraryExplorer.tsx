@@ -4,7 +4,7 @@ import { joinPath, confirmDialog, dirname } from '../../atma/platform_adapter/sw
 import { WhiteboardRepository } from '../../atma/storage/repositories/WhiteboardRepository';
 import { ContentRepository } from '../../atma/storage/repositories/ContentRepository';
 import { ButtonFlat } from '../primitives/ButtonFlat';
-import { ButtonSquare } from '../primitives/ButtonSquare';
+import { ButtonSquare } from './ButtonSquare';
 import { TextInput } from '../primitives/TextInput';
 
 // --- Capability Hook ---

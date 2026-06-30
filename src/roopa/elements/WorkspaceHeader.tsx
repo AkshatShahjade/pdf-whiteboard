@@ -1,5 +1,5 @@
 import React from 'react';
-import { BackupSaveIndicator } from './BackupSaveIndicator';
+import { BackupSaveIndicator } from '../primitives/BackupSaveIndicator';
 import { ButtonFlat } from '../primitives/ButtonFlat';
 import { UIStateStore } from '../../ui/ui_state_store';
 

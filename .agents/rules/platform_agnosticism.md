@@ -1,0 +1,1 @@
+ensure platform adapter is still abstracting away tauri from the rest of the codebase.

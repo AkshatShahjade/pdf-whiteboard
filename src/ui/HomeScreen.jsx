@@ -3,11 +3,10 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { RecentCard } from '../roopa/elements/RecentCard';
+import { RecentCard } from '../roopa/primitives/RecentCard';
 import { DropZone } from '../roopa/elements/DropZone';
 import { LibraryExplorer } from '../roopa/elements/LibraryExplorer';
 import { SettingsPane } from '../roopa/elements/SettingsPane';
-import { LastUIStateRepository } from '../atma/storage/repositories/LastUIStateRepository.ts';
 import { MarkRepository } from '../atma/storage/repositories/MarkRepository';
 import { WhiteboardRepository } from '../atma/storage/repositories/WhiteboardRepository';
 import { ContentRepository } from '../atma/storage/repositories/ContentRepository';
@@ -449,7 +448,7 @@ export default function HomeScreen({ onOpen, uiController }) {
                   <button onClick={clearRecents} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: '10px', fontFamily: 'inherit' }}>clear all</button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {recents.map(entry => <RecentCard key={entry.path} entry={entry} onOpen={handleRecentOpen} onRemove={handleRemoveRecent} />)}
+                  {recents.map(entry => <RecentCard key={entry.path} entry={entry} onOpen={handleRecentOpen} onRemove={handleRemoveRecent} uiController={uiController} />)}
                 </div>
               </div>
             )}

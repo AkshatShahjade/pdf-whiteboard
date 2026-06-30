@@ -2,7 +2,7 @@ import React from 'react'
 import { UIState, UIStateStore } from '../../ui/ui_state_store'
 import { UIController } from '../../ui/ui_controller'
 import { screenToolRendererRegistry } from '../../ui/renderer_registry/screen_level/tool_renderer_registry'
-import { ButtonSquare } from '../primitives/ButtonSquare'
+import { ButtonSquare } from './ButtonSquare'
 
 export interface ScreenToolbarProps {
     uiState: UIState

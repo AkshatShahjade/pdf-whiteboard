@@ -11,7 +11,7 @@ import { WhiteboardRepository } from '../../../atma/storage/repositories/Whitebo
 import { ContentRepository } from '../../../atma/storage/repositories/ContentRepository';
 import { useShortcutToolState } from '../../window/useShortcutToolState';
 import { DEFAULT_SECTION_WIDTH, SECTION_BASE_WIDTH, SECTION_WIDTH_STEP } from '../../../shared_doman_models_and_dtos/mark_domain_model';
-import { PageIndicator } from '../../../roopa/elements/PageIndicator';
+import { PageIndicator } from '../../../roopa/primitives/PageIndicator';
 import { VerticalToolBar } from '../../../roopa/elements/VerticalToolBar';
 
 // Re-use mark color palette from WorkWindow
