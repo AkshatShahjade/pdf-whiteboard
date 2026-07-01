@@ -11,6 +11,12 @@ In every shape / markable object producing tool like rec
 
 \
 
+\ COMPLETING the Link Tool
+1) ensure library explorer uses cards and has a variant type that is passes to that card
+2) add selectContentForLink function to uiController
+3) inspect all the uiElements. Card type isn't being used by others more advanced stuff.
+\
+
 why is it that when I create a mark in a whiteboard on the right slot it opens in the elft slot, but then If I create a mark in the left slot no whiteboard opens.
 Also, ther is no indication that a tldraw shape has been marked in the ui. There should be a linked symbol next to the shape.
 research the reasons for why this is happening and propse fixes.
